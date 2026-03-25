@@ -1,4 +1,5 @@
-﻿'use client'
+$onboarding = @'
+'use client'
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -141,7 +142,7 @@ export default function OnboardingPage() {
                   i < stepIdx ? 'bg-[#00d4a0] text-[#0f1923]' :
                   i === stepIdx ? 'border-2 border-[#00d4a0] text-[#00d4a0]' :
                   'border-2 border-white/10 text-[#4d6478]'
-                }`}>{i < stepIdx ? 'âœ“' : i + 1}</div>
+                }`}>{i < stepIdx ? '✓' : i + 1}</div>
                 <span className={`text-sm ${i === stepIdx ? 'text-white font-medium' : 'text-[#4d6478]'}`}>{label}</span>
                 {i < 2 && <div className="flex-1 h-px bg-white/5"/>}
               </div>
@@ -172,7 +173,7 @@ export default function OnboardingPage() {
                 disabled={loading || !companyName.trim()}
                 className="w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-40 text-[#0f1923] font-semibold rounded-xl py-3.5 text-sm transition-colors"
               >
-                {loading ? 'Saving...' : 'Continue â†’'}
+                {loading ? 'Saving...' : 'Continue →'}
               </button>
             </div>
           </div>
@@ -219,13 +220,13 @@ export default function OnboardingPage() {
             {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3 mt-4">{error}</p>}
 
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setStep('company')} className="flex-1 bg-[#243040] hover:bg-[#2d3d52] text-[#8fa3b8] font-medium rounded-xl py-3 text-sm transition-colors">â† Back</button>
+              <button onClick={() => setStep('company')} className="flex-1 bg-[#243040] hover:bg-[#2d3d52] text-[#8fa3b8] font-medium rounded-xl py-3 text-sm transition-colors">← Back</button>
               <button
                 onClick={saveInstallers}
                 disabled={loading}
                 className="flex-[2] bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-40 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors"
               >
-                {loading ? 'Saving...' : 'Continue â†’'}
+                {loading ? 'Saving...' : 'Continue →'}
               </button>
             </div>
           </div>
@@ -271,13 +272,13 @@ export default function OnboardingPage() {
             {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3 mt-4">{error}</p>}
 
             <div className="flex gap-3 mt-6">
-              <button onClick={() => setStep('installers')} className="flex-1 bg-[#243040] hover:bg-[#2d3d52] text-[#8fa3b8] font-medium rounded-xl py-3 text-sm transition-colors">â† Back</button>
+              <button onClick={() => setStep('installers')} className="flex-1 bg-[#243040] hover:bg-[#2d3d52] text-[#8fa3b8] font-medium rounded-xl py-3 text-sm transition-colors">← Back</button>
               <button
                 onClick={saveJobs}
                 disabled={loading}
                 className="flex-[2] bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-40 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors"
               >
-                {loading ? 'Finishing setup...' : 'Go to dashboard â†’'}
+                {loading ? 'Finishing setup...' : 'Go to dashboard →'}
               </button>
             </div>
           </div>
@@ -297,7 +298,7 @@ export default function OnboardingPage() {
               onClick={() => window.location.href = '/admin'}
               className="w-full bg-[#00d4a0] hover:bg-[#00a87e] text-[#0f1923] font-semibold rounded-xl py-3.5 text-sm transition-colors"
             >
-              Open my dashboard â†’
+              Open my dashboard →
             </button>
           </div>
         )}
@@ -306,3 +307,6 @@ export default function OnboardingPage() {
     </div>
   )
 }
+'@
+Set-Content -Path "app\onboarding\page.tsx" -Value $onboarding -Encoding UTF8
+Write-Host "Done" -ForegroundColor Green
