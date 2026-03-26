@@ -63,6 +63,9 @@ function SetupForm() {
       body: JSON.stringify({ email, pin })
     })
     if (!res.ok) { const d = await res.json(); setError(d.error); setLoading(false); return }
+    // Sign out supabase session - installer uses PIN auth not supabase session
+    const supabase = createClient()
+    await supabase.auth.signOut()
     setStep('done')
     setLoading(false)
     setTimeout(() => router.push('/installer'), 2000)
