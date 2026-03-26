@@ -45,6 +45,18 @@ export async function POST(request: Request) {
     }
   }
 
+  // Check already signed in today
+  const today = new Date(); today.setHours(0,0,0,0)
+  const { data: existing } = await service.from('signins')
+    .select('id')
+    .eq('job_id', jobId)
+    .eq('user_id', installer.userId)
+    .gte('signed_in_at', today.toISOString())
+    .is('signed_out_at', null)
+    .single()
+  
+  if (existing) return NextResponse.json({ success: true, distanceMetres, withinRange, alreadySignedIn: true })
+
   const { error } = await service.from('signins').insert({
     job_id: jobId,
     user_id: installer.userId,
