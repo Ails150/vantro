@@ -1,5 +1,6 @@
 ﻿"use client"
 import PayrollTab from "@/components/admin/PayrollTab"
+import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -123,6 +124,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
 
   const tabs = [
     { id: "overview", label: "Overview" },
+    { id: "analytics", label: "Analytics" },
     { id: "approvals", label: "Approvals", badge: pendingQA.length },
     { id: "jobs", label: "Jobs" },
     { id: "team", label: "Team" },
@@ -246,6 +248,9 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           </div>
         )}
 
+        {activeTab === "analytics" && (
+          <AnalyticsTab companyId={userData.company_id} teamMembers={teamMembers} jobs={jobs} />
+        )}
         {activeTab === "approvals" && (
           <div className={card}>
             <div className={cardHeader}><span className="font-semibold">QA approval queue</span></div>
