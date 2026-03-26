@@ -10,7 +10,7 @@ interface Props {
 }
 
 export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries }: Props) {
-  const [activeTab, setActiveTab] = useState("overview")
+  const [activeTab, setActiveTab] = useState(() => { if (typeof window !== "undefined") { return new URLSearchParams(window.location.search).get("tab") || "overview" } return "overview" })
   const [showAddJob, setShowAddJob] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
   const [showAddTemplate, setShowAddTemplate] = useState(false)
@@ -44,7 +44,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     const { data: job, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null }).select().single()
     if (error) { setFormError(error.message); setSaving(false); return }
     setJobName(""); setJobAddress(""); setJobTemplateId(""); setShowAddJob(false); setSaving(false)
-    window.location.reload()
+    window.location.href = window.location.href
   }
 
   async function addMember() {
@@ -57,7 +57,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
       await fetch("/api/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: memberEmail.trim(), name: memberName.trim() }) })
     } catch(e) { console.error("Invite email failed", e) }
     setMemberName(""); setMemberEmail(""); setShowAddMember(false); setSaving(false)
-    window.location.reload()
+    window.location.href = window.location.href
   }
 
   async function toggleAssignment(jobId: string, userId: string) {
@@ -73,7 +73,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create_template", name: templateName.trim() }) })
     if (!res.ok) { const d = await res.json(); setFormError(d.error); setSaving(false); return }
     setTemplateName(""); setShowAddTemplate(false); setSaving(false)
-    window.location.reload()
+    window.location.href = window.location.href
   }
 
   async function addItem(templateId: string) {
@@ -82,18 +82,18 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_item", templateId, label: itemLabel.trim(), item_type: itemType, is_mandatory: itemMandatory, requires_photo: itemPhoto, requires_video: itemVideo, fail_note_required: itemFailNote }) })
     if (!res.ok) { const d = await res.json(); setFormError(d.error); setSaving(false); return }
     setItemLabel(""); setItemType("tick"); setItemMandatory(false); setItemPhoto(false); setItemVideo(false); setItemFailNote(false); setShowAddItem(null); setSaving(false)
-    window.location.reload()
+    window.location.href = window.location.href
   }
 
   async function deleteItem(itemId: string) {
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_item", itemId }) })
-    window.location.reload()
+    window.location.href = window.location.href
   }
 
   async function deleteTemplate(templateId: string) {
     if (!window.confirm("Delete this template and all its items?")) return
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_template", templateId }) })
-    window.location.reload()
+    window.location.href = window.location.href
   }
 
   const installers = teamMembers.filter((m: any) => m.role === "installer")
@@ -512,3 +512,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
+
+
