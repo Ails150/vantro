@@ -507,15 +507,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
 
         {activeTab === "payroll" && (
           <PayrollTab teamMembers={teamMembers} />
-        )}h</div><div className={"text-sm " + sub}>today</div></div>
-                  </div>
-                )
-              })}
-            </div>
-            <p className={"text-sm " + sub + " px-1"}>Full weekly payroll coming in next build.</p>
-          </div>
         )}
-
         {activeTab === "alerts" && (
           <div className={card}>
             <div className={cardHeader}><span className="font-semibold">SiteLog alerts</span></div>
