@@ -4,14 +4,11 @@ import AdminDashboard from '@/components/admin/AdminDashboard'
 
 export default async function AdminPage() {
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  
+  const { data: { user } } = await supabase.auth.getUser()
+
   if (!user) {
-    console.log('No user found, redirecting to login')
     redirect('/login')
   }
-
-  console.log('User ID:', user.id)
 
   const { data: userData, error: userError } = await supabase
     .from('users')
@@ -20,12 +17,15 @@ export default async function AdminPage() {
     .eq('role', 'admin')
     .single()
 
-  console.log('userData:', JSON.stringify(userData))
-  console.log('userError:', JSON.stringify(userError))
-
   if (userError || !userData || !userData.company_id) {
-    console.log('No userData found, redirecting to onboarding')
-    redirect('/onboarding')
+    return (
+      <div style={{color:'white',background:'#0f1923',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'16px',fontFamily:'sans-serif'}}>
+        <h1>Debug Info</h1>
+        <p>User ID: {user.id}</p>
+        <p>User Error: {JSON.stringify(userError)}</p>
+        <p>User Data: {JSON.stringify(userData)}</p>
+      </div>
+    )
   }
 
   const companyId = userData.company_id
