@@ -51,7 +51,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
     if (!key) return
     function init() {
-      if (!window.google) return
+      if (!(window as any).google) return
       if (addAddressRef.current) {
         const ac = new (window as any).google.maps.places.Autocomplete(addAddressRef.current, { types: ["address"] })
         ac.addListener("place_changed", () => {
@@ -615,5 +615,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
 
 
