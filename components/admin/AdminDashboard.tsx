@@ -20,6 +20,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [showAddTemplate, setShowAddTemplate] = useState(false)
   const [showAddItem, setShowAddItem] = useState(null)
   const [assigningJobId, setAssigningJobId] = useState(null)
+  const [jobFilter, setJobFilter] = useState("active")
   const [editingJobId, setEditingJobId] = useState(null)
   const [editJobName, setEditJobName] = useState("")
   const [editJobAddress, setEditJobAddress] = useState("")
@@ -371,9 +372,17 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
               </div>
             )}
             <div className={card}>
-              <div className={cardHeader}><span className="font-semibold">All jobs</span></div>
-              {jobs.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No jobs yet</div>
-              : jobs.map((j: any) => {
+              <div className="px-6 pt-5 pb-3 flex gap-2 flex-wrap border-b border-gray-100">
+                {["all","active","on_hold","completed","cancelled"].map((f: any) => (
+                  <button key={f} onClick={() => setJobFilter(f)}
+                    className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors " + (jobFilter === f ? "bg-teal-400 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>
+                    {f === "all" ? "All" : f === "on_hold" ? "On hold" : f.charAt(0).toUpperCase() + f.slice(1)}
+                    <span className="ml-1 opacity-70">{f === "all" ? jobs.length : jobs.filter((j: any) => j.status === f).length}</span>
+                  </button>
+                ))}
+              </div>
+              {jobs.filter((j: any) => jobFilter === "all" || j.status === jobFilter).length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No jobs</div>
+              : jobs.filter((j: any) => jobFilter === "all" || j.status === jobFilter).map((j: any) => {
                 const assigned = getAssigned(j.id)
                 const isAssigning = assigningJobId === j.id
                 const template = checklistTemplates.find((t) => t.id === j.checklist_template_id)
