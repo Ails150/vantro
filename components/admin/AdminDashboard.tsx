@@ -1,4 +1,5 @@
 ﻿"use client"
+import PayrollTab from "@/components/admin/PayrollTab"
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -505,21 +506,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         )}
 
         {activeTab === "payroll" && (
-          <div className="space-y-5">
-            <div className={card}>
-              <div className={cardHeader}><span className="font-semibold">Hours this week - by installer</span></div>
-              {installers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No installers yet</div>
-              : installers.map((m: any) => {
-                const ms = signins.filter((s: any) => s.user_id === m.id)
-                const hrs = ms.reduce((acc: number, s: any) => {
-                  if (s.signed_in_at && s.signed_out_at) return acc + (new Date(s.signed_out_at).getTime() - new Date(s.signed_in_at).getTime()) / 3600000
-                  return acc
-                }, 0)
-                return (
-                  <div key={m.id} className="flex items-center gap-4 px-6 py-5 border-b border-gray-50 last:border-0">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold flex-shrink-0">{m.initials}</div>
-                    <div className="flex-1"><div className="font-semibold">{m.name}</div><div className={"text-sm " + sub}>{m.email}</div></div>
-                    <div className="text-right"><div className="text-2xl font-bold text-teal-500">{hrs.toFixed(1)}h</div><div className={"text-sm " + sub}>today</div></div>
+          <PayrollTab teamMembers={teamMembers} />
+        )}h</div><div className={"text-sm " + sub}>today</div></div>
                   </div>
                 )
               })}
