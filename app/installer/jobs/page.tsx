@@ -73,7 +73,6 @@ export default function InstallerJobsPage() {
         if (!res.ok) {
           setGpsStatus('blocked')
           setGpsMessage(data.error || 'Cannot sign in')
-          setActiveJob(null)
           return
         }
         if (res.ok) {
