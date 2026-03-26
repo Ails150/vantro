@@ -102,7 +102,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   }
 
   const installers = teamMembers.filter((m) => m.role === "installer")
-  const getAssigned = (jobId) => {
+  const getAssigned = (jobId: string) => {
     const ids = jobAssignments.filter((a) => a.job_id === jobId).map((a) => a.user_id)
     return teamMembers.filter((m) => ids.includes(m.id))
   }
@@ -513,4 +513,5 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
 
