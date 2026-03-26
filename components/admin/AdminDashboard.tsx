@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -35,7 +35,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const router = useRouter()
   const supabase = createClient()
 
-  function switchTab(tab) {
+  function switchTab(tab: string) {
     setActiveTab(tab)
     try { localStorage.setItem("vantro_tab", tab) } catch {}
   }
