@@ -7,56 +7,25 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Check if user has completed onboarding
   const { data: userData } = await supabase
     .from('users')
-    .select('*, companies(*)')
+    .select('id, company_id, name, role')
     .eq('auth_user_id', user.id)
+    .eq('role', 'admin')
     .single()
 
-  // No company set up yet â€” go to onboarding
   if (!userData || !userData.company_id) {
     redirect('/onboarding')
   }
 
   const companyId = userData.company_id
 
-  const { data: jobs } = await supabase
-    .from('jobs')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false })
-
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-
-  const { data: signins } = await supabase
-    .from('signins')
-    .select('*, users(name, initials)')
-    .eq('company_id', companyId)
-    .gte('signed_in_at', today.toISOString())
-    .is('signed_out_at', null)
-
-  const { data: alerts } = await supabase
-    .from('alerts')
-    .select('*, jobs(name)')
-    .eq('company_id', companyId)
-    .eq('is_read', false)
-    .order('created_at', { ascending: false })
-    .limit(10)
-
-  const { data: pendingQA } = await supabase
-    .from('qa_submissions')
-    .select('*, jobs(name), users(name, initials), checklist_items(label)')
-    .eq('company_id', companyId)
-    .eq('state', 'submitted')
-    .order('submitted_at', { ascending: false })
-
-  const { data: teamMembers } = await supabase
-    .from('users')
-    .select('*')
-    .eq('company_id', companyId)
-    .eq('is_active', true)
+  const { data: jobs } = await supabase.from('jobs').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
+  const today = new Date(); today.setHours(0,0,0,0)
+  const { data: signins } = await supabase.from('signins').select('*, users(name, initials)').eq('company_id', companyId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null)
+  const { data: alerts } = await supabase.from('alerts').select('*, jobs(name)').eq('company_id', companyId).eq('is_read', false).order('created_at', { ascending: false }).limit(10)
+  const { data: pendingQA } = await supabase.from('qa_submissions').select('*, jobs(name), users(name, initials)').eq('company_id', companyId).eq('state', 'submitted').order('submitted_at', { ascending: false })
+  const { data: teamMembers } = await supabase.from('users').select('*').eq('company_id', companyId)
 
   return (
     <AdminDashboard
