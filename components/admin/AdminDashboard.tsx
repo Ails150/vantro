@@ -1,7 +1,7 @@
 ﻿"use client"
 import PayrollTab from "@/components/admin/PayrollTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -27,6 +27,12 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [jobName, setJobName] = useState("")
   const [jobAddress, setJobAddress] = useState("")
   const [jobTemplateId, setJobTemplateId] = useState("")
+  const [jobLat, setJobLat] = useState(null)
+  const [jobLng, setJobLng] = useState(null)
+  const [editJobLat, setEditJobLat] = useState(null)
+  const [editJobLng, setEditJobLng] = useState(null)
+  const addAddressRef = useRef(null)
+  const editAddressRef = useRef(null)
   const [memberName, setMemberName] = useState("")
   const [memberEmail, setMemberEmail] = useState("")
   const [templateName, setTemplateName] = useState("")
@@ -41,6 +47,39 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const router = useRouter()
   const supabase = createClient()
 
+  useEffect(() => {
+    const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
+    if (!key) return
+    function init() {
+      if (!window.google) return
+      if (addAddressRef.current) {
+        const ac = new (window as any).google.maps.places.Autocomplete(addAddressRef.current, { types: ["address"] })
+        ac.addListener("place_changed", () => {
+          const place = ac.getPlace()
+          if (place.formatted_address) setJobAddress(place.formatted_address)
+          if (place.geometry?.location) { setJobLat(place.geometry.location.lat()); setJobLng(place.geometry.location.lng()) }
+        })
+      }
+      if (editAddressRef.current) {
+        const ac2 = new (window as any).google.maps.places.Autocomplete(editAddressRef.current, { types: ["address"] })
+        ac2.addListener("place_changed", () => {
+          const place = ac2.getPlace()
+          if (place.formatted_address) setEditJobAddress(place.formatted_address)
+          if (place.geometry?.location) { setEditJobLat(place.geometry.location.lat()); setEditJobLng(place.geometry.location.lng()) }
+        })
+      }
+    }
+    if ((window as any).google) { init(); return }
+    if (!document.getElementById("gmaps")) {
+      const s = document.createElement("script")
+      s.id = "gmaps"
+      s.src = "https://maps.googleapis.com/maps/api/js?key=" + key + "&libraries=places"
+      s.async = true
+      s.onload = init
+      document.head.appendChild(s)
+    }
+  }, [showAddJob, editingJobId])
+
   function switchTab(tab: string) {
     setActiveTab(tab)
     try { localStorage.setItem("vantro_tab", tab) } catch {}
@@ -54,7 +93,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   async function addJob() {
     if (!jobName.trim() || !jobAddress.trim()) { setFormError("Enter job name and address"); return }
     setSaving(true); setFormError("")
-    const { error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null })
+    const { error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng })
     if (error) { setFormError(error.message); setSaving(false); return }
     setJobName(""); setJobAddress(""); setJobTemplateId(""); setShowAddJob(false); setSaving(false)
     router.refresh()
@@ -63,7 +102,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   async function updateJob(jobId: string) {
     if (!editJobName.trim() || !editJobAddress.trim()) { setFormError("Enter job name and address"); return }
     setSaving(true); setFormError("")
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng }).eq("id", jobId)
     if (error) { setFormError(error.message); setSaving(false); return }
     setEditingJobId(null); setSaving(false)
     router.refresh()
@@ -309,7 +348,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
               <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
                 <h3 className="font-semibold">New job</h3>
                 <input value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={inp}/>
-                <input value={jobAddress} onChange={e => setJobAddress(e.target.value)} placeholder="Site address" className={inp}/>
+                <input ref={addAddressRef} value={jobAddress} onChange={e => setJobAddress(e.target.value)} placeholder="Start typing site address..." className={inp}/>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template (optional)</label>
                   <select value={jobTemplateId} onChange={e => setJobTemplateId(e.target.value)} className={inp}>
@@ -357,7 +396,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
                           <h4 className="text-sm font-semibold">Edit job</h4>
                           <input value={editJobName} onChange={e => setEditJobName(e.target.value)} placeholder="Job name" className={inp}/>
-                          <input value={editJobAddress} onChange={e => setEditJobAddress(e.target.value)} placeholder="Site address" className={inp}/>
+                          <input ref={editAddressRef} value={editJobAddress} onChange={e => setEditJobAddress(e.target.value)} placeholder="Start typing site address..." className={inp}/>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template</label>
                             <select value={editJobTemplateId} onChange={e => setEditJobTemplateId(e.target.value)} className={inp}>
