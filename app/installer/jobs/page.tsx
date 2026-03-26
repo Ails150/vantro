@@ -34,7 +34,10 @@ export default function InstallerJobsPage() {
     })
     if (!res.ok) { router.push('/installer'); return }
     const data = await res.json()
-    setJobs(data.jobs || [])
+    const jobs = data.jobs || []
+    setJobs(jobs)
+    const alreadySignedIn = jobs.find((j: any) => j.signed_in)
+    if (alreadySignedIn) { setActiveJob(alreadySignedIn); setGpsStatus('confirmed') }
     setLoading(false)
   }
 
@@ -174,7 +177,7 @@ export default function InstallerJobsPage() {
       )}
 
       {/* Active job tabs */}
-      {activeJob && gpsStatus === 'confirmed' && (
+      {activeJob && (gpsStatus === 'confirmed' || activeJob.signed_in) && (
         <div className="flex gap-0 border-b border-white/5 px-4 mt-4">
           {['jobs','diary','qa'].map(t => (
             <button
