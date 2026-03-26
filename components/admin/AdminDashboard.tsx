@@ -11,7 +11,12 @@ interface Props {
 }
 
 export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, defaultTab }: Props) {
-  const [activeTab, setActiveTab] = useState(defaultTab)
+  const [activeTab, setActiveTab] = useState(() => { try { return localStorage.getItem("vantro_tab") || defaultTab } catch { return defaultTab } })
+  
+  function switchTab(tab) {
+    setActiveTab(tab)
+    if (typeof window !== "undefined") localStorage.setItem("vantro_tab", tab)
+  }
   const [showAddJob, setShowAddJob] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
   const [showAddTemplate, setShowAddTemplate] = useState(false)
@@ -45,11 +50,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     const { data: job, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null }).select().single()
     if (error) { setFormError(error.message); setSaving(false); return }
     setJobName(""); setJobAddress(""); setJobTemplateId(""); setShowAddJob(false); setSaving(false)
-    window.location.href = window.location.href
-  }
-
-  async function addMember() {
-    if (!memberName.trim() || !memberEmail.trim()) { setFormError("Enter name and email"); return }
+    router.refresh(); return }
     setSaving(true); setFormError("")
     const initials = memberName.trim().split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: "installer", is_active: true })
@@ -58,195 +59,17 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
       await fetch("/api/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: memberEmail.trim(), name: memberName.trim() }) })
     } catch(e) { console.error("Invite email failed", e) }
     setMemberName(""); setMemberEmail(""); setShowAddMember(false); setSaving(false)
-    window.location.href = window.location.href
-  }
-
-  async function toggleAssignment(jobId: string, userId: string) {
-    const existing = jobAssignments.find((a: any) => a.job_id === jobId && a.user_id === userId)
-    if (existing) { await supabase.from("job_assignments").delete().eq("id", existing.id) }
-    else { await supabase.from("job_assignments").insert({ job_id: jobId, user_id: userId, company_id: userData.company_id }) }
-    router.refresh()
-  }
-
-  async function addTemplate() {
-    if (!templateName.trim()) { setFormError("Enter template name"); return }
+    router.refresh(); return }
     setSaving(true); setFormError("")
     const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create_template", name: templateName.trim() }) })
     if (!res.ok) { const d = await res.json(); setFormError(d.error); setSaving(false); return }
     setTemplateName(""); setShowAddTemplate(false); setSaving(false)
-    window.location.href = window.location.href
-  }
-
-  async function addItem(templateId: string) {
-    if (!itemLabel.trim()) { setFormError("Enter item label"); return }
+    router.refresh(); return }
     setSaving(true); setFormError("")
     const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_item", templateId, label: itemLabel.trim(), item_type: itemType, is_mandatory: itemMandatory, requires_photo: itemPhoto, requires_video: itemVideo, fail_note_required: itemFailNote }) })
     if (!res.ok) { const d = await res.json(); setFormError(d.error); setSaving(false); return }
     setItemLabel(""); setItemType("tick"); setItemMandatory(false); setItemPhoto(false); setItemVideo(false); setItemFailNote(false); setShowAddItem(null); setSaving(false)
-    window.location.href = window.location.href
-  }
-
-  async function deleteItem(itemId: string) {
-    await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_item", itemId }) })
-    window.location.href = window.location.href
-  }
-
-  async function deleteTemplate(templateId: string) {
-    if (!window.confirm("Delete this template and all its items?")) return
-    await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_template", templateId }) })
-    window.location.href = window.location.href
-  }
-
-  const installers = teamMembers.filter((m: any) => m.role === "installer")
-  const getAssigned = (jobId: string) => {
-    const ids = jobAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
-    return teamMembers.filter((m: any) => ids.includes(m.id))
-  }
-
-  const tabs = [
-    { id: "overview", label: "Overview" },
-    { id: "approvals", label: "Approvals", badge: pendingQA.length },
-    { id: "jobs", label: "Jobs" },
-    { id: "team", label: "Team" },
-    { id: "checklists", label: "Checklists" },
-    { id: "diary", label: "Diary" },
-    { id: "payroll", label: "Payroll" },
-    { id: "alerts", label: "Alerts", badge: alerts.length },
-  ]
-
-  const inp = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
-  const card = "bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
-  const cardHeader = "flex items-center justify-between px-6 py-4 border-b border-gray-100"
-  const sub = "text-gray-500"
-  const btn = "bg-teal-400 hover:bg-teal-500 text-white font-bold rounded-xl px-5 py-2.5 text-sm transition-colors"
-  const btnGhost = "bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl px-5 py-2.5 text-sm transition-colors"
-
-  const itemTypeOptions = [
-    { value: "tick", label: "Tick only" },
-    { value: "photo", label: "Photo required" },
-    { value: "pass_fail", label: "Pass / Fail" },
-    { value: "measurement", label: "Measurement" },
-  ]
-
-  return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-teal-400 flex items-center justify-center flex-shrink-0">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="2" width="7" height="7" rx="1.5" fill="white"/>
-              <rect x="11" y="2" width="7" height="7" rx="1.5" fill="white" opacity="0.7"/>
-              <rect x="2" y="11" width="7" height="7" rx="1.5" fill="white" opacity="0.7"/>
-              <rect x="11" y="11" width="7" height="7" rx="1.5" fill="white" opacity="0.4"/>
-            </svg>
-          </div>
-          <div>
-            <div className="font-bold text-base">Van<span className="text-teal-500">tro</span></div>
-            <div className="text-xs text-gray-500">Field Operations</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-full px-4 py-1.5">
-            <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"/>
-            <span className="text-sm text-teal-700 font-semibold">{signins.length} on site</span>
-          </div>
-          <button onClick={handleSignOut} className="text-sm text-gray-500 hover:text-gray-900 border border-gray-200 rounded-full px-4 py-1.5">Sign out</button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-4 px-8 py-6">
-        {[
-          { label: "On Site Now", value: signins.length, color: "text-teal-500" },
-          { label: "Active Jobs", value: jobs.filter((j: any) => j.status === "active").length, color: "text-gray-900" },
-          { label: "Awaiting Approval", value: pendingQA.length, color: "text-amber-500" },
-          { label: "Unread Alerts", value: alerts.length, color: "text-red-500" },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <div className="text-gray-500 text-sm font-medium mb-2">{s.label}</div>
-            <div className={`text-4xl font-bold ${s.color}`}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex border-b border-gray-200 px-8 bg-white overflow-x-auto">
-        {tabs.map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`flex items-center gap-2 px-4 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id ? "border-teal-400 text-teal-600" : "border-transparent text-gray-500 hover:text-gray-900"}`}>
-            {tab.label}
-            {tab.badge ? <span className="bg-teal-50 text-teal-600 text-xs font-bold px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
-          </button>
-        ))}
-      </div>
-
-      <div className="px-8 py-6 max-w-6xl">
-
-        {activeTab === "overview" && (
-          <div className="grid grid-cols-2 gap-5">
-            <div className={card}>
-              <div className={cardHeader}>
-                <span className="font-semibold">Live on site</span>
-                <span className="text-sm bg-teal-50 text-teal-600 px-3 py-1 rounded-full">{signins.length} active</span>
-              </div>
-              {signins.length === 0 ? <div className={`px-6 py-10 text-center ${sub}`}>No one signed in yet today</div>
-              : signins.map((s: any) => (
-                <div key={s.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
-                  <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center text-sm font-bold text-teal-600">{s.users?.initials || "?"}</div>
-                  <div className="flex-1"><div className="font-semibold">{s.users?.name}</div><div className={`text-sm ${sub}`}>In at {new Date(s.signed_in_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div></div>
-                  <span className="text-sm text-teal-500 font-medium">On site</span>
-                </div>
-              ))}
-            </div>
-            <div className={card}>
-              <div className={cardHeader}>
-                <span className="font-semibold">Recent alerts</span>
-                {alerts.length > 0 && <span className="text-sm bg-red-50 text-red-500 px-3 py-1 rounded-full">{alerts.length} unread</span>}
-              </div>
-              {alerts.length === 0 ? <div className={`px-6 py-10 text-center ${sub}`}>No alerts - all clear</div>
-              : alerts.slice(0, 5).map((a: any) => (
-                <div key={a.id} className="px-6 py-4 border-b border-gray-50 last:border-0">
-                  <div className={`text-xs ${sub} mb-1`}>{a.jobs?.name}</div>
-                  <div className="text-sm">{a.message}</div>
-                </div>
-              ))}
-            </div>
-            <div className={`${card} col-span-2`}>
-              <div className={cardHeader}>
-                <span className="font-semibold">Active jobs</span>
-                <span className={`text-sm ${sub}`}>{jobs.length} total</span>
-              </div>
-              {jobs.length === 0 ? <div className={`px-6 py-10 text-center ${sub}`}>No jobs yet</div>
-              : jobs.slice(0, 6).map((j: any) => {
-                const assigned = getAssigned(j.id)
-                return (
-                  <div key={j.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
-                    <div className="flex-1"><div className="font-semibold">{j.name}</div><div className={`text-sm ${sub}`}>{j.address}</div></div>
-                    {assigned.length > 0 && <div className="flex gap-1">{assigned.map((a: any) => <div key={a.id} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{a.initials}</div>)}</div>}
-                    <span className={`text-sm px-3 py-1 rounded-full font-medium ${j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500"}`}>{j.status}</span>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {activeTab === "approvals" && (
-          <div className={card}>
-            <div className={cardHeader}><span className="font-semibold">QA approval queue</span></div>
-            {pendingQA.length === 0 ? <div className={`px-6 py-16 text-center ${sub}`}>Nothing waiting for approval</div>
-            : pendingQA.map((qa: any) => (
-              <div key={qa.id} className="px-6 py-5 border-b border-gray-50 last:border-0">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <div className="w-8 h-8 rounded-full bg-teal-50 flex items-center justify-center text-sm font-bold text-teal-600">{qa.users?.initials || "?"}</div>
-                      <span className="font-semibold">{qa.users?.name}</span>
-                      <span className={`text-sm ${sub}`}>on {qa.jobs?.name}</span>
-                    </div>
-                    {qa.notes && <div className={`text-sm ${sub}`}>Note: {qa.notes}</div>}
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => approveQA(qa.id)} className="bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl px-4 py-2 text-sm font-semibold">Approve</button>
-                    <button onClick={() => { const note = window.prompt("Rejection reason:"); if (note) rejectQA(qa.id, note) }} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl px-4 py-2 text-sm font-semibold">Reject</button>
+    router.refresh(); if (note) rejectQA(qa.id, note) }} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl px-4 py-2 text-sm font-semibold">Reject</button>
                   </div>
                 </div>
               </div>
