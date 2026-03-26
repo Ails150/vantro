@@ -1,4 +1,5 @@
-"use client"
+﻿const fs = require("fs")
+const content = `"use client"
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -512,4 +513,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
       </div>
     </div>
   )
-}
+}`
+fs.writeFileSync("components/admin/AdminDashboard.tsx", content, "utf8")
+console.log("Done - clean rewrite complete")
