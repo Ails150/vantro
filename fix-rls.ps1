@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server'
+$api = @"
+import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
@@ -92,3 +93,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ error: 'Unknown step' }, { status: 400 })
 }
+"@
+Set-Content -Path "app\api\onboarding\route.ts" -Value $api -Encoding UTF8
+Write-Host "Done" -ForegroundColor Green
