@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const installer = getInstallerFromToken(request)
   if (!installer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId, itemId, state, notes } = await request.json()
+  const { jobId, itemId, state, notes, photoUrl, photoPath } = await request.json()
   const service = await createServiceClient()
   const { data: job } = await service.from('jobs').select('company_id').eq('id', jobId).single()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
@@ -40,9 +40,9 @@ export async function POST(request: Request) {
   const { data: existing } = await service.from('qa_submissions').select('id').eq('job_id', jobId).eq('user_id', installer.userId).eq('checklist_item_id', itemId).single()
 
   if (existing) {
-    await service.from('qa_submissions').update({ state, notes, submitted_at: new Date().toISOString() }).eq('id', existing.id)
+    await service.from('qa_submissions').update({ state, notes, photo_url: photoUrl || null, photo_path: photoPath || null, submitted_at: new Date().toISOString() }).eq('id', existing.id)
   } else {
-    await service.from('qa_submissions').insert({ job_id: jobId, user_id: installer.userId, company_id: job.company_id, checklist_item_id: itemId, state, notes })
+    await service.from('qa_submissions').insert({ job_id: jobId, user_id: installer.userId, company_id: job.company_id, checklist_item_id: itemId, state, notes, photo_url: photoUrl || null, photo_path: photoPath || null })
   }
 
   return NextResponse.json({ success: true })
