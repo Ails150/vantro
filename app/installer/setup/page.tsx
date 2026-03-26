@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState, Suspense } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
@@ -9,11 +9,37 @@ function SetupForm() {
   const searchParams = useSearchParams()
   const email = searchParams.get('email') || ''
   const [step, setStep] = useState<'password'|'pin'|'done'>('password')
+  const [sessionReady, setSessionReady] = useState(false)
+  const [sessionError, setSessionError] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [pin, setPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function extractSession() {
+      const hash = window.location.hash
+      if (hash && hash.includes('access_token')) {
+        const params = new URLSearchParams(hash.replace('#', ''))
+        const access_token = params.get('access_token')
+        const refresh_token = params.get('refresh_token')
+        if (access_token && refresh_token) {
+          const supabase = createClient()
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token })
+          if (error) { setSessionError('Session error: ' + error.message); return }
+          setSessionReady(true)
+          return
+        }
+      }
+      // Check if already has session
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) { setSessionReady(true) }
+      else { setSessionError('No session found. Please use the link from your invite email.') }
+    }
+    extractSession()
+  }, [])
 
   async function setPasswordStep(e: React.FormEvent) {
     e.preventDefault()
@@ -63,7 +89,9 @@ function SetupForm() {
       <div className="bg-[#1a2635] border border-white/5 rounded-2xl p-8">
         {step === 'password' && (
           <>
-            <h1 className="text-lg font-semibold mb-1">Set your password</h1>
+            {sessionError && <p className="text-sm text-red-400 mb-4">{sessionError}</p>}
+    {!sessionReady && !sessionError && <p className="text-sm text-[#4d6478] mb-4">Loading session...</p>}
+    <h1 className="text-lg font-semibold mb-1">Set your password</h1>
             <p className="text-sm text-[#4d6478] mb-6">Welcome to Vantro. Set a password for {email}</p>
             <form onSubmit={setPasswordStep} className="space-y-4">
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="New password" required minLength={8} className={inp}/>
