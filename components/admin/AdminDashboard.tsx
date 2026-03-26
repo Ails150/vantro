@@ -16,7 +16,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
       return new URLSearchParams(window.location.search).get("tab") || "overview"
     }
     return "overview"
-  }) => { if (typeof window !== "undefined") { return new URLSearchParams(window.location.search).get("tab") || "overview" } return "overview" })
+  })
   const [showAddJob, setShowAddJob] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
   const [showAddTemplate, setShowAddTemplate] = useState(false)
