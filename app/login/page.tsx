@@ -1,39 +1,37 @@
-﻿'use client'
-
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-
+﻿"use client"
+import { useState } from "react"
+import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
+import Link from "next/link"
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
+  const [error, setError] = useState("")
+  const [resetMode, setResetMode] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
-    setError('')
-
+    setLoading(true); setError("")
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-
-    if (error) {
-      setError('Incorrect email or password')
-      setLoading(false)
-      return
-    }
-
-    router.push('/admin')
-    router.refresh()
+    if (error) { setError("Incorrect email or password"); setLoading(false); return }
+    router.push("/admin"); router.refresh()
   }
-
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true); setError("")
+    const supabase = createClient()
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: "https://app.getvantro.com/auth/callback?next=/reset-password"
+    })
+    if (error) { setError(error.message); setLoading(false); return }
+    setResetSent(true); setLoading(false)
+  }
   return (
     <div className="min-h-screen bg-[#0f1923] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-[#00d4a0] flex items-center justify-center">
@@ -46,56 +44,48 @@ export default function LoginPage() {
             </div>
             <span className="text-xl font-semibold text-white">Van<span className="text-[#00d4a0]">tro</span></span>
           </Link>
-          <p className="text-[#4d6478] text-sm mt-2">Sign in to your dashboard</p>
         </div>
-
         <div className="bg-[#1a2635] border border-white/5 rounded-2xl p-8">
-          <h1 className="text-xl font-semibold mb-6">Welcome back</h1>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-[#8fa3b8] mb-2">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="john@smithglazing.com"
-                required
-                className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#8fa3b8] mb-2">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
-                required
-                className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors"
-              />
-            </div>
-
-            {error && (
-              <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">{error}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-50 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors"
-            >
-              {loading ? 'Signing in...' : 'Sign in'}
-            </button>
-          </form>
+          {resetMode ? (
+            <>
+              <h1 className="text-xl font-semibold mb-2">Reset password</h1>
+              <p className="text-sm text-[#4d6478] mb-6">Enter your email and we will send a reset link.</p>
+              {resetSent ? (
+                <p className="text-sm text-[#00d4a0] bg-[#00d4a0]/10 border border-[#00d4a0]/20 rounded-lg px-4 py-3">Check your email for the reset link.</p>
+              ) : (
+                <form onSubmit={handleReset} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#8fa3b8] mb-2">Email</label>
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@company.com" required className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors" />
+                  </div>
+                  {error && <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">{error}</p>}
+                  <button type="submit" disabled={loading} className="w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-50 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors">{loading ? "Sending..." : "Send reset link"}</button>
+                </form>
+              )}
+              <button onClick={() => { setResetMode(false); setResetSent(false); setError("") }} className="mt-4 text-sm text-[#4d6478] hover:text-white transition-colors w-full text-center">Back to sign in</button>
+            </>
+          ) : (
+            <>
+              <h1 className="text-xl font-semibold mb-6">Welcome back</h1>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#8fa3b8] mb-2">Email</label>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="john@smithglazing.com" required className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors" />
+                </div>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-[#8fa3b8]">Password</label>
+                    <button type="button" onClick={() => setResetMode(true)} className="text-xs text-[#00d4a0] hover:text-[#00a87e] transition-colors">Forgot password?</button>
+                  </div>
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors" />
+                </div>
+                {error && <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">{error}</p>}
+                <button type="submit" disabled={loading} className="w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-50 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors">{loading ? "Signing in..." : "Sign in"}</button>
+              </form>
+            </>
+          )}
         </div>
-
-        <p className="text-center text-sm text-[#4d6478] mt-6">
-          Do not have an account?{' '}
-          <Link href="/signup" className="text-[#00d4a0] hover:text-[#00a87e] transition-colors">Start free trial</Link>
-        </p>
-
+        <p className="text-center text-sm text-[#4d6478] mt-6">Do not have an account?{" "}<Link href="/signup" className="text-[#00d4a0] hover:text-[#00a87e] transition-colors">Start free trial</Link></p>
       </div>
     </div>
   )
