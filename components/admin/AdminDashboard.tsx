@@ -41,9 +41,9 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   }
 
   async function handleSignOut() { await supabase.auth.signOut(); router.push("/login") }
-  async function approveQA(id) { await supabase.from("qa_submissions").update({ state: "approved", reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
-  async function rejectQA(id, note) { await supabase.from("qa_submissions").update({ state: "rejected", rejection_note: note, reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
-  async function markAlertRead(id) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
+  async function approveQA(id: string) { await supabase.from("qa_submissions").update({ state: "approved", reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
+  async function rejectQA(id: string, note: string) { await supabase.from("qa_submissions").update({ state: "rejected", rejection_note: note, reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
+  async function markAlertRead(id: string) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
 
   async function addJob() {
     if (!jobName.trim() || !jobAddress.trim()) { setFormError("Enter job name and address"); return }
@@ -65,7 +65,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     router.refresh()
   }
 
-  async function toggleAssignment(jobId, userId) {
+  async function toggleAssignment(jobId: string, userId: string) {
     const existing = jobAssignments.find((a) => a.job_id === jobId && a.user_id === userId)
     if (existing) { await supabase.from("job_assignments").delete().eq("id", existing.id) }
     else { await supabase.from("job_assignments").insert({ job_id: jobId, user_id: userId, company_id: userData.company_id }) }
@@ -81,7 +81,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     router.refresh()
   }
 
-  async function addItem(templateId) {
+  async function addItem(templateId: string) {
     if (!itemLabel.trim()) { setFormError("Enter item label"); return }
     setSaving(true); setFormError("")
     const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_item", templateId, label: itemLabel.trim(), item_type: itemType, is_mandatory: itemMandatory, requires_photo: itemPhoto, requires_video: itemVideo, fail_note_required: itemFailNote }) })
@@ -90,12 +90,12 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     router.refresh()
   }
 
-  async function deleteItem(itemId) {
+  async function deleteItem(itemId: string) {
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_item", itemId }) })
     router.refresh()
   }
 
-  async function deleteTemplate(templateId) {
+  async function deleteTemplate(templateId: string) {
     if (!window.confirm("Delete this template and all its items?")) return
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_template", templateId }) })
     router.refresh()
@@ -513,3 +513,4 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
