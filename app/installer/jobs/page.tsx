@@ -70,6 +70,12 @@ export default function InstallerJobsPage() {
           })
         })
         const data = await res.json()
+        if (!res.ok) {
+          setGpsStatus('blocked')
+          setGpsMessage(data.error || 'Cannot sign in')
+          setActiveJob(null)
+          return
+        }
         if (res.ok) {
           setGpsStatus('confirmed')
           setGpsMessage(`GPS confirmed Â· ${data.distanceMetres}m from site Â· Â±${Math.round(accuracy)}m accuracy`)
