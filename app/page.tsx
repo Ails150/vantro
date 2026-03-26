@@ -5,8 +5,8 @@ export default function Home() {
 }
 ```
 
-Save, then push:
+Save, then:
 ```
 git add .
-git commit -m "root redirect"
+git commit -m "fix page.tsx"
 git push origin master
