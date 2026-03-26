@@ -248,6 +248,19 @@ export default function InstallerJobsPage() {
     })
   }
 
+  async function submitQAForApproval() {
+    const token = localStorage.getItem('vantro_installer_token')
+    const res = await fetch('/api/qa/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ jobId: activeJob.id })
+    })
+    if (res.ok) {
+      alert('QA submitted for foreman approval!')
+      loadQA(activeJob)
+    }
+  }
+
   function signOut() {
     localStorage.removeItem('vantro_installer_token')
     localStorage.removeItem('vantro_installer_id')
