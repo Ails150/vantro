@@ -6,9 +6,7 @@ export default async function AdminPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   const { data: userData, error: userError } = await supabase
     .from('users')
@@ -17,16 +15,7 @@ export default async function AdminPage() {
     .eq('role', 'admin')
     .single()
 
-  if (userError || !userData || !userData.company_id) {
-    return (
-      <div style={{color:'white',background:'#0f1923',minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column',gap:'16px',fontFamily:'sans-serif'}}>
-        <h1>Debug Info</h1>
-        <p>User ID: {user.id}</p>
-        <p>User Error: {JSON.stringify(userError)}</p>
-        <p>User Data: {JSON.stringify(userData)}</p>
-      </div>
-    )
-  }
+  if (userError || !userData || !userData.company_id) redirect('/onboarding')
 
   const companyId = userData.company_id
   const { data: jobs } = await supabase.from('jobs').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
