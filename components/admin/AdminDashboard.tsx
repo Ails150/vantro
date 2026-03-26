@@ -108,6 +108,13 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     router.refresh()
   }
 
+  async function deleteJob(jobId: string, jobName: string) {
+    if (!window.confirm("Delete job: " + jobName + "? This cannot be undone.")) return
+    await supabase.from("job_assignments").delete().eq("job_id", jobId)
+    await supabase.from("jobs").delete().eq("id", jobId)
+    window.location.href = "/admin?tab=jobs"
+  }
+
   async function addMember() {
     if (!memberName.trim() || !memberEmail.trim()) { setFormError("Enter name and email"); return }
     setSaving(true); setFormError("")
