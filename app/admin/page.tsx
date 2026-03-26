@@ -4,17 +4,27 @@ import AdminDashboard from '@/components/admin/AdminDashboard'
 
 export default async function AdminPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  
+  if (!user) {
+    console.log('No user found, redirecting to login')
+    redirect('/login')
+  }
 
-  const { data: userData, error } = await supabase
+  console.log('User ID:', user.id)
+
+  const { data: userData, error: userError } = await supabase
     .from('users')
     .select('id, company_id, name, role')
     .eq('auth_user_id', user.id)
     .eq('role', 'admin')
     .single()
 
-  if (error || !userData || !userData.company_id) {
+  console.log('userData:', JSON.stringify(userData))
+  console.log('userError:', JSON.stringify(userError))
+
+  if (userError || !userData || !userData.company_id) {
+    console.log('No userData found, redirecting to onboarding')
     redirect('/onboarding')
   }
 
