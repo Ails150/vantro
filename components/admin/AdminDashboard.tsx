@@ -57,7 +57,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   async function addMember() {
     if (!memberName.trim() || !memberEmail.trim()) { setFormError("Enter name and email"); return }
     setSaving(true); setFormError("")
-    const initials = memberName.trim().split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    const initials = memberName.trim().split(" ").map((n: any) => n[0]).join("").toUpperCase().slice(0, 2)
     const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: "installer", is_active: true })
     if (error) { setFormError(error.message); setSaving(false); return }
     try { await fetch("/api/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: memberEmail.trim(), name: memberName.trim() }) }) } catch(e) {}
@@ -101,10 +101,10 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     router.refresh()
   }
 
-  const installers = teamMembers.filter((m) => m.role === "installer")
+  const installers = teamMembers.filter((m: any) => m.role === "installer")
   const getAssigned = (jobId: string) => {
-    const ids = jobAssignments.filter((a) => a.job_id === jobId).map((a) => a.user_id)
-    return teamMembers.filter((m) => ids.includes(m.id))
+    const ids = jobAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
+    return teamMembers.filter((m: any) => ids.includes(m.id))
   }
 
   const tabs = [
@@ -160,7 +160,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
       <div className="grid grid-cols-4 gap-4 px-8 py-6">
         {[
           { label: "On Site Now", value: signins.length, color: "text-teal-500" },
-          { label: "Active Jobs", value: jobs.filter((j) => j.status === "active").length, color: "text-gray-900" },
+          { label: "Active Jobs", value: jobs.filter((j: any) => j.status === "active").length, color: "text-gray-900" },
           { label: "Awaiting Approval", value: pendingQA.length, color: "text-amber-500" },
           { label: "Unread Alerts", value: alerts.length, color: "text-red-500" },
         ].map(s => (
@@ -191,7 +191,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <span className="text-sm bg-teal-50 text-teal-600 px-3 py-1 rounded-full">{signins.length} active</span>
               </div>
               {signins.length === 0 ? <div className={"px-6 py-10 text-center " + sub}>No one signed in yet today</div>
-              : signins.map((s) => (
+              : signins.map((s: any) => (
                 <div key={s.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
                   <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center text-sm font-bold text-teal-600">{s.users?.initials || "?"}</div>
                   <div className="flex-1"><div className="font-semibold">{s.users?.name}</div><div className={"text-sm " + sub}>In at {new Date(s.signed_in_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div></div>
@@ -205,7 +205,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 {alerts.length > 0 && <span className="text-sm bg-red-50 text-red-500 px-3 py-1 rounded-full">{alerts.length} unread</span>}
               </div>
               {alerts.length === 0 ? <div className={"px-6 py-10 text-center " + sub}>No alerts - all clear</div>
-              : alerts.slice(0, 5).map((a) => (
+              : alerts.slice(0, 5).map((a: any) => (
                 <div key={a.id} className="px-6 py-4 border-b border-gray-50 last:border-0">
                   <div className={"text-xs " + sub + " mb-1"}>{a.jobs?.name}</div>
                   <div className="text-sm">{a.message}</div>
@@ -218,12 +218,12 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <span className={"text-sm " + sub}>{jobs.length} total</span>
               </div>
               {jobs.length === 0 ? <div className={"px-6 py-10 text-center " + sub}>No jobs yet</div>
-              : jobs.slice(0, 6).map((j) => {
+              : jobs.slice(0, 6).map((j: any) => {
                 const assigned = getAssigned(j.id)
                 return (
                   <div key={j.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
                     <div className="flex-1"><div className="font-semibold">{j.name}</div><div className={"text-sm " + sub}>{j.address}</div></div>
-                    {assigned.length > 0 && <div className="flex gap-1">{assigned.map((a) => <div key={a.id} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{a.initials}</div>)}</div>}
+                    {assigned.length > 0 && <div className="flex gap-1">{assigned.map((a: any) => <div key={a.id} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{a.initials}</div>)}</div>}
                     <span className={"text-sm px-3 py-1 rounded-full font-medium " + (j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500")}>{j.status}</span>
                   </div>
                 )
@@ -236,7 +236,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           <div className={card}>
             <div className={cardHeader}><span className="font-semibold">QA approval queue</span></div>
             {pendingQA.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>Nothing waiting for approval</div>
-            : pendingQA.map((qa) => (
+            : pendingQA.map((qa: any) => (
               <div key={qa.id} className="px-6 py-5 border-b border-gray-50 last:border-0">
                 <div className="flex items-center justify-between gap-4">
                   <div>
@@ -269,7 +269,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template (optional)</label>
                   <select value={jobTemplateId} onChange={e => setJobTemplateId(e.target.value)} className={inp}>
                     <option value="">No checklist</option>
-                    {checklistTemplates.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.checklist_items?.length || 0} items)</option>)}
+                    {checklistTemplates.map((t: any) => <option key={t.id} value={t.id}>{t.name} ({t.checklist_items?.length || 0} items)</option>)}
                   </select>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
@@ -282,7 +282,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
             <div className={card}>
               <div className={cardHeader}><span className="font-semibold">All jobs</span></div>
               {jobs.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No jobs yet</div>
-              : jobs.map((j) => {
+              : jobs.map((j: any) => {
                 const assigned = getAssigned(j.id)
                 const isAssigning = assigningJobId === j.id
                 const template = checklistTemplates.find((t) => t.id === j.checklist_template_id)
@@ -295,7 +295,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                         {template && <div className="text-xs text-teal-600 mt-1">Checklist: {template.name}</div>}
                         {assigned.length > 0 && (
                           <div className="flex gap-2 mt-2 flex-wrap">
-                            {assigned.map((a) => <span key={a.id} className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-lg font-medium">{a.name}</span>)}
+                            {assigned.map((a: any) => <span key={a.id} className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-lg font-medium">{a.name}</span>)}
                           </div>
                         )}
                       </div>
@@ -310,7 +310,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                           <p className={"text-sm " + sub + " mb-3"}>Click to assign or unassign</p>
                           {installers.length === 0 ? <p className={"text-sm " + sub}>No installers yet</p>
                           : <div className="flex flex-wrap gap-2">
-                            {installers.map((m) => {
+                            {installers.map((m: any) => {
                               const isAssigned = jobAssignments.some((a) => a.job_id === j.id && a.user_id === m.id)
                               return (
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
@@ -350,7 +350,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
             <div className={card}>
               <div className={cardHeader}><span className="font-semibold">Team members</span></div>
               {teamMembers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No team members yet</div>
-              : teamMembers.map((m) => (
+              : teamMembers.map((m: any) => (
                 <div key={m.id} className="flex items-center gap-4 px-6 py-5 border-b border-gray-50 last:border-0">
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center font-bold flex-shrink-0">{m.initials}</div>
                   <div className="flex-1"><div className="font-semibold">{m.name}</div><div className={"text-sm " + sub + " mt-0.5"}>{m.email || "No email"}</div></div>
@@ -377,7 +377,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
             )}
             {checklistTemplates.length === 0 ? (
               <div className={card}><div className={"px-6 py-16 text-center " + sub}>No checklist templates yet. Create one to attach to jobs.</div></div>
-            ) : checklistTemplates.map((t) => (
+            ) : checklistTemplates.map((t: any) => (
               <div key={t.id} className={card}>
                 <div className={cardHeader}>
                   <div>
@@ -421,7 +421,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 )}
                 {(!t.checklist_items || t.checklist_items.length === 0) ? (
                   <div className={"px-6 py-8 text-center " + sub + " text-sm"}>No items yet</div>
-                ) : t.checklist_items.sort((a, b) => a.sort_order - b.sort_order).map((item) => (
+                ) : t.checklist_items.sort((a: any, b: any) => a.sort_order - b.sort_order).map((item: any) => (
                   <div key={item.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
                     <div className="flex-1">
                       <div className="font-medium text-sm">{item.label}</div>
@@ -448,7 +448,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
               <span className={"text-sm " + sub}>{diaryEntries.length} entries</span>
             </div>
             {diaryEntries.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No diary entries yet</div>
-            : diaryEntries.map((d) => (
+            : diaryEntries.map((d: any) => (
               <div key={d.id} className="px-6 py-5 border-b border-gray-50 last:border-0">
                 <div className="flex items-start gap-4">
                   <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold flex-shrink-0">{d.users?.initials || "?"}</div>
@@ -472,9 +472,9 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
             <div className={card}>
               <div className={cardHeader}><span className="font-semibold">Hours this week - by installer</span></div>
               {installers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No installers yet</div>
-              : installers.map((m) => {
-                const ms = signins.filter((s) => s.user_id === m.id)
-                const hrs = ms.reduce((acc, s) => {
+              : installers.map((m: any) => {
+                const ms = signins.filter((s: any) => s.user_id === m.id)
+                const hrs = ms.reduce((acc: number, s: any) => {
                   if (s.signed_in_at && s.signed_out_at) return acc + (new Date(s.signed_out_at).getTime() - new Date(s.signed_in_at).getTime()) / 3600000
                   return acc
                 }, 0)
@@ -495,7 +495,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           <div className={card}>
             <div className={cardHeader}><span className="font-semibold">SiteLog alerts</span></div>
             {alerts.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No alerts - all clear</div>
-            : alerts.map((a) => (
+            : alerts.map((a: any) => (
               <div key={a.id} className="px-6 py-5 border-b border-gray-50 last:border-0">
                 <div className="flex items-start justify-between gap-4">
                   <div>
