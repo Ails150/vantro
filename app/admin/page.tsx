@@ -7,19 +7,18 @@ export default async function AdminPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: userData } = await supabase
+  const { data: userData, error } = await supabase
     .from('users')
     .select('id, company_id, name, role')
     .eq('auth_user_id', user.id)
     .eq('role', 'admin')
     .single()
 
-  if (!userData || !userData.company_id) {
+  if (error || !userData || !userData.company_id) {
     redirect('/onboarding')
   }
 
   const companyId = userData.company_id
-
   const { data: jobs } = await supabase.from('jobs').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
   const today = new Date(); today.setHours(0,0,0,0)
   const { data: signins } = await supabase.from('signins').select('*, users(name, initials)').eq('company_id', companyId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null)
