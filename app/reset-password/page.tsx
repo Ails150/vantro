@@ -1,6 +1,5 @@
 ﻿"use client"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -12,13 +11,25 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [done, setDone] = useState(false)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setReady(true)
+      }
+    })
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setReady(true)
+    })
+  }, [])
 
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()
     if (password !== confirm) { setError("Passwords do not match"); return }
     if (password.length < 8) { setError("Password must be at least 8 characters"); return }
-    setLoading(true)
-    setError("")
+    setLoading(true); setError("")
     const supabase = createClient()
     const { error } = await supabase.auth.updateUser({ password })
     if (error) { setError(error.message); setLoading(false); return }
@@ -47,6 +58,10 @@ export default function ResetPasswordPage() {
           <p className="text-sm text-[#4d6478] mb-6">Choose a strong password for your account.</p>
           {done ? (
             <p className="text-sm text-[#00d4a0] bg-[#00d4a0]/10 border border-[#00d4a0]/20 rounded-lg px-4 py-3">Password updated. Redirecting to login...</p>
+          ) : !ready ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-2 border-[#00d4a0] border-t-transparent rounded-full animate-spin"/>
+            </div>
           ) : (
             <form onSubmit={handleReset} className="space-y-4">
               <div>
