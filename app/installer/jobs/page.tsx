@@ -19,6 +19,8 @@ export default function InstallerJobsPage() {
   const [qaSubmissions, setQaSubmissions] = useState<any[]>([])
   const [qaLoading, setQaLoading] = useState(false)
   const [qaNote, setQaNote] = useState<Record<string, string>>({})
+  const [signInTime, setSignInTime] = useState<Date|null>(null)
+  const [elapsed, setElapsed] = useState("")
 
   useEffect(() => {
     const token = localStorage.getItem('vantro_installer_token')
@@ -37,9 +39,28 @@ export default function InstallerJobsPage() {
     const jobs = data.jobs || []
     setJobs(jobs)
     const alreadySignedIn = jobs.find((j: any) => j.signed_in)
-    if (alreadySignedIn) { setActiveJob(alreadySignedIn); setGpsStatus('confirmed') }
+    if (alreadySignedIn) { setActiveJob(alreadySignedIn); setGpsStatus('confirmed'); setSignInTime(new Date()) }
     setLoading(false)
   }
+
+  useEffect(() => {
+    if (!signInTime) return
+    const interval = setInterval(() => {
+      const diff = Math.floor((Date.now() - signInTime.getTime()) / 1000)
+      const h = Math.floor(diff / 3600)
+      const m = Math.floor((diff % 3600) / 60)
+      const s = diff % 60
+      setElapsed((h > 0 ? h + "h " : "") + (m > 0 ? m + "m " : "") + s + "s")
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [signInTime])
+
+  useEffect(() => {
+    const token = localStorage.getItem('vantro_installer_token')
+    if (!token) return
+    const interval = setInterval(() => loadJobs(token), 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   async function signInToJob(job: any) {
     setActiveJob(job)
@@ -76,6 +97,7 @@ export default function InstallerJobsPage() {
           return
         }
         if (res.ok) {
+          setSignInTime(new Date())
           setGpsStatus('confirmed')
           setGpsMessage(`GPS confirmed Â· ${data.distanceMetres}m from site Â· Â±${Math.round(accuracy)}m accuracy`)
           setJobs(prev => prev.map(j => j.id === job.id ? { ...j, signed_in: true } : j))
@@ -190,7 +212,7 @@ export default function InstallerJobsPage() {
           {gpsStatus === 'checking' && <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin flex-shrink-0"/>}
           {gpsStatus === 'confirmed' && <div className="w-2 h-2 rounded-full bg-[#00d4a0] flex-shrink-0"/>}
           {gpsStatus === 'blocked' && <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0"/>}
-          <span>{gpsStatus === 'checking' ? 'Checking your location...' : gpsMessage}</span>
+          <span>{gpsStatus === 'checking' ? 'Checking your location...' : gpsMessage}{gpsStatus === 'confirmed' && elapsed ? ' · ' + elapsed : ''}</span>
         </div>
       )}
 
