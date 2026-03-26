@@ -2,7 +2,8 @@
 import { createClient } from '@/lib/supabase/server'
 import AdminDashboard from '@/components/admin/AdminDashboard'
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const params = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -39,6 +40,7 @@ export default async function AdminPage() {
       jobAssignments={jobAssignments || []}
       checklistTemplates={checklistTemplates || []}
       diaryEntries={diaryEntries || []}
+      defaultTab={params.tab || "overview"}
     />
   )
 }

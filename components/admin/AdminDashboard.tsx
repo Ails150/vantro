@@ -1,4 +1,5 @@
 ﻿"use client"
+// tab persistence via localStorage
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -6,10 +7,10 @@ import { useRouter } from "next/navigation"
 interface Props {
   user: any; userData: any; jobs: any[]; signins: any[]; alerts: any[]
   pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
-  checklistTemplates: any[]; diaryEntries: any[]
+  checklistTemplates: any[]; diaryEntries: any[]; defaultTab: string
 }
 
-export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries }: Props) {
+export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, defaultTab }: Props) {
   const [activeTab, setActiveTab] = useState(() => { if (typeof window !== "undefined") { return new URLSearchParams(window.location.search).get("tab") || "overview" } return "overview" })
   const [showAddJob, setShowAddJob] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
@@ -313,7 +314,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300"}`}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
                                   {m.name}
-                                  {isAssigned && " ✓"}
+                                  {isAssigned && " ?"}
                                 </button>
                               )
                             })}
@@ -512,6 +513,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
+
 
 
 
