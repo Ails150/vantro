@@ -18,6 +18,10 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [showAddTemplate, setShowAddTemplate] = useState(false)
   const [showAddItem, setShowAddItem] = useState(null)
   const [assigningJobId, setAssigningJobId] = useState(null)
+  const [editingJobId, setEditingJobId] = useState(null)
+  const [editJobName, setEditJobName] = useState("")
+  const [editJobAddress, setEditJobAddress] = useState("")
+  const [editJobTemplateId, setEditJobTemplateId] = useState("")
   const [jobName, setJobName] = useState("")
   const [jobAddress, setJobAddress] = useState("")
   const [jobTemplateId, setJobTemplateId] = useState("")
@@ -51,6 +55,15 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     const { error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null })
     if (error) { setFormError(error.message); setSaving(false); return }
     setJobName(""); setJobAddress(""); setJobTemplateId(""); setShowAddJob(false); setSaving(false)
+    router.refresh()
+  }
+
+  async function updateJob(jobId: string) {
+    if (!editJobName.trim() || !editJobAddress.trim()) { setFormError("Enter job name and address"); return }
+    setSaving(true); setFormError("")
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null }).eq("id", jobId)
+    if (error) { setFormError(error.message); setSaving(false); return }
+    setEditingJobId(null); setSaving(false)
     router.refresh()
   }
 
@@ -299,11 +312,35 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                           </div>
                         )}
                       </div>
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                        {editingJobId === j.id ? "Cancel" : "Edit"}
+                      </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {isAssigning ? "Done" : "Assign"}
                       </button>
                       <span className={"text-sm px-3 py-1 rounded-full font-medium flex-shrink-0 " + (j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500")}>{j.status}</span>
                     </div>
+                    {editingJobId === j.id && (
+                      <div className="px-6 pb-5">
+                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
+                          <h4 className="text-sm font-semibold">Edit job</h4>
+                          <input value={editJobName} onChange={e => setEditJobName(e.target.value)} placeholder="Job name" className={inp}/>
+                          <input value={editJobAddress} onChange={e => setEditJobAddress(e.target.value)} placeholder="Site address" className={inp}/>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template</label>
+                            <select value={editJobTemplateId} onChange={e => setEditJobTemplateId(e.target.value)} className={inp}>
+                              <option value="">No checklist</option>
+                              {checklistTemplates.map((t: any) => <option key={t.id} value={t.id}>{t.name} ({t.checklist_items?.length || 0} items)</option>)}
+                            </select>
+                          </div>
+                          {formError && <p className="text-sm text-red-500">{formError}</p>}
+                          <div className="flex gap-3">
+                            <button onClick={() => updateJob(j.id)} disabled={saving} className={btn}>{saving ? "Saving..." : "Save changes"}</button>
+                            <button onClick={() => setEditingJobId(null)} className={btnGhost}>Cancel</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {isAssigning && (
                       <div className="px-6 pb-5">
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
