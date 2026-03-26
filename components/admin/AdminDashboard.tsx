@@ -1,4 +1,4 @@
-"use client"
+ï»¿"use client"
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -147,7 +147,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <span className="text-base font-semibold">Alerts</span>
                 {alerts.length > 0 && <span className="text-sm bg-red-400/10 text-red-400 px-3 py-1 rounded-full font-medium">{alerts.length} unread</span>}
               </div>
-              {alerts.length === 0 ? <div className="px-6 py-10 text-center text-gray-400">No alerts — all clear</div>
+              {alerts.length === 0 ? <div className="px-6 py-10 text-center text-gray-400">No alerts ï¿½ all clear</div>
               : alerts.slice(0, 5).map((a: any) => (
                 <div key={a.id} className="px-6 py-4 border-b border-white/5 last:border-0">
                   <div className="text-sm text-gray-400 mb-1">{a.jobs?.name}</div>
@@ -257,7 +257,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                         <div className="bg-[#111827] border border-white/8 rounded-xl p-4">
                           <p className="text-sm text-gray-400 mb-3">Tap to assign / unassign</p>
                           {installers.length === 0 ? (
-                            <p className="text-sm text-[#4d6478]">No installers on your team yet — add them in the Team tab</p>
+                            <p className="text-sm text-[#4d6478]">No installers on your team yet ï¿½ add them in the Team tab</p>
                           ) : (
                             <div className="flex flex-wrap gap-2">
                               {installers.map((m: any) => {
@@ -320,7 +320,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         {activeTab === "payroll" && (
           <div className="space-y-5">
             <div className="bg-[#1f2937] border border-white/8 rounded-2xl overflow-hidden">
-              <div className="px-6 py-5 border-b border-white/8"><span className="text-base font-semibold">Hours today — by installer</span></div>
+              <div className="px-6 py-5 border-b border-white/8"><span className="text-base font-semibold">Hours today ï¿½ by installer</span></div>
               {installers.length === 0 ? <div className="px-6 py-16 text-center text-gray-400">No installers on your team yet</div>
               : installers.map((m: any) => {
                 const ms = signins.filter((s: any) => s.user_id === m.id)
@@ -350,12 +350,12 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         {activeTab === "alerts" && (
           <div className="bg-[#1f2937] border border-white/8 rounded-2xl overflow-hidden">
             <div className="px-6 py-5 border-b border-white/8"><span className="text-base font-semibold">SiteLog alerts</span></div>
-            {alerts.length === 0 ? <div className="px-6 py-16 text-center text-gray-400">No alerts — all clear</div>
+            {alerts.length === 0 ? <div className="px-6 py-16 text-center text-gray-400">No alerts ï¿½ all clear</div>
             : alerts.map((a: any) => (
               <div key={a.id} className="px-6 py-5 border-b border-white/5 last:border-0">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm text-gray-400 mb-1">{a.jobs?.name} · {new Date(a.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
+                    <div className="text-sm text-gray-400 mb-1">{a.jobs?.name} ï¿½ {new Date(a.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
                     <div className="text-base">{a.message}</div>
                   </div>
                   <button onClick={() => markAlertRead(a.id)} className="text-sm text-gray-400 hover:text-white transition-colors flex-shrink-0 border border-white/10 rounded-lg px-3 py-2">Dismiss</button>
