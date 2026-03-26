@@ -4,13 +4,14 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface Props {
-  user: any; userData: any; jobs: any[]; signins: any[]; alerts: any[]; pendingQA: any[]; teamMembers: any[]
+  user: any; userData: any; jobs: any[]; signins: any[]; alerts: any[]; pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
 }
 
-export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers }: Props) {
+export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments }: Props) {
   const [activeTab, setActiveTab] = useState("overview")
   const [showAddJob, setShowAddJob] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
+  const [assigningJobId, setAssigningJobId] = useState<string|null>(null)
   const [jobName, setJobName] = useState("")
   const [jobAddress, setJobAddress] = useState("")
   const [memberName, setMemberName] = useState("")
@@ -42,6 +43,22 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     setMemberName(""); setMemberEmail(""); setShowAddMember(false); setSaving(false); router.refresh()
   }
 
+  async function toggleAssignment(jobId: string, userId: string) {
+    const existing = jobAssignments.find((a: any) => a.job_id === jobId && a.user_id === userId)
+    if (existing) {
+      await supabase.from("job_assignments").delete().eq("id", existing.id)
+    } else {
+      await supabase.from("job_assignments").insert({ job_id: jobId, user_id: userId, company_id: userData.company_id })
+    }
+    router.refresh()
+  }
+
+  const installers = teamMembers.filter((m: any) => m.role === "installer")
+  const getAssignedInstallers = (jobId: string) => {
+    const assignedIds = jobAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
+    return teamMembers.filter((m: any) => assignedIds.includes(m.id))
+  }
+
   const tabs = [
     { id: "overview", label: "Overview" },
     { id: "approvals", label: "Approvals", badge: pendingQA.length },
@@ -51,25 +68,24 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     { id: "alerts", label: "Alerts", badge: alerts.length },
   ]
 
-  const inp = "w-full bg-[#0f1923] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/60 text-base"
+  const inp = "w-full bg-[#0a1520] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/60 text-base"
 
   return (
     <div className="min-h-screen bg-[#0a1520] text-white">
 
-      {/* Header */}
       <div className="bg-[#0f1e30] border-b border-white/8 px-8 py-5 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-10 h-10 rounded-xl bg-[#00d4a0] flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="2" width="7" height="7" rx="1.5" fill="#0f1923"/>
-              <rect x="11" y="2" width="7" height="7" rx="1.5" fill="#0f1923" opacity="0.7"/>
-              <rect x="2" y="11" width="7" height="7" rx="1.5" fill="#0f1923" opacity="0.7"/>
-              <rect x="11" y="11" width="7" height="7" rx="1.5" fill="#0f1923" opacity="0.4"/>
+              <rect x="2" y="2" width="7" height="7" rx="1.5" fill="#0a1520"/>
+              <rect x="11" y="2" width="7" height="7" rx="1.5" fill="#0a1520" opacity="0.7"/>
+              <rect x="2" y="11" width="7" height="7" rx="1.5" fill="#0a1520" opacity="0.7"/>
+              <rect x="11" y="11" width="7" height="7" rx="1.5" fill="#0a1520" opacity="0.4"/>
             </svg>
           </div>
           <div>
             <div className="font-bold text-lg">Van<span className="text-[#00d4a0]">tro</span></div>
-            <div className="text-sm text-[#7a9ab8]">{userData?.company_name || "Your Company"}</div>
+            <div className="text-sm text-[#7a9ab8]">{userData?.company_name || "Dashboard"}</div>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -81,7 +97,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         </div>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-4 gap-4 px-8 py-6">
         {[
           { label: "On Site Now", value: signins.length, color: "#00d4a0" },
@@ -96,7 +111,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         ))}
       </div>
 
-      {/* Tabs */}
       <div className="flex border-b border-white/8 px-8">
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -107,10 +121,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         ))}
       </div>
 
-      {/* Content */}
       <div className="px-8 py-8 max-w-6xl">
 
-        {/* OVERVIEW */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-2 gap-6">
             <div className="bg-[#0f1e30] border border-white/8 rounded-2xl overflow-hidden">
@@ -118,9 +130,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <span className="text-base font-semibold">Live on site</span>
                 <span className="text-sm bg-[#00d4a0]/10 text-[#00d4a0] px-3 py-1 rounded-full font-medium">{signins.length} active</span>
               </div>
-              {signins.length === 0 ? (
-                <div className="px-6 py-10 text-center text-[#7a9ab8]">No one signed in yet today</div>
-              ) : signins.map((s: any) => (
+              {signins.length === 0 ? <div className="px-6 py-10 text-center text-[#7a9ab8]">No one signed in yet today</div>
+              : signins.map((s: any) => (
                 <div key={s.id} className="flex items-center gap-4 px-6 py-4 border-b border-white/5 last:border-0">
                   <div className="w-10 h-10 rounded-full bg-[#00d4a0]/15 flex items-center justify-center text-sm font-bold text-[#00d4a0]">{s.users?.initials || "?"}</div>
                   <div className="flex-1">
@@ -131,49 +142,53 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 </div>
               ))}
             </div>
-
             <div className="bg-[#0f1e30] border border-white/8 rounded-2xl overflow-hidden">
               <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
                 <span className="text-base font-semibold">Alerts</span>
                 {alerts.length > 0 && <span className="text-sm bg-red-400/10 text-red-400 px-3 py-1 rounded-full font-medium">{alerts.length} unread</span>}
               </div>
-              {alerts.length === 0 ? (
-                <div className="px-6 py-10 text-center text-[#7a9ab8]">No alerts — all clear</div>
-              ) : alerts.slice(0, 5).map((a: any) => (
+              {alerts.length === 0 ? <div className="px-6 py-10 text-center text-[#7a9ab8]">No alerts — all clear</div>
+              : alerts.slice(0, 5).map((a: any) => (
                 <div key={a.id} className="px-6 py-4 border-b border-white/5 last:border-0">
                   <div className="text-sm text-[#7a9ab8] mb-1">{a.jobs?.name}</div>
                   <div className="text-base">{a.message}</div>
                 </div>
               ))}
             </div>
-
             <div className="bg-[#0f1e30] border border-white/8 rounded-2xl overflow-hidden col-span-2">
               <div className="flex items-center justify-between px-6 py-5 border-b border-white/8">
                 <span className="text-base font-semibold">Active jobs</span>
                 <span className="text-sm text-[#7a9ab8]">{jobs.length} total</span>
               </div>
-              {jobs.length === 0 ? (
-                <div className="px-6 py-10 text-center text-[#7a9ab8]">No jobs yet — add one in the Jobs tab</div>
-              ) : jobs.slice(0, 6).map((j: any) => (
-                <div key={j.id} className="flex items-center gap-4 px-6 py-4 border-b border-white/5 last:border-0">
-                  <div className="flex-1">
-                    <div className="text-base font-medium">{j.name}</div>
-                    <div className="text-sm text-[#7a9ab8]">{j.address}</div>
+              {jobs.length === 0 ? <div className="px-6 py-10 text-center text-[#7a9ab8]">No jobs yet</div>
+              : jobs.slice(0, 6).map((j: any) => {
+                const assigned = getAssignedInstallers(j.id)
+                return (
+                  <div key={j.id} className="flex items-center gap-4 px-6 py-4 border-b border-white/5 last:border-0">
+                    <div className="flex-1">
+                      <div className="text-base font-medium">{j.name}</div>
+                      <div className="text-sm text-[#7a9ab8]">{j.address}</div>
+                    </div>
+                    {assigned.length > 0 && (
+                      <div className="flex items-center gap-1">
+                        {assigned.map((a: any) => (
+                          <div key={a.id} className="w-7 h-7 rounded-full bg-[#1a3050] flex items-center justify-center text-xs font-bold">{a.initials}</div>
+                        ))}
+                      </div>
+                    )}
+                    <span className={`text-sm px-3 py-1 rounded-full font-medium ${j.status === "active" ? "bg-[#00d4a0]/10 text-[#00d4a0]" : "bg-white/5 text-[#7a9ab8]"}`}>{j.status}</span>
                   </div>
-                  <span className={`text-sm px-3 py-1 rounded-full font-medium ${j.status === "active" ? "bg-[#00d4a0]/10 text-[#00d4a0]" : "bg-white/5 text-[#7a9ab8]"}`}>{j.status}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
 
-        {/* APPROVALS */}
         {activeTab === "approvals" && (
           <div className="bg-[#0f1e30] border border-white/8 rounded-2xl overflow-hidden">
             <div className="px-6 py-5 border-b border-white/8"><span className="text-base font-semibold">QA approval queue</span></div>
-            {pendingQA.length === 0 ? (
-              <div className="px-6 py-16 text-center text-[#7a9ab8]">Nothing waiting for approval</div>
-            ) : pendingQA.map((qa: any) => (
+            {pendingQA.length === 0 ? <div className="px-6 py-16 text-center text-[#7a9ab8]">Nothing waiting for approval</div>
+            : pendingQA.map((qa: any) => (
               <div key={qa.id} className="px-6 py-5 border-b border-white/5 last:border-0">
                 <div className="flex items-center justify-between gap-4">
                   <div>
@@ -194,7 +209,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           </div>
         )}
 
-        {/* JOBS */}
         {activeTab === "jobs" && (
           <div className="space-y-5">
             <div className="flex justify-end">
@@ -214,23 +228,61 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
             )}
             <div className="bg-[#0f1e30] border border-white/8 rounded-2xl overflow-hidden">
               <div className="px-6 py-5 border-b border-white/8"><span className="text-base font-semibold">All jobs</span></div>
-              {jobs.length === 0 ? (
-                <div className="px-6 py-16 text-center text-[#7a9ab8]">No jobs yet</div>
-              ) : jobs.map((j: any) => (
-                <div key={j.id} className="flex items-center gap-4 px-6 py-5 border-b border-white/5 last:border-0">
-                  <div className="flex-1">
-                    <div className="text-base font-semibold">{j.name}</div>
-                    <div className="text-sm text-[#7a9ab8] mt-0.5">{j.address}</div>
-                    <div className="text-xs text-[#4d6478] mt-1">Added {new Date(j.created_at).toLocaleDateString("en-GB")}</div>
+              {jobs.length === 0 ? <div className="px-6 py-16 text-center text-[#7a9ab8]">No jobs yet</div>
+              : jobs.map((j: any) => {
+                const assigned = getAssignedInstallers(j.id)
+                const isAssigning = assigningJobId === j.id
+                return (
+                  <div key={j.id} className="border-b border-white/5 last:border-0">
+                    <div className="flex items-center gap-4 px-6 py-5">
+                      <div className="flex-1">
+                        <div className="text-base font-semibold">{j.name}</div>
+                        <div className="text-sm text-[#7a9ab8] mt-0.5">{j.address}</div>
+                        {assigned.length > 0 && (
+                          <div className="flex items-center gap-2 mt-2">
+                            {assigned.map((a: any) => (
+                              <span key={a.id} className="text-xs bg-[#1a3050] text-[#7a9ab8] px-2 py-1 rounded-lg font-medium">{a.name}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)}
+                        className="text-sm border border-white/10 text-[#7a9ab8] hover:text-white hover:border-white/20 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                        {isAssigning ? "Done" : "Assign installers"}
+                      </button>
+                      <span className={`text-sm px-3 py-1 rounded-full font-medium flex-shrink-0 ${j.status === "active" ? "bg-[#00d4a0]/10 text-[#00d4a0]" : "bg-white/5 text-[#7a9ab8]"}`}>{j.status}</span>
+                    </div>
+                    {isAssigning && (
+                      <div className="px-6 pb-5">
+                        <div className="bg-[#0a1520] border border-white/8 rounded-xl p-4">
+                          <p className="text-sm text-[#7a9ab8] mb-3">Tap to assign / unassign</p>
+                          {installers.length === 0 ? (
+                            <p className="text-sm text-[#4d6478]">No installers on your team yet — add them in the Team tab</p>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {installers.map((m: any) => {
+                                const isAssigned = jobAssignments.some((a: any) => a.job_id === j.id && a.user_id === m.id)
+                                return (
+                                  <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
+                                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${isAssigned ? "bg-[#00d4a0]/15 text-[#00d4a0] border border-[#00d4a0]/30" : "bg-[#1a3050] text-[#7a9ab8] border border-white/8 hover:border-white/20"}`}>
+                                    <div className="w-6 h-6 rounded-full bg-current/20 flex items-center justify-center text-xs font-bold">{m.initials}</div>
+                                    {m.name}
+                                    {isAssigned && <span className="text-xs">✓</span>}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <span className={`text-sm px-3 py-1 rounded-full font-medium flex-shrink-0 ${j.status === "active" ? "bg-[#00d4a0]/10 text-[#00d4a0]" : "bg-white/5 text-[#7a9ab8]"}`}>{j.status}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
 
-        {/* TEAM */}
         {activeTab === "team" && (
           <div className="space-y-5">
             <div className="flex justify-end">
@@ -250,11 +302,10 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
             )}
             <div className="bg-[#0f1e30] border border-white/8 rounded-2xl overflow-hidden">
               <div className="px-6 py-5 border-b border-white/8"><span className="text-base font-semibold">Team members</span></div>
-              {teamMembers.length === 0 ? (
-                <div className="px-6 py-16 text-center text-[#7a9ab8]">No team members yet</div>
-              ) : teamMembers.map((m: any) => (
+              {teamMembers.length === 0 ? <div className="px-6 py-16 text-center text-[#7a9ab8]">No team members yet</div>
+              : teamMembers.map((m: any) => (
                 <div key={m.id} className="flex items-center gap-4 px-6 py-5 border-b border-white/5 last:border-0">
-                  <div className="w-11 h-11 rounded-full bg-[#1a3050] flex items-center justify-center text-base font-bold text-white flex-shrink-0">{m.initials}</div>
+                  <div className="w-11 h-11 rounded-full bg-[#1a3050] flex items-center justify-center text-base font-bold flex-shrink-0">{m.initials}</div>
                   <div className="flex-1">
                     <div className="text-base font-semibold">{m.name}</div>
                     <div className="text-sm text-[#7a9ab8] mt-0.5">{m.email || "No email"}</div>
@@ -266,14 +317,12 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           </div>
         )}
 
-        {/* PAYROLL */}
         {activeTab === "payroll" && (
           <div className="space-y-5">
             <div className="bg-[#0f1e30] border border-white/8 rounded-2xl overflow-hidden">
               <div className="px-6 py-5 border-b border-white/8"><span className="text-base font-semibold">Hours today — by installer</span></div>
-              {teamMembers.filter((m: any) => m.role === "installer").length === 0 ? (
-                <div className="px-6 py-16 text-center text-[#7a9ab8]">No installers on your team yet</div>
-              ) : teamMembers.filter((m: any) => m.role === "installer").map((m: any) => {
+              {installers.length === 0 ? <div className="px-6 py-16 text-center text-[#7a9ab8]">No installers on your team yet</div>
+              : installers.map((m: any) => {
                 const ms = signins.filter((s: any) => s.user_id === m.id)
                 const hrs = ms.reduce((acc: number, s: any) => {
                   if (s.signed_in_at && s.signed_out_at) return acc + (new Date(s.signed_out_at).getTime() - new Date(s.signed_in_at).getTime()) / 3600000
@@ -281,7 +330,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 }, 0)
                 return (
                   <div key={m.id} className="flex items-center gap-4 px-6 py-5 border-b border-white/5 last:border-0">
-                    <div className="w-11 h-11 rounded-full bg-[#1a3050] flex items-center justify-center text-base font-bold text-white flex-shrink-0">{m.initials}</div>
+                    <div className="w-11 h-11 rounded-full bg-[#1a3050] flex items-center justify-center text-base font-bold flex-shrink-0">{m.initials}</div>
                     <div className="flex-1">
                       <div className="text-base font-semibold">{m.name}</div>
                       <div className="text-sm text-[#7a9ab8]">{m.email}</div>
@@ -294,24 +343,22 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 )
               })}
             </div>
-            <p className="text-sm text-[#4d6478] px-1">Full weekly payroll coming in next build. Currently showing today from live GPS sign-in data.</p>
+            <p className="text-sm text-[#4d6478] px-1">Full weekly payroll coming in next build.</p>
           </div>
         )}
 
-        {/* ALERTS */}
         {activeTab === "alerts" && (
           <div className="bg-[#0f1e30] border border-white/8 rounded-2xl overflow-hidden">
             <div className="px-6 py-5 border-b border-white/8"><span className="text-base font-semibold">SiteLog alerts</span></div>
-            {alerts.length === 0 ? (
-              <div className="px-6 py-16 text-center text-[#7a9ab8]">No alerts — all clear</div>
-            ) : alerts.map((a: any) => (
+            {alerts.length === 0 ? <div className="px-6 py-16 text-center text-[#7a9ab8]">No alerts — all clear</div>
+            : alerts.map((a: any) => (
               <div key={a.id} className="px-6 py-5 border-b border-white/5 last:border-0">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-sm text-[#7a9ab8] mb-1">{a.jobs?.name} · {new Date(a.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div>
                     <div className="text-base">{a.message}</div>
                   </div>
-                  <button onClick={() => markAlertRead(a.id)} className="text-sm text-[#7a9ab8] hover:text-white transition-colors flex-shrink-0 border border-white/10 rounded-lg px-3 py-1.5">Dismiss</button>
+                  <button onClick={() => markAlertRead(a.id)} className="text-sm text-[#7a9ab8] hover:text-white transition-colors flex-shrink-0 border border-white/10 rounded-lg px-3 py-2">Dismiss</button>
                 </div>
               </div>
             ))}
