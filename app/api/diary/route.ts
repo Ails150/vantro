@@ -21,11 +21,9 @@ export async function POST(request: Request) {
 
   const service = await createServiceClient()
 
-  // Get job info
   const { data: job } = await service.from('jobs').select('name, company_id').eq('id', jobId).single()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-  // Save diary entry
   const { data: entry, error } = await service.from('diary_entries').insert({
     job_id: jobId,
     user_id: installer.userId,
@@ -35,7 +33,6 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-  // Run AI analysis in background
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const response = await anthropic.messages.create({
@@ -53,7 +50,7 @@ Classify the entry into exactly one of these three categories:
 Diary entry: "${text}"
 
 Respond with JSON only. For blocker and issue include a brief message for the foreman. For update, message should be null:
-{"type": "blocker"|"issue"|"update", "message": "brief one sentence summary for foreman or null"}`
+{"type": "blocker"|"issue"|"update", "message": "brief one sentence summary or null"}`
       }]
     })
 
@@ -61,7 +58,6 @@ Respond with JSON only. For blocker and issue include a brief message for the fo
     const aiResult = JSON.parse(aiText.replace(/```json|```/g, '').trim())
 
     if (aiResult.type === 'blocker' && aiResult.message) {
-      // Save alert
       await service.from('alerts').insert({
         company_id: job.company_id,
         job_id: jobId,
@@ -70,17 +66,22 @@ Respond with JSON only. For blocker and issue include a brief message for the fo
         alert_type: aiResult.type,
         message: aiResult.message,
       })
-
-      // Mark diary entry as processed
-      await service.from('diary_entries').update({ ai_processed: true, ai_alert_type: aiResult.type }).eq('id', entry.id)
-    }
+      await service.from('diary_entries').update({
+        ai_processed: true,
+        ai_alert_type: 'blocker',
+        ai_summary: aiResult.message
+      }).eq('id', entry.id)
     } else if (aiResult.type === 'issue') {
-      await service.from('diary_entries').update({ ai_alert_type: 'issue', ai_summary: aiResult.message }).eq('id', entry.id)
+      await service.from('diary_entries').update({
+        ai_alert_type: 'issue',
+        ai_summary: aiResult.message
+      }).eq('id', entry.id)
     } else {
-      await service.from('diary_entries').update({ ai_alert_type: 'update' }).eq('id', entry.id)
+      await service.from('diary_entries').update({
+        ai_alert_type: 'update'
+      }).eq('id', entry.id)
     }
   } catch (e) {
-    // AI failed silently â€” diary entry still saved
     console.error('AI processing failed:', e)
   }
 
