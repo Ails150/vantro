@@ -26,8 +26,7 @@ export async function POST(request: Request) {
   const { jobId, lat, lng, accuracy } = await request.json()
   const service = await createServiceClient()
 
-  // Get job location
-  const { data: job } = await service.from('jobs').select('lat, lng, company_id').eq('id', jobId).single()
+  const { data: job } = await service.from('jobs').select('lat, lng, company_id, name').eq('id', jobId).single()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
   let distanceMetres = 0
@@ -36,9 +35,16 @@ export async function POST(request: Request) {
   if (job.lat && job.lng) {
     distanceMetres = Math.round(haversine(lat, lng, job.lat, job.lng))
     withinRange = distanceMetres <= 500
+
+    if (!withinRange) {
+      return NextResponse.json({
+        error: `You are ${distanceMetres}m from ${job.name}. You must be within 500m to sign in.`,
+        distanceMetres,
+        withinRange: false
+      }, { status: 400 })
+    }
   }
 
-  // Save sign-in regardless (flag if out of range)
   const { error } = await service.from('signins').insert({
     job_id: jobId,
     user_id: installer.userId,
