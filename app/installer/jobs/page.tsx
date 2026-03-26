@@ -127,6 +127,19 @@ export default function InstallerJobsPage() {
     })
   }
 
+  async function signOutFromJob(job: any) {
+    const token = localStorage.getItem('vantro_installer_token')
+    await fetch('/api/signout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ jobId: job.id })
+    })
+    setJobs(prev => prev.map((j: any) => j.id === job.id ? { ...j, signed_in: false } : j))
+    setActiveJob(null)
+    setGpsStatus('idle')
+    setView('jobs')
+  }
+
   function signOut() {
     localStorage.removeItem('vantro_installer_token')
     localStorage.removeItem('vantro_installer_id')
@@ -221,12 +234,15 @@ export default function InstallerJobsPage() {
                   >
                     {gpsStatus === 'checking' && activeJob?.id === job.id ? 'Getting location...' : 'Sign in to this job'}
                   </button>
-                ) : activeJob?.id === job.id ? (
-                  <div className="flex gap-2">
-                    <button onClick={() => setView('diary')} className="flex-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg py-2 text-xs font-medium">Site diary</button>
-                    <button onClick={() => setView('qa')} className="flex-1 bg-[#00d4a0]/10 text-[#00d4a0] border border-[#00d4a0]/20 rounded-lg py-2 text-xs font-medium">QA checklist</button>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <button onClick={() => { setActiveJob(job); setView('diary') }} className="flex-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg py-2 text-xs font-medium">Site diary</button>
+                      <button onClick={() => { setActiveJob(job); setView('qa'); loadQA(job) }} className="flex-1 bg-[#00d4a0]/10 text-[#00d4a0] border border-[#00d4a0]/20 rounded-lg py-2 text-xs font-medium">QA checklist</button>
+                    </div>
+                    <button onClick={() => signOutFromJob(job)} className="w-full bg-red-400/10 text-red-400 border border-red-400/20 rounded-lg py-2 text-xs font-medium">Sign out of job</button>
                   </div>
-                ) : null}
+                )}
               </div>
             ))}
           </div>

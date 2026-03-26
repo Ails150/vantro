@@ -34,11 +34,11 @@ export async function POST(request: Request) {
 
   if (job.lat && job.lng) {
     distanceMetres = Math.round(haversine(lat, lng, job.lat, job.lng))
-    withinRange = distanceMetres <= 500
+    withinRange = distanceMetres <= 150
 
     if (!withinRange) {
       return NextResponse.json({
-        error: `You are ${distanceMetres}m from ${job.name}. You must be within 500m to sign in.`,
+        error: `You are ${distanceMetres}m from ${job.name}. You must be within 150m to sign in.`,
         distanceMetres,
         withinRange: false
       }, { status: 400 })
