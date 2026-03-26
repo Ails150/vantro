@@ -40,7 +40,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     const initials = memberName.trim().split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
     const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: "installer", is_active: true })
     if (error) { setFormError(error.message); setSaving(false); return }
-    setMemberName(""); setMemberEmail(""); setShowAddMember(false); setSaving(false); router.refresh()
+    setMemberName(""); setMemberEmail(""); setShowAddMember(false); setSaving(false); window.location.reload()
   }
 
   async function toggleAssignment(jobId: string, userId: string) {
@@ -368,3 +368,4 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
