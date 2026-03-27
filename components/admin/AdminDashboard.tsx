@@ -1,6 +1,7 @@
 ﻿"use client"
 import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
+import DefectsTab from "@/components/admin/DefectsTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -610,6 +611,10 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         {activeTab === "payroll" && (
           <PayrollTab teamMembers={teamMembers} />
         )}
+        {activeTab === "defects" && (
+          <DefectsTab />
+        )}
+
         {activeTab === "alerts" && (
           <div className={card}>
             <div className={cardHeader}><span className="font-semibold">SiteLog alerts</span></div>
