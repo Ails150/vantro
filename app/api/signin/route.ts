@@ -45,17 +45,23 @@ export async function POST(request: Request) {
     }
   }
 
-  // Check already signed in today
+  // Block if already signed in to ANY job
   const today = new Date(); today.setHours(0,0,0,0)
   const { data: existing } = await service.from('signins')
-    .select('id')
-    .eq('job_id', jobId)
+    .select('id, job_id, jobs(name)')
     .eq('user_id', installer.userId)
     .gte('signed_in_at', today.toISOString())
     .is('signed_out_at', null)
-    .single()
-  
-  if (existing) return NextResponse.json({ success: true, distanceMetres, withinRange, alreadySignedIn: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (existing) {
+    if (existing.job_id === jobId) {
+      return NextResponse.json({ success: true, distanceMetres, withinRange, alreadySignedIn: true })
+    }
+    const otherJobName = (existing.jobs as any)?.name || 'another job'
+    return NextResponse.json({ error: `You are already signed in to ${otherJobName}. Sign out first.` }, { status: 400 })
+  }
 
   const { error } = await service.from('signins').insert({
     job_id: jobId,
@@ -71,3 +77,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true, distanceMetres, withinRange })
 }
+
