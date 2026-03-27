@@ -1,5 +1,4 @@
-﻿$fix = @'
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 const geistSans = Geist({
@@ -42,8 +41,3 @@ export default function RootLayout({
     </html>
   );
 }
-'@
-Set-Content "C:\vantro\app\layout.tsx" $fix -Encoding UTF8
-git add .
-git commit -m "remove service worker and manifest - fix black screen"
-git push origin master
