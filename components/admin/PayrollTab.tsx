@@ -70,17 +70,7 @@ export default function PayrollTab({ teamMembers }: Props) {
     fetchPayroll()
   }
 
-  async function saveSigninEdit(signinId: string) {
-    setEditSaving(true)
-    await fetch("/api/payroll/edit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ signinId, signed_in_at: editSigninTime, signed_out_at: editSignoutTime || null })
-    })
-    setEditingSignin(null)
-    setEditSaving(false)
-    fetchPayroll()
-  }
+  
 
   function getInstallerSignins(id: string) {
     return signins.filter((s: any) => s.user_id === id)
