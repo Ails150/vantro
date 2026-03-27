@@ -424,8 +424,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                             </select>
                           </div>
                           <div>
-                          
-                          <div>
                           <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template</label>
                             <select value={editJobTemplateId} onChange={e => setEditJobTemplateId(e.target.value)} className={inp}>
                               <option value="">No checklist</option>
