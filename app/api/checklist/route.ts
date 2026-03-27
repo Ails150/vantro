@@ -47,8 +47,11 @@ export async function POST(request: Request) {
 
   if (action === 'delete_item') {
     const { itemId } = body
-    await service.from('checklist_items').delete().eq('id', itemId)
-    return NextResponse.json({ success: true })
+    console.log('Deleting item:', itemId)
+    const { error, count } = await service.from('checklist_items').delete({ count: 'exact' }).eq('id', itemId)
+    console.log('Delete result:', { error, count })
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true, deleted: count })
   }
 
   if (action === 'delete_template') {
