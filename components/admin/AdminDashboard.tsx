@@ -1,5 +1,6 @@
 ﻿"use client"
 import PayrollTab from "@/components/admin/PayrollTab"
+import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
@@ -326,28 +327,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           <AnalyticsTab companyId={userData.company_id} teamMembers={teamMembers} jobs={jobs} />
         )}
         {activeTab === "approvals" && (
-          <div className={card}>
-            <div className={cardHeader}><span className="font-semibold">QA approval queue</span></div>
-            {pendingQA.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>Nothing waiting for approval</div>
-            : pendingQA.map((qa: any) => (
-              <div key={qa.id} className="px-6 py-5 border-b border-gray-50 last:border-0">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <div className="w-8 h-8 rounded-full bg-teal-50 flex items-center justify-center text-sm font-bold text-teal-600">{qa.users?.initials || "?"}</div>
-                      <span className="font-semibold">{qa.users?.name}</span>
-                      <span className={"text-sm " + sub}>on {qa.jobs?.name}</span>
-                    </div>
-                    {qa.notes && <div className={"text-sm " + sub}>Note: {qa.notes}</div>}
-                  </div>
-                  <div className="flex gap-3">
-                    <button onClick={() => approveQA(qa.id)} className="bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 rounded-xl px-4 py-2 text-sm font-semibold">Approve</button>
-                    <button onClick={() => { const note = window.prompt("Rejection reason:"); if (note) rejectQA(qa.id, note) }} className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl px-4 py-2 text-sm font-semibold">Reject</button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+          <ApprovalsTab pendingQA={pendingQA} onRefresh={() => router.refresh()} />
         )}
 
         {activeTab === "jobs" && (
