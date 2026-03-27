@@ -33,6 +33,10 @@ export default function PayrollTab({ teamMembers }: Props) {
   const [editSigninTime, setEditSigninTime] = useState("")
   const [editSignoutTime, setEditSignoutTime] = useState("")
   const [editSaving, setEditSaving] = useState(false)
+  const [editingSignin, setEditingSignin] = useState<string|null>(null)
+  const [editSigninTime, setEditSigninTime] = useState("")
+  const [editSignoutTime, setEditSignoutTime] = useState("")
+  const [editSaving, setEditSaving] = useState(false)
 
   function getRange() {
     if (mode === "this_week") return getWeekRange(0)
@@ -57,6 +61,18 @@ export default function PayrollTab({ teamMembers }: Props) {
   }
 
   useEffect(() => { fetchPayroll() }, [mode, customFrom, customTo])
+
+  async function saveSigninEdit(signinId: string) {
+    setEditSaving(true)
+    await fetch("/api/payroll/edit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ signinId, signed_in_at: editSigninTime, signed_out_at: editSignoutTime || null })
+    })
+    setEditingSignin(null)
+    setEditSaving(false)
+    fetchPayroll()
+  }
 
   async function saveSigninEdit(signinId: string) {
     setEditSaving(true)
