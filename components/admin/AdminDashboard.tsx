@@ -142,7 +142,9 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     if (!window.confirm("Remove this installer from your team? This cannot be undone.")) return
     await supabase.from("users").delete().eq("id", userId)
     if (authUserId) {
-      await fetch("/api/team/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ authUserId }) })
+      await fetch("/api/team/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ authUserId, userId }) })
+        router.refresh()
+      router.refresh()
     }
     router.refresh()
   }
@@ -638,6 +640,10 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
+
+
+
 
 
 
