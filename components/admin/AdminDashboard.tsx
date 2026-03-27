@@ -439,7 +439,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " âœ“"}
+                                  {m.name}{isAssigned && " ✓"}
                                 </button>
                               )
                             })}
@@ -466,8 +466,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Role</label>
                   <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
-                    <option value="installer">Installer â€” PIN app access only</option>
-                    <option value="foreman">Foreman â€” PIN app + alert emails</option>
+                    <option value="installer">Installer — PIN app access only</option>
+                    <option value="foreman">Foreman — PIN app + alert emails</option>
                   </select>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}

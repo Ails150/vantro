@@ -71,7 +71,7 @@ export default function OnboardingPage() {
           <div className="flex items-center gap-2 mb-8">
             {['Company','Team'].map((label, i) => (
               <div key={label} className="flex items-center gap-2 flex-1 last:flex-none">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-all ${i < stepIdx ? 'bg-[#00d4a0] text-[#0f1923]' : i === stepIdx ? 'border-2 border-[#00d4a0] text-[#00d4a0]' : 'border-2 border-white/10 text-[#4d6478]'}`}>{i < stepIdx ? 'âœ“' : i + 1}</div>
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-all ${i < stepIdx ? 'bg-[#00d4a0] text-[#0f1923]' : i === stepIdx ? 'border-2 border-[#00d4a0] text-[#00d4a0]' : 'border-2 border-white/10 text-[#4d6478]'}`}>{i < stepIdx ? '✓' : i + 1}</div>
                 <span className={`text-sm ${i === stepIdx ? 'text-white font-medium' : 'text-[#4d6478]'}`}>{label}</span>
                 {i < 1 && <div className="flex-1 h-px bg-white/5"/>}
               </div>
