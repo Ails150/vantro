@@ -47,20 +47,14 @@ export async function POST(request: Request) {
 
   if (action === 'delete_item') {
     const { itemId } = body
-    console.log('Deleting item:', itemId)
-    const { error, count } = await service.from('checklist_items').delete({ count: 'exact' }).eq('id', itemId)
-    console.log('Delete result:', { error, count })
+    await service.from('qa_submissions').delete().eq('checklist_item_id', itemId)
+    await service.from('qa_submissions').delete().eq('checklist_item_id', itemId)
+    const { error } = await service.from('checklist_items').delete().eq('id', itemId)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ success: true, deleted: count })
-  }
-
-  if (action === 'delete_template') {
-    const { templateId } = body
-    await service.from('checklist_items').delete().eq('template_id', templateId)
-    await service.from('checklist_templates').delete().eq('id', templateId)
     return NextResponse.json({ success: true })
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
+
 
