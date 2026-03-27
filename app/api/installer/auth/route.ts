@@ -28,3 +28,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ token, userId: matchedUser.id, name: matchedUser.name, companyId: matchedUser.company_id, role: matchedUser.role })
 }
+
