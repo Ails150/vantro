@@ -32,6 +32,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [jobLat, setJobLat] = useState(null)
   const [jobLng, setJobLng] = useState(null)
   const [editJobLat, setEditJobLat] = useState(null)
+  const [editJobStatus, setEditJobStatus] = useState("")
   const [editJobLng, setEditJobLng] = useState(null)
   const addAddressRef = useRef(null)
   const editAddressRef = useRef(null)
@@ -104,7 +105,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   async function updateJob(jobId: string) {
     if (!editJobName.trim() || !editJobAddress.trim()) { setFormError("Enter job name and address"); return }
     setSaving(true); setFormError("")
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng, status: editJobStatus || j.status }).eq("id", jobId)
     if (error) { setFormError(error.message); setSaving(false); return }
     setEditingJobId(null); setSaving(false)
     router.refresh()
@@ -415,7 +416,16 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                           <input value={editJobName} onChange={e => setEditJobName(e.target.value)} placeholder="Job name" className={inp}/>
                           <input ref={editAddressRef} value={editJobAddress} onChange={e => setEditJobAddress(e.target.value)} placeholder="Start typing site address..." className={inp}/>
                           <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template</label>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
+                            <select value={editJobStatus || j.status} onChange={e => setEditJobStatus(e.target.value)} className={inp}>
+                              <option value="active">Active</option>
+                              <option value="on_hold">On hold</option>
+                              <option value="completed">Completed</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </div>
+                          <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template</label>
                             <select value={editJobTemplateId} onChange={e => setEditJobTemplateId(e.target.value)} className={inp}>
                               <option value="">No checklist</option>
                               {checklistTemplates.map((t: any) => <option key={t.id} value={t.id}>{t.name} ({t.checklist_items?.length || 0} items)</option>)}
