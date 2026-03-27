@@ -37,9 +37,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Vantro"/>
         <meta name="theme-color" content="#00d4a0"/>
         <link rel="manifest" href="/manifest.json"/>
-        <link rel="apple-touch-icon" href="/icon-192.png"/>
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+        <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js');})}` }}/>
       </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }
+
