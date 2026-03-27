@@ -424,14 +424,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                             </select>
                           </div>
                           <div>
-                          <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
-                            <select value={editJobStatus || j.status} onChange={e => setEditJobStatus(e.target.value)} className={inp}>
-                              <option value="active">Active</option>
-                              <option value="on_hold">On hold</option>
-                              <option value="completed">Completed</option>
-                              <option value="cancelled">Cancelled</option>
-                            </select>
-                          </div>
+                          
                           <div>
                           <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template</label>
                             <select value={editJobTemplateId} onChange={e => setEditJobTemplateId(e.target.value)} className={inp}>
