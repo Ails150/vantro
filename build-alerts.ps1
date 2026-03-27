@@ -1,4 +1,6 @@
-﻿import { NextResponse } from 'next/server'
+﻿# 1. Update diary route to send email alerts
+$diary = @"
+import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Anthropic from '@anthropic-ai/sdk'
 
@@ -61,3 +63,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true, entry })
 }
+"@
+Set-Content "C:\vantro\app\api\diary\route.ts" $diary -Encoding UTF8
+Write-Host "Diary route updated"
