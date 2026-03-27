@@ -33,10 +33,6 @@ export default function PayrollTab({ teamMembers }: Props) {
   const [editSigninTime, setEditSigninTime] = useState("")
   const [editSignoutTime, setEditSignoutTime] = useState("")
   const [editSaving, setEditSaving] = useState(false)
-  const [editingSignin, setEditingSignin] = useState<string|null>(null)
-  const [editSigninTime, setEditSigninTime] = useState("")
-  const [editSignoutTime, setEditSignoutTime] = useState("")
-  const [editSaving, setEditSaving] = useState(false)
 
   function getRange() {
     if (mode === "this_week") return getWeekRange(0)
