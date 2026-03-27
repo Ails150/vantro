@@ -216,6 +216,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     { id: "diary", label: "Diary" },
     { id: "payroll", label: "Payroll" },
     { id: "alerts", label: "Alerts", badge: alerts.length },
+    { id: "defects", label: "Defects" },
   ]
 
   const inp = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
@@ -637,6 +638,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
 
 
 
