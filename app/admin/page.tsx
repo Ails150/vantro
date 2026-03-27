@@ -12,7 +12,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .from('users')
     .select('id, company_id, name, role')
     .eq('auth_user_id', user.id)
-    .eq('role', 'admin')
+    .in('role', ['admin', 'foreman'])
     .single()
 
   if (userError || !userData || !userData.company_id) redirect('/onboarding')
@@ -44,3 +44,4 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     />
   )
 }
+
