@@ -9,7 +9,7 @@ export default function InstallerJobsPage() {
   const [loading, setLoading] = useState(true)
   const [installerName, setInstallerName] = useState('')
   const [activeJob, setActiveJob] = useState<any>(null)
-  const [view, setView] = useState<'jobs'|'diary'|'qa'>('jobs')
+  const [view, setView] = useState<'jobs'|'diary'|'qa'|'defects'>('jobs')
   const [diaryText, setDiaryText] = useState('')
   const [diaryLoading, setDiaryLoading] = useState(false)
   const [diarySuccess, setDiarySuccess] = useState(false)
@@ -588,3 +588,4 @@ export default function InstallerJobsPage() {
     </div>
   )
 }
+
