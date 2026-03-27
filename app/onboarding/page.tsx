@@ -113,28 +113,6 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {step === 'jobs' && (
-            <div>
-              <h1 className="text-xl font-semibold mb-1">Add your active jobs</h1>
-              <p className="text-[#4d6478] text-sm mb-6">Add more any time from your dashboard.</p>
-              <div className="space-y-2">
-                {jobs.map((job, i) => (
-                  <div key={i} className="flex gap-2">
-                    <input value={job.name} onChange={e => { const u=[...jobs]; u[i]={...u[i],name:e.target.value}; setJobs(u) }} placeholder="Job name" className="flex-1 bg-[#243040] border border-white/5 rounded-lg px-3 py-2.5 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm"/>
-                    <input value={job.address} onChange={e => { const u=[...jobs]; u[i]={...u[i],address:e.target.value}; setJobs(u) }} placeholder="Site address" className="flex-1 bg-[#243040] border border-white/5 rounded-lg px-3 py-2.5 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm"/>
-                    {jobs.length > 1 && <button onClick={() => setJobs(jobs.filter((_,idx)=>idx!==i))} className="text-[#4d6478] hover:text-red-400 px-2">-</button>}
-                  </div>
-                ))}
-              </div>
-              <button onClick={() => setJobs([...jobs,{name:'',address:''}])} className="mt-3 text-sm text-[#00d4a0] flex items-center gap-1">+ Add another job</button>
-              {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3 mt-4">{error}</p>}
-              <div className="flex gap-3 mt-6">
-                <button onClick={() => setStep('installers')} className="flex-1 bg-[#243040] text-[#8fa3b8] rounded-xl py-3 text-sm">Back</button>
-                <button onClick={saveJobs} disabled={loading} className="flex-[2] bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-40 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors">{loading ? 'Saving...' : 'Go to dashboard'}</button>
-              </div>
-            </div>
-          )}
-
           {step === 'done' && (
             <div className="text-center">
               <div className="w-16 h-16 rounded-full bg-[#00d4a0]/10 border border-[#00d4a0]/20 flex items-center justify-center mx-auto mb-5">
@@ -150,4 +128,5 @@ export default function OnboardingPage() {
     </div>
   )
 }
+
 
