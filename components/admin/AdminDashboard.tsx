@@ -32,6 +32,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [jobTemplateId, setJobTemplateId] = useState("")
   const [jobLat, setJobLat] = useState(null)
   const [jobLng, setJobLng] = useState(null)
+  const [jobPlaceSelected, setJobPlaceSelected] = useState(false)
+  const [editJobPlaceSelected, setEditJobPlaceSelected] = useState(false)
   const [editJobLat, setEditJobLat] = useState(null)
   const [editJobStatus, setEditJobStatus] = useState("")
   const [editJobLng, setEditJobLng] = useState(null)
@@ -63,6 +65,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           const place = ac.getPlace()
           if (place.formatted_address) setJobAddress(place.formatted_address)
           if (place.geometry?.location) { setJobLat(place.geometry.location.lat()); setJobLng(place.geometry.location.lng()) }
+          setJobPlaceSelected(true)
         })
       }
       if (editAddressRef.current) {
@@ -71,6 +74,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           const place = ac2.getPlace()
           if (place.formatted_address) setEditJobAddress(place.formatted_address)
           if (place.geometry?.location) { setEditJobLat(place.geometry.location.lat()); setEditJobLng(place.geometry.location.lng()) }
+          setEditJobPlaceSelected(true)
         })
       }
     }
@@ -96,16 +100,18 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   async function markAlertRead(id: string) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
 
   async function addJob() {
-    if (!jobName.trim() || !jobAddress.trim()) { setFormError("Enter job name and address"); return }
+    if (!jobName.trim()) { setFormError("Enter a job name"); return }
+    if (!jobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
     const { error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng })
     if (error) { setFormError(error.message); setSaving(false); return }
-    setJobName(""); setJobAddress(""); setJobTemplateId(""); setShowAddJob(false); setSaving(false)
+    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false)
     router.refresh()
   }
 
   async function updateJob(jobId: string) {
-    if (!editJobName.trim() || !editJobAddress.trim()) { setFormError("Enter job name and address"); return }
+    if (!editJobName.trim()) { setFormError("Enter a job name"); return }
+    if (!editJobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
     const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng, status: editJobStatus || "active" }).eq("id", jobId)
     if (error) { setFormError(error.message); setSaving(false); return }
@@ -230,7 +236,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
-      <div className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between shadow-sm">
+      <div className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-teal-400 flex items-center justify-center flex-shrink-0">
             <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
@@ -254,34 +260,34 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 px-8 py-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 px-4 md:px-8 py-4 md:py-6">
         {[
           { label: "On Site Now", value: signins.length, color: "text-teal-500" },
           { label: "Active Jobs", value: jobs.filter((j: any) => j.status === "active").length, color: "text-gray-900" },
           { label: "Awaiting Approval", value: pendingQA.length, color: "text-amber-500" },
           { label: "Unread Alerts", value: alerts.length, color: "text-red-500" },
         ].map(s => (
-          <div key={s.label} className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-            <div className="text-gray-500 text-sm font-medium mb-2">{s.label}</div>
-            <div className={"text-4xl font-bold " + s.color}>{s.value}</div>
+          <div key={s.label} className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6 shadow-sm">
+            <div className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">{s.label}</div>
+            <div className={"text-3xl md:text-4xl font-bold " + s.color}>{s.value}</div>
           </div>
         ))}
       </div>
 
-      <div className="flex border-b border-gray-200 px-8 bg-white overflow-x-auto">
+      <div className="flex border-b border-gray-200 px-2 md:px-8 bg-white overflow-x-auto">
         {tabs.map(tab => (
           <button key={tab.id} onClick={() => switchTab(tab.id)}
-            className={"flex items-center gap-2 px-4 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap " + (activeTab === tab.id ? "border-teal-400 text-teal-600" : "border-transparent text-gray-500 hover:text-gray-900")}>
+            className={"flex items-center gap-2 px-3 md:px-4 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap " + (activeTab === tab.id ? "border-teal-400 text-teal-600" : "border-transparent text-gray-500 hover:text-gray-900")}>
             {tab.label}
             {tab.badge ? <span className="bg-teal-50 text-teal-600 text-xs font-bold px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
           </button>
         ))}
       </div>
 
-      <div className="px-8 py-6 max-w-6xl">
+      <div className="px-4 md:px-8 py-4 md:py-6 max-w-6xl">
 
         {activeTab === "overview" && (
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className={card}>
               <div className={cardHeader}>
                 <span className="font-semibold">Live on site</span>
@@ -309,7 +315,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 </div>
               ))}
             </div>
-            <div className={card + " col-span-2"}>
+            <div className={card + " md:col-span-2"}>
               <div className={cardHeader}>
                 <span className="font-semibold">Active jobs</span>
                 <span className={"text-sm " + sub}>{jobs.length} total</span>
@@ -339,7 +345,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
               <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
                 <h3 className="font-semibold">New job</h3>
                 <input value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={inp}/>
-                <input ref={addAddressRef} value={jobAddress} onChange={e => setJobAddress(e.target.value)} placeholder="Start typing site address..." className={inp}/>
+                <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template (optional)</label>
                   <select value={jobTemplateId} onChange={e => setJobTemplateId(e.target.value)} className={inp}>
@@ -382,7 +388,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobPlaceSelected(true); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -395,7 +401,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
                           <h4 className="text-sm font-semibold">Edit job</h4>
                           <input value={editJobName} onChange={e => setEditJobName(e.target.value)} placeholder="Job name" className={inp}/>
-                          <input ref={editAddressRef} value={editJobAddress} onChange={e => setEditJobAddress(e.target.value)} placeholder="Start typing site address..." className={inp}/>
+                          <input ref={editAddressRef} value={editJobAddress} onChange={e => { setEditJobAddress(e.target.value); setEditJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
                             <select value={editJobStatus || j.status} onChange={e => setEditJobStatus(e.target.value)} className={inp}>
@@ -633,4 +639,5 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
 

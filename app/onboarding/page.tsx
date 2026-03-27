@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-type Step = 'company' | 'installers' | 'jobs' | 'done'
+type Step = 'company' | 'installers' | 'done'
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -14,7 +14,6 @@ export default function OnboardingPage() {
   const [error, setError] = useState('')
   const [companyName, setCompanyName] = useState('')
   const [installers, setInstallers] = useState([{ name: '', email: '' }])
-  const [jobs, setJobs] = useState([{ name: '', address: '' }])
 
   useEffect(() => {
     async function checkExisting() {
@@ -45,15 +44,6 @@ export default function OnboardingPage() {
     const res = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step: 'installers', installers: valid }) })
     const data = await res.json()
     if (!res.ok) { setError(data.error); setLoading(false); return }
-    setStep('jobs'); setLoading(false)
-  }
-
-  async function saveJobs() {
-    setLoading(true); setError('')
-    const valid = jobs.filter(j => j.name && j.address)
-    const res = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step: 'jobs', jobs: valid }) })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error); setLoading(false); return }
     setStep('done'); setLoading(false)
   }
 
@@ -63,7 +53,7 @@ export default function OnboardingPage() {
     </div>
   )
 
-  const stepIdx = ['company','installers','jobs','done'].indexOf(step)
+  const stepIdx = ['company','installers','done'].indexOf(step)
 
   return (
     <div className="min-h-screen bg-[#0f1923] text-white flex items-center justify-center px-4 py-12">
@@ -79,11 +69,11 @@ export default function OnboardingPage() {
 
         {step !== 'done' && (
           <div className="flex items-center gap-2 mb-8">
-            {['Company','Team','Jobs'].map((label, i) => (
+            {['Company','Team'].map((label, i) => (
               <div key={label} className="flex items-center gap-2 flex-1 last:flex-none">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 transition-all ${i < stepIdx ? 'bg-[#00d4a0] text-[#0f1923]' : i === stepIdx ? 'border-2 border-[#00d4a0] text-[#00d4a0]' : 'border-2 border-white/10 text-[#4d6478]'}`}>{i < stepIdx ? 'âœ“' : i + 1}</div>
                 <span className={`text-sm ${i === stepIdx ? 'text-white font-medium' : 'text-[#4d6478]'}`}>{label}</span>
-                {i < 2 && <div className="flex-1 h-px bg-white/5"/>}
+                {i < 1 && <div className="flex-1 h-px bg-white/5"/>}
               </div>
             ))}
           </div>
@@ -160,3 +150,4 @@ export default function OnboardingPage() {
     </div>
   )
 }
+
