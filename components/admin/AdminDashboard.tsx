@@ -21,6 +21,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [showAddItem, setShowAddItem] = useState(null)
   const [assigningJobId, setAssigningJobId] = useState(null)
   const [jobFilter, setJobFilter] = useState("active")
+  const [jobFilter, setJobFilter] = useState("active")
   const [editingJobId, setEditingJobId] = useState(null)
   const [editJobName, setEditJobName] = useState("")
   const [editJobAddress, setEditJobAddress] = useState("")
