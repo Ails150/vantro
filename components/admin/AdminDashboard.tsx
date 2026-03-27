@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import DefectsTab from "@/components/admin/DefectsTab"
@@ -39,6 +39,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const editAddressRef = useRef(null)
   const [memberName, setMemberName] = useState("")
   const [memberEmail, setMemberEmail] = useState("")
+  const [memberRole, setMemberRole] = useState("installer")
   const [templateName, setTemplateName] = useState("")
   const [itemLabel, setItemLabel] = useState("")
   const [itemType, setItemType] = useState("tick")
@@ -114,32 +115,24 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
 
   async function deleteJob(jobId: string, jobName: string) {
     if (!window.confirm("Delete job: " + jobName + "? This cannot be undone.")) return
-    const res = await fetch("/api/jobs/delete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ jobId })
-    })
-    if (res.ok) {
-      window.location.href = "/admin?tab=jobs"
-    } else {
-      const d = await res.json()
-      alert("Failed to delete: " + d.error)
-    }
+    const res = await fetch("/api/jobs/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId }) })
+    if (res.ok) { window.location.href = "/admin?tab=jobs" }
+    else { const d = await res.json(); alert("Failed to delete: " + d.error) }
   }
 
   async function addMember() {
     if (!memberName.trim() || !memberEmail.trim()) { setFormError("Enter name and email"); return }
     setSaving(true); setFormError("")
     const initials = memberName.trim().split(" ").map((n: any) => n[0]).join("").toUpperCase().slice(0, 2)
-    const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: "installer", is_active: true })
+    const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: memberRole, is_active: true })
     if (error) { setFormError(error.message); setSaving(false); return }
     try { await fetch("/api/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: memberEmail.trim(), name: memberName.trim() }) }) } catch(e) {}
-    setMemberName(""); setMemberEmail(""); setShowAddMember(false); setSaving(false)
+    setMemberName(""); setMemberEmail(""); setMemberRole("installer"); setShowAddMember(false); setSaving(false)
     router.refresh()
   }
 
   async function removeMember(userId: string, authUserId: string) {
-    if (!window.confirm("Remove this installer from your team? This cannot be undone.")) return
+    if (!window.confirm("Remove this member from your team? This cannot be undone.")) return
     const res = await fetch("/api/team/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ authUserId, userId }) })
     if (res.ok) window.location.reload()
   }
@@ -197,7 +190,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     router.refresh()
   }
 
-  const installers = teamMembers.filter((m: any) => m.role === "installer")
+  const installers = teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman")
   const getAssigned = (jobId: string) => {
     const ids = jobAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
     return teamMembers.filter((m: any) => ids.includes(m.id))
@@ -228,6 +221,12 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     { value: "pass_fail", label: "Pass / Fail" },
     { value: "measurement", label: "Measurement" },
   ]
+
+  const roleColors: any = {
+    admin: "bg-purple-50 text-purple-700",
+    foreman: "bg-blue-50 text-blue-700",
+    installer: "bg-gray-100 text-gray-600",
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -330,12 +329,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           </div>
         )}
 
-        {activeTab === "analytics" && (
-          <AnalyticsTab companyId={userData.company_id} teamMembers={teamMembers} jobs={jobs} />
-        )}
-        {activeTab === "approvals" && (
-          <ApprovalsTab pendingQA={pendingQA} onRefresh={() => router.refresh()} />
-        )}
+        {activeTab === "analytics" && <AnalyticsTab companyId={userData.company_id} teamMembers={teamMembers} jobs={jobs} />}
+        {activeTab === "approvals" && <ApprovalsTab pendingQA={pendingQA} onRefresh={() => router.refresh()} />}
 
         {activeTab === "jobs" && (
           <div className="space-y-5">
@@ -462,6 +457,13 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <p className="text-sm text-gray-500">They will receive an email invite to set up their account.</p>
                 <input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="Full name" className={inp}/>
                 <input value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="Email address" type="email" className={inp}/>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Role</label>
+                  <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
+                    <option value="installer">Installer — PIN app access only</option>
+                    <option value="foreman">Foreman — PIN app + alert emails</option>
+                  </select>
+                </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
                   <button onClick={addMember} disabled={saving} className={btn}>{saving ? "Saving..." : "Save and send invite"}</button>
@@ -482,8 +484,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                       {m.is_active === false && <span className="text-xs text-amber-500">Suspended</span>}
                       {!m.pin_hash && m.role === "installer" && <span className="text-xs text-red-400 ml-2">PIN not set</span>}
                     </div>
-                    <span className="text-sm bg-gray-100 text-gray-600 px-3 py-1 rounded-full capitalize font-medium flex-shrink-0">{m.role}</span>
-                    {m.role === "installer" && (
+                    <span className={"text-sm px-3 py-1 rounded-full capitalize font-medium flex-shrink-0 " + (roleColors[m.role] || "bg-gray-100 text-gray-600")}>{m.role}</span>
+                    {(m.role === "installer" || m.role === "foreman") && (
                       <div className="flex gap-2">
                         <button onClick={() => resendInvite(m.email, m.name)} className="text-xs border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-lg px-3 py-1.5 transition-colors">Resend invite</button>
                         <button onClick={() => resetPin(m.id)} className="text-xs border border-gray-200 text-gray-600 hover:border-amber-300 hover:text-amber-600 rounded-lg px-3 py-1.5 transition-colors">Reset PIN</button>
@@ -606,12 +608,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           </div>
         )}
 
-        {activeTab === "payroll" && (
-          <PayrollTab teamMembers={teamMembers} />
-        )}
-        {activeTab === "defects" && (
-          <DefectsTab />
-        )}
+        {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
+        {activeTab === "defects" && <DefectsTab />}
 
         {activeTab === "alerts" && (
           <div className={card}>
