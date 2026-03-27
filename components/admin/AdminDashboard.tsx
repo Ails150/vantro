@@ -104,7 +104,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   async function updateJob(jobId: string) {
     if (!editJobName.trim() || !editJobAddress.trim()) { setFormError("Enter job name and address"); return }
     setSaving(true); setFormError("")
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng, status: editJobStatus || j.status }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng, status: editJobStatus || "active" }).eq("id", jobId)
     if (error) { setFormError(error.message); setSaving(false); return }
     setEditingJobId(null); setSaving(false)
     router.refresh()
@@ -652,6 +652,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
 
 
 
