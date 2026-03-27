@@ -1,5 +1,4 @@
-﻿$fix = @'
-  async function signOutFromJob(job: any) {
+﻿async function signOutFromJob(job: any) {
     const token = localStorage.getItem('vantro_installer_token')
     if (!navigator.geolocation) {
       alert('Location not available on this device')
@@ -30,20 +29,3 @@
       alert('Could not get your location. Please enable location access to sign out.')
     }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
   }
-'@
-
-$content = Get-Content "C:\vantro\app\installer\jobs\page.tsx" -Raw
-$old = '  async function signOutFromJob(job: any) {
-    const token = localStorage.getItem(''vantro_installer_token'')
-    await fetch(''/api/signout'', {
-      method: ''POST'',
-      headers: { ''Content-Type'': ''application/json'', ''Authorization'': ''Bearer '' + token },
-      body: JSON.stringify({ jobId: job.id })
-    })
-    setJobs(prev => prev.map((j: any) => j.id === job.id ? { ...j, signed_in: false } : j))
-    setActiveJob(null)
-    setGpsStatus(''idle'')
-    setView(''jobs'')
-  }'
-$content.Replace($old, $fix) | Set-Content "C:\vantro\app\installer\jobs\page.tsx" -Encoding UTF8
-Write-Host "Done"
