@@ -33,6 +33,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [jobLng, setJobLng] = useState(null)
   const [editJobLat, setEditJobLat] = useState(null)
   const [editJobStatus, setEditJobStatus] = useState("")
+  const [editJobStatus, setEditJobStatus] = useState("")
   const [editJobLng, setEditJobLng] = useState(null)
   const addAddressRef = useRef(null)
   const editAddressRef = useRef(null)
@@ -417,6 +418,15 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                           <input ref={editAddressRef} value={editJobAddress} onChange={e => setEditJobAddress(e.target.value)} placeholder="Start typing site address..." className={inp}/>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
+                            <select value={editJobStatus || j.status} onChange={e => setEditJobStatus(e.target.value)} className={inp}>
+                              <option value="active">Active</option>
+                              <option value="on_hold">On hold</option>
+                              <option value="completed">Completed</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </div>
+                          <div>
+                          <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
                             <select value={editJobStatus || j.status} onChange={e => setEditJobStatus(e.target.value)} className={inp}>
                               <option value="active">Active</option>
                               <option value="on_hold">On hold</option>
