@@ -434,6 +434,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                           <div className="flex gap-3">
                             <button onClick={() => updateJob(j.id)} disabled={saving} className={btn}>{saving ? "Saving..." : "Save changes"}</button>
                             <button onClick={() => setEditingJobId(null)} className={btnGhost}>Cancel</button>
+                            <button onClick={() => deleteJob(j.id, j.name)} className="bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 rounded-xl px-5 py-2.5 text-sm transition-colors">Delete</button>
                           </div>
                         </div>
                       </div>
