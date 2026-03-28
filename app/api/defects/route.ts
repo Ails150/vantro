@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 function getInstallerFromToken(request: Request) {
@@ -26,7 +26,17 @@ export async function GET(request: Request) {
   if (jobId) query = query.eq('job_id', jobId)
 
   const { data } = await query
-  return NextResponse.json({ defects: data || [] })
+
+  // Generate signed URLs for photos
+  const defectsWithSignedUrls = await Promise.all((data || []).map(async (defect: any) => {
+    if (defect.photo_path) {
+      const { data: signedData } = await service.storage.from('vantro-media').createSignedUrl(defect.photo_path, 3600)
+      return { ...defect, photo_url: signedData?.signedUrl || defect.photo_url }
+    }
+    return defect
+  }))
+
+  return NextResponse.json({ defects: defectsWithSignedUrls })
 }
 
 export async function POST(request: Request) {
