@@ -72,6 +72,32 @@ export async function POST(request: Request) {
       is_read: false
     })
 
+    // Push notify admin and foreman
+    const { data: admins } = await service.from("users")
+      .select("push_token, name")
+      .eq("company_id", resolvedCompanyId)
+      .in("role", ["admin", "foreman"])
+      .not("push_token", "is", null)
+
+    if (admins && admins.length > 0) {
+      const tokens = admins.map((a: any) => a.push_token).filter(Boolean)
+      if (tokens.length > 0) {
+        const { data: jobData } = await service.from("jobs").select("name").eq("id", jobId).single()
+        await fetch("https://exp.host/--/api/v2/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(tokens.map((token: string) => ({
+            to: token,
+            sound: "default",
+            title: aiAlertType === "blocker" ? "ðŸš¨ BLOCKER on site" : "âš ï¸ Issue flagged",
+            body: (jobData?.name || "Job") + ": " + (aiSummary || entryText.slice(0, 80)),
+            data: { type: "diary_alert", jobId, alertType: aiAlertType },
+            channelId: "vantro",
+          })))
+        }).catch(() => {})
+      }
+    }
+
     const { data: recipients } = await service.from("users").select("email, name").eq("company_id", resolvedCompanyId).in("role", ["admin", "foreman"])
     if (recipients && recipients.length > 0 && process.env.RESEND_API_KEY) {
       for (const recipient of recipients.filter((r: any) => r.email)) {
