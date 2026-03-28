@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     const completion = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 200,
-      messages: [{ role: "user", content: "Analyse this site diary entry. Reply with JSON only: {\"alert_type\": \"blocker\"|\"issue\"|\"none\", \"summary\": \"one sentence\"}. Entry: " + entryText }]
+      messages: [{ role: "user", content: "You are a construction site supervisor AI. Analyse this site diary entry and classify it. Reply with JSON only - no other text: {\"alert_type\": \"blocker\"|\"issue\"|\"none\", \"summary\": \"one sentence max 15 words\"}.\n\nBLOCKER = work cannot continue today. Examples: no workers on site, missing materials, access denied, safety hazard, waiting for delivery, nobody turned up.\nISSUE = problem that needs attention but work can continue. Examples: minor delay, quality concern, one person missing.\nNONE = normal progress update.\n\nEntry: " + entryText }]
     })
     const parsed = JSON.parse(completion.content[0].type === "text" ? completion.content[0].text : "{}")
     aiAlertType = parsed.alert_type || null
