@@ -1,14 +1,40 @@
-﻿import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
-import Anthropic from '@anthropic-ai/sdk'
+import { NextResponse } from "next/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
+import Anthropic from "@anthropic-ai/sdk"
+
+function getInstallerFromToken(request: Request) {
+  const auth = request.headers.get("authorization")
+  if (!auth?.startsWith("Bearer ")) return null
+  try {
+    const payload = JSON.parse(Buffer.from(auth.slice(7), "base64").toString())
+    if (payload.exp < Date.now()) return null
+    return payload
+  } catch { return null }
+}
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const service = await createServiceClient()
   const body = await request.json()
-  const { jobId, entryText, companyId, userId } = body
+  const { jobId, entryText } = body
+
+  let resolvedUserId: string
+  let resolvedCompanyId: string
+
+  const auth = request.headers.get("authorization")
+  if (auth?.startsWith("Bearer ")) {
+    const installer = getInstallerFromToken(request)
+    if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    resolvedUserId = installer.userId
+    resolvedCompanyId = installer.companyId
+  } else {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { data: u } = await service.from("users").select("id, company_id").eq("auth_user_id", user.id).single()
+    if (!u) return NextResponse.json({ error: "User not found" }, { status: 404 })
+    resolvedUserId = u.id
+    resolvedCompanyId = u.company_id
+  }
 
   let aiAlertType = null
   let aiSummary = null
@@ -16,45 +42,49 @@ export async function POST(request: Request) {
   try {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
     const completion = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 200,
-      messages: [{ role: 'user', content: 'Analyse this site diary entry. Reply with JSON only: {"alert_type": "blocker"|"issue"|"none", "summary": "one sentence"}. Entry: ' + entryText }]
+      messages: [{ role: "user", content: "Analyse this site diary entry. Reply with JSON only: {\"alert_type\": \"blocker\"|\"issue\"|\"none\", \"summary\": \"one sentence\"}. Entry: " + entryText }]
     })
-    const parsed = JSON.parse(completion.content[0].type === 'text' ? completion.content[0].text : '{}')
+    const parsed = JSON.parse(completion.content[0].type === "text" ? completion.content[0].text : "{}")
     aiAlertType = parsed.alert_type || null
     aiSummary = parsed.summary || null
   } catch(e) {}
 
-  const { data: entry } = await service.from('diary_entries').insert({
-    job_id: jobId, company_id: companyId, user_id: userId,
-    entry_text: entryText, ai_alert_type: aiAlertType, ai_summary: aiSummary
+  const { data: entry } = await service.from("diary_entries").insert({
+    job_id: jobId,
+    company_id: resolvedCompanyId,
+    user_id: resolvedUserId,
+    entry_text: entryText,
+    ai_alert_type: aiAlertType,
+    ai_summary: aiSummary
   }).select().single()
 
-  if (aiAlertType && aiAlertType !== 'none') {
-    const { data: job } = await service.from('jobs').select('name').eq('id', jobId).single()
-    const { data: alertUser } = await service.from('users').select('name').eq('id', userId).single()
+  if (aiAlertType && aiAlertType !== "none") {
+    const { data: job } = await service.from("jobs").select("name").eq("id", jobId).single()
+    const { data: alertUser } = await service.from("users").select("name").eq("id", resolvedUserId).single()
 
-    await service.from('alerts').insert({
-      company_id: companyId, job_id: jobId,
-      message: (aiAlertType === 'blocker' ? 'BLOCKER' : 'ISSUE') + ' — ' + (aiSummary || entryText.slice(0, 100)),
-      alert_type: aiAlertType, is_read: false
+    await service.from("alerts").insert({
+      company_id: resolvedCompanyId,
+      job_id: jobId,
+      message: (aiAlertType === "blocker" ? "BLOCKER" : "ISSUE") + " - " + (aiSummary || entryText.slice(0, 100)),
+      alert_type: aiAlertType,
+      is_read: false
     })
 
-    const { data: recipients } = await service.from('users').select('email, name').eq('company_id', companyId).in('role', ['admin', 'foreman'])
-
+    const { data: recipients } = await service.from("users").select("email, name").eq("company_id", resolvedCompanyId).in("role", ["admin", "foreman"])
     if (recipients && recipients.length > 0 && process.env.RESEND_API_KEY) {
-      const emailList = recipients.filter(r => r.email)
-      for (const recipient of emailList) {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: { 'Authorization': 'Bearer ' + process.env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      for (const recipient of recipients.filter((r: any) => r.email)) {
+        await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: { "Authorization": "Bearer " + process.env.RESEND_API_KEY, "Content-Type": "application/json" },
           body: JSON.stringify({
-            from: 'Vantro Alerts <alerts@getvantro.com>',
+            from: "Vantro Alerts <alerts@getvantro.com>",
             to: recipient.email,
-            subject: (aiAlertType === 'blocker' ? 'BLOCKER' : 'ISSUE') + ' — ' + (job?.name || 'Job'),
-            html: '<div style="font-family:sans-serif;max-width:600px;margin:0 auto"><div style="background:#00C896;padding:20px;border-radius:8px 8px 0 0"><h2 style="color:white;margin:0">Vantro Alert</h2></div><div style="padding:24px;background:#f9f9f9;border-radius:0 0 8px 8px"><p style="font-size:18px;font-weight:bold;color:' + (aiAlertType === 'blocker' ? '#dc2626' : '#d97706') + '">' + (aiAlertType === 'blocker' ? 'BLOCKER' : 'ISSUE') + '</p><p><strong>Job:</strong> ' + (job?.name || 'Unknown') + '</p><p><strong>Logged by:</strong> ' + (alertUser?.name || 'Unknown') + '</p><p><strong>Summary:</strong> ' + (aiSummary || entryText) + '</p><a href="https://app.getvantro.com/admin" style="display:inline-block;margin-top:16px;padding:12px 24px;background:#00C896;color:white;border-radius:8px;text-decoration:none;font-weight:bold">View Dashboard</a></div></div>'
+            subject: (aiAlertType === "blocker" ? "BLOCKER" : "ISSUE") + " - " + (job?.name || "Job"),
+            html: "<div style=\"font-family:sans-serif\"><h2>Vantro Alert</h2><p><strong>" + (aiAlertType === "blocker" ? "BLOCKER" : "ISSUE") + "</strong></p><p>Job: " + (job?.name || "Unknown") + "</p><p>By: " + (alertUser?.name || "Unknown") + "</p><p>" + (aiSummary || entryText) + "</p><a href=\"https://app.getvantro.com/admin\">View Dashboard</a></div>"
           })
-        })
+        }).catch(() => {})
       }
     }
   }
