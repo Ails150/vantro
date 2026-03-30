@@ -19,7 +19,6 @@ async function sendPushNotification(tokens: string[], title: string, body: strin
 }
 
 export async function GET(request: Request) {
-  // Verify this is called by Vercel cron
   const authHeader = request.headers.get("authorization")
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -28,20 +27,17 @@ export async function GET(request: Request) {
   const service = await createServiceClient()
   const now = new Date()
   const hour = now.getUTCHours()
-  const ukHour = (hour + 1) % 24 // BST offset (approximate)
+  const ukHour = (hour + 1) % 24 // BST offset
 
-  // â”€â”€ Sign-in reminder at 8:30am â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // â”€â”€ 8:30am: Sign-in reminder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (ukHour === 8) {
     const today = new Date(); today.setHours(0,0,0,0)
 
-    // Get all active job assignments
     const { data: assignments } = await service
       .from("job_assignments")
       .select("user_id, job_id, jobs(name, status), users(name, push_token)")
-      .eq("jobs.status", "active")
 
     if (assignments) {
-      // Get who has already signed in today
       const { data: signins } = await service
         .from("signins")
         .select("user_id")
@@ -65,8 +61,10 @@ export async function GET(request: Request) {
     }
   }
 
-  // â”€â”€ Sign-out reminder at 6pm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  if (ukHour === 18) {
+  // â”€â”€ 6pm: First sign-out reminder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // REMINDER ONLY - never auto sign out
+  // Accurate payroll requires installer to sign out themselves
+  if (ukHour === 17) {
     const today = new Date(); today.setHours(0,0,0,0)
 
     const { data: activeSignins } = await service
@@ -84,8 +82,58 @@ export async function GET(request: Request) {
         await sendPushNotification(
           [user.push_token],
           "Still signed in",
-          `You're still signed in to ${job?.name}. Did you forget to sign out?`,
-          { type: "signout_reminder", jobId: signin.job_id }
+          `You are still signed in to ${job?.name}. Please sign out when you leave site.`,
+          { type: "signout_reminder_1", jobId: signin.job_id }
+        )
+      }
+    }
+
+    // Also notify admin of anyone still on site at 6pm
+    if (activeSignins && activeSignins.length > 0) {
+      const uniqueCompanies = new Set(activeSignins.map((s: any) => s.jobs?.company_id).filter(Boolean))
+      for (const companyId of uniqueCompanies) {
+        const { data: admins } = await service.from("users")
+          .select("push_token")
+          .eq("company_id", companyId)
+          .in("role", ["admin", "foreman"])
+          .not("push_token", "is", null)
+
+        if (admins && admins.length > 0) {
+          const tokens = admins.map((a: any) => a.push_token).filter(Boolean)
+          const stillOnSite = activeSignins.filter((s: any) => s.jobs?.company_id === companyId)
+          await sendPushNotification(
+            tokens,
+            `${stillOnSite.length} installer${stillOnSite.length > 1 ? "s" : ""} still signed in`,
+            `${stillOnSite.map((s: any) => (s.users as any)?.name).join(", ")} still on site at 6pm`,
+            { type: "admin_still_on_site" }
+          )
+        }
+      }
+    }
+  }
+
+  // â”€â”€ 7pm: Second sign-out reminder (urgent) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Still REMINDER ONLY - payroll accuracy depends on installer signing out
+  if (ukHour === 18) {
+    const today = new Date(); today.setHours(0,0,0,0)
+
+    const { data: activeSignins } = await service
+      .from("signins")
+      .select("user_id, job_id, jobs(name), users(name, push_token)")
+      .gte("signed_in_at", today.toISOString())
+      .is("signed_out_at", null)
+
+    if (activeSignins) {
+      for (const signin of activeSignins) {
+        const user = signin.users as any
+        const job = signin.jobs as any
+        if (!user?.push_token) continue
+
+        await sendPushNotification(
+          [user.push_token],
+          "Please sign out now",
+          `You are still signed in to ${job?.name}. Your manager has been notified. Please sign out.`,
+          { type: "signout_reminder_2", jobId: signin.job_id }
         )
       }
     }
