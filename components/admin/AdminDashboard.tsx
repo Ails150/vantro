@@ -487,8 +487,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Role</label>
                   <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
-                    <option value="installer">Installer — PIN app access only</option>
-                    <option value="foreman">Foreman — PIN app + alert emails</option>
+                    <option value="installer">Installer - PIN app access only</option>
+                    <option value="foreman">Foreman - PIN app + alert emails</option>
                   </select>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
