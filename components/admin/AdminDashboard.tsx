@@ -99,21 +99,17 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   async function handleSignOut() { await supabase.auth.signOut(); router.push("/login") }
   async function approveQA(id: string) { await supabase.from("qa_submissions").update({ state: "approved", reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
   async function rejectQA(id: string, note: string) { await supabase.from("qa_submissions").update({ state: "rejected", rejection_note: note, reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
-  async function markAlertRead(id: string) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
-
   async function resolveAlert(id: string) {
     if (!resolutionNote.trim()) { alert("Please enter a resolution note"); return }
     setSaving(true)
-    await fetch("/api/alerts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ alertId: id, resolutionNote })
-    })
+    await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ alertId: id, resolutionNote }) })
     setResolvingAlert(null)
     setResolutionNote("")
     setSaving(false)
     router.refresh()
   }
+
+  async function markAlertRead(id: string) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
 
   async function addJob() {
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
@@ -460,7 +456,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " "}
+                                  {m.name}{isAssigned && " ✓"}
                                 </button>
                               )
                             })}
@@ -487,8 +483,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Role</label>
                   <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
-                    <option value="installer">Installer - PIN app access only</option>
-                    <option value="foreman">Foreman - PIN app + alert emails</option>
+                    <option value="installer">Installer — PIN app access only</option>
+                    <option value="foreman">Foreman — PIN app + alert emails</option>
                   </select>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
@@ -602,6 +598,10 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                     <button onClick={() => deleteItem(item.id)} className={"text-xs " + sub + " hover:text-red-500 transition-colors"}>Remove</button>
                   </div>
                 ))}
+              </div>
+            ))}
+          </div>
+        )}
 
         {activeTab === "diary" && (
           <div className={card}>
@@ -622,12 +622,15 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                     </div>
                     <p className="text-sm text-gray-700">{d.entry_text}</p>
                   </div>
-                  {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-medium font-bold"> BLOCKER</span>}
-                  {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full flex-shrink-0 font-medium"> Issue</span>}
+                  {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-medium font-bold">ðŸš¨ BLOCKER</span>}
+                  {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full flex-shrink-0 font-medium">âš ï¸ Issue</span>}
                   {d.ai_alert_type === 'none' && <span className="text-xs bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full flex-shrink-0">Normal</span>}
                   {d.ai_summary && <span className="text-xs text-gray-500 italic ml-1">{d.ai_summary}</span>}
                 </div>
-
+              </div>
+            ))}
+          </div>
+        )}
 
         {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
         {activeTab === "defects" && <DefectsTab />}
@@ -651,16 +654,17 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                   </div>
                   <button onClick={() => { setResolvingAlert(resolvingAlert === a.id ? null : a.id); setResolutionNote("") }} className="text-sm bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 flex-shrink-0 font-medium">Resolve</button>
                 </div>
-                {resolvingAlert === a.id && (
-                  <div className="mt-3 flex gap-2">
-                    <input value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="Enter resolution note - this will be sent to the installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)} />
-                    <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving ? "Sending..." : "Send & resolve"}</button>
-                  </div>
-                )}
+              {resolvingAlert === a.id && (
+                <div className="mt-3 flex gap-2">
+                  <input value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="Enter resolution note - sent to installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)} />
+                  <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving ? "Sending..." : "Send & resolve"}</button>
+                </div>
+              )}
               </div>
             ))}
           </div>
         )}
+
       </div>
     </div>
   )
