@@ -197,7 +197,11 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     if (!editJobName.trim()) { setFormError("Enter a job name"); return }
     if (!editJobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng, status: editJobStatus || "active" }).eq("id", jobId)
+    const newStatus = editJobStatus || "active"
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng, status: newStatus }).eq("id", jobId)
+    if (newStatus === "completed" || newStatus === "cancelled") {
+      await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
+    }
     if (error) { setFormError(error.message); setSaving(false); return }
     setEditingJobId(null); setSaving(false)
     router.refresh()
