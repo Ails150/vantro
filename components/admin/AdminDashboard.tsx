@@ -460,7 +460,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " ✓"}
+                                  {m.name}{isAssigned && " "}
                                 </button>
                               )
                             })}
@@ -622,8 +622,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                     </div>
                     <p className="text-sm text-gray-700">{d.entry_text}</p>
                   </div>
-                  {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-medium font-bold">ðŸš¨ BLOCKER</span>}
-                  {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full flex-shrink-0 font-medium">âš ï¸ Issue</span>}
+                  {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-medium font-bold"> BLOCKER</span>}
+                  {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full flex-shrink-0 font-medium"> Issue</span>}
                   {d.ai_alert_type === 'none' && <span className="text-xs bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full flex-shrink-0">Normal</span>}
                   {d.ai_summary && <span className="text-xs text-gray-500 italic ml-1">{d.ai_summary}</span>}
                 </div>
