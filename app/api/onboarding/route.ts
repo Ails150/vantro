@@ -51,7 +51,18 @@ export async function POST(request: Request) {
 
   if (step === 'installers') {
     const { installers } = body
-    const { data: userData } = await service.from('users').select('company_id').eq('auth_user_id', user.id).single()
+    let { data: userData } = await service.from('users').select('company_id').eq('auth_user_id', user.id).single()
+    if (!userData) {
+      const companyName = user.user_metadata?.company_name || 'My Company'
+      const slug = companyName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) + '_' + Math.random().toString(36).slice(2, 6)
+      const { data: company } = await service.from('companies').insert({ name: companyName, slug }).select().single()
+      if (!company) return NextResponse.json({ error: 'Could not create company' }, { status: 400 })
+      const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Admin'
+      const initials = fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+      await service.from('users').insert({ company_id: company.id, email: user.email, name: fullName, initials, role: 'admin', auth_user_id: user.id })
+      const { data: newUser } = await service.from('users').select('company_id').eq('auth_user_id', user.id).single()
+      userData = newUser
+    }
     if (!userData) return NextResponse.json({ error: 'Company not found' }, { status: 400 })
 
     const valid = installers.filter((i: any) => i.name && i.email)
@@ -62,7 +73,7 @@ export async function POST(request: Request) {
       email: inst.email,
       name: inst.name,
       initials: inst.name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2),
-      role: 'installer',
+      role: inst.role || 'installer',
       is_active: true,
     }))
 
