@@ -602,8 +602,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                     <button onClick={() => deleteItem(item.id)} className={"text-xs " + sub + " hover:text-red-500 transition-colors"}>Remove</button>
                   </div>
                 ))}
-              {resolvingAlert === a.id && (
-                  <div className="mt-3 flex gap-2">
+
+
                     <input
                       value={resolutionNote}
                       onChange={e => setResolutionNote(e.target.value)}
@@ -645,8 +645,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                   {d.ai_alert_type === 'none' && <span className="text-xs bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full flex-shrink-0">Normal</span>}
                   {d.ai_summary && <span className="text-xs text-gray-500 italic ml-1">{d.ai_summary}</span>}
                 </div>
-              {resolvingAlert === a.id && (
-                  <div className="mt-3 flex gap-2">
+
+
                     <input
                       value={resolutionNote}
                       onChange={e => setResolutionNote(e.target.value)}
