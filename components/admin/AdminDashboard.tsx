@@ -30,6 +30,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [jobName, setJobName] = useState("")
   const [jobAddress, setJobAddress] = useState("")
   const [jobTemplateId, setJobTemplateId] = useState("")
+  const [jobTemplateIds, setJobTemplateIds] = useState<string[]>([])
+  const [editJobTemplateIds, setEditJobTemplateIds] = useState<string[]>([])
   const [jobLat, setJobLat] = useState(null)
   const [jobLng, setJobLng] = useState(null)
   const [jobPlaceSelected, setJobPlaceSelected] = useState(false)
@@ -183,7 +185,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     setSaving(true); setFormError("")
     const { error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng })
     if (error) { setFormError(error.message); setSaving(false); return }
-    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false)
+    if (jobTemplateIds.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJob.data.id, templateId: tid }) }) } } }
+    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false)
     router.refresh()
   }
 
@@ -477,14 +480,14 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                       <div className="flex-1">
                         <div className="font-semibold">{j.name}</div>
                         <div className={"text-sm " + sub + " mt-0.5"}>{j.address}</div>
-                        {template && <div className="text-xs text-teal-600 mt-1">Checklist: {template.name}</div>}
+                        {(j.job_checklists || []).map((jc: any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full mr-1">{checklistTemplates.find((t:any) => t.id === jc.template_id)?.name}</span>)}
                         {assigned.length > 0 && (
                           <div className="flex gap-2 mt-2 flex-wrap">
                             {assigned.map((a: any) => <span key={a.id} className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-lg font-medium">{a.name}</span>)}
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobPlaceSelected(true); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); setEditJobPlaceSelected(true); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -786,6 +789,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
+
 
 
 
