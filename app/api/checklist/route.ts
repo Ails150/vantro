@@ -64,8 +64,12 @@ export async function POST(request: Request) {
 
   if (action === 'remove_from_job') {
     const { jobId, templateId } = body
-    const { error } = await service.from('job_checklists').delete().eq('job_id', jobId).eq('template_id', templateId)
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (templateId === 'all') {
+      await service.from('job_checklists').delete().eq('job_id', jobId)
+    } else {
+      const { error } = await service.from('job_checklists').delete().eq('job_id', jobId).eq('template_id', templateId)
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     return NextResponse.json({ success: true })
   }
 
@@ -86,6 +90,7 @@ export async function POST(request: Request) {
   }
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
+
 
 
 
