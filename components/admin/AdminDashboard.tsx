@@ -446,11 +446,17 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 <input value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={inp}/>
                 <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template (optional)</label>
-                  <select value={jobTemplateId} onChange={e => setJobTemplateId(e.target.value)} className={inp}>
-                    <option value="">No checklist</option>
-                    {checklistTemplates.map((t: any) => <option key={t.id} value={t.id}>{t.name} ({t.checklist_items?.length || 0} items)</option>)}
-                  </select>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Checklists (optional)</label>
+                  <div className="space-y-2 mt-1">
+                    {checklistTemplates.map((t: any) => (
+                      <label key={t.id} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={jobTemplateIds?.includes(t.id) || false} onChange={e => setJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="w-4 h-4 accent-teal-500"/>
+                        <span className="text-sm text-gray-700">{t.name}</span>
+                        {t.requires_approval && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded">Approval</span>}
+                        {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Audit</span>}
+                      </label>
+                    ))}
+                  </div>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
@@ -511,11 +517,17 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                             </select>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Checklist template</label>
-                            <select value={editJobTemplateId} onChange={e => setEditJobTemplateId(e.target.value)} className={inp}>
-                              <option value="">No checklist</option>
-                              {checklistTemplates.map((t: any) => <option key={t.id} value={t.id}>{t.name} ({t.checklist_items?.length || 0} items)</option>)}
-                            </select>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Checklists</label>
+                            <div className="space-y-2 mt-1">
+                              {checklistTemplates.map((t: any) => (
+                                <label key={t.id} className="flex items-center gap-2 cursor-pointer">
+                                  <input type="checkbox" checked={editJobTemplateIds?.includes(t.id) || false} onChange={e => setEditJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="w-4 h-4 accent-teal-500"/>
+                                  <span className="text-sm text-gray-700">{t.name}</span>
+                                  {t.requires_approval && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded">Approval</span>}
+                                  {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Audit</span>}
+                                </label>
+                              ))}
+                            </div>
                           </div>
                           {formError && <p className="text-sm text-red-500">{formError}</p>}
                           <div className="flex gap-3">
@@ -628,8 +640,16 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                     <span className="font-semibold">{t.name}</span>
                     <span className={"text-sm " + sub + " ml-3"}>{t.checklist_items?.length || 0} items</span>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => { setShowAddItem(t.id); setFormError("") }} className="text-sm bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 rounded-xl px-3 py-1.5 font-medium">+ Add item</button>
+                  <div className="flex gap-2 flex-wrap items-center">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600">
+                      <input type="checkbox" checked={t.requires_approval || false} onChange={async e => { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_template", templateId: t.id, requires_approval: e.target.checked, audit_only: t.audit_only || false }) }); window.location.reload() }} className="w-3.5 h-3.5 accent-teal-500"/>
+                      Requires approval
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600">
+                      <input type="checkbox" checked={t.audit_only || false} onChange={async e => { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_template", templateId: t.id, requires_approval: t.requires_approval || false, audit_only: e.target.checked }) }); window.location.reload() }} className="w-3.5 h-3.5 accent-teal-500"/>
+                      Audit only
+                    </label>
+                    <<button onClick={() => { setShowAddItem(t.id); setFormError("") }} className="text-sm bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 rounded-xl px-3 py-1.5 font-medium">+ Add item</button>
                     <button onClick={() => deleteTemplate(t.id)} className="text-sm bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-1.5 font-medium">Delete</button>
                   </div>
                 </div>
@@ -789,6 +809,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
 
 
 
