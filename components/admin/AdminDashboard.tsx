@@ -735,7 +735,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
               ))}
             </div>
           )}
-        )}
 
         {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
         {activeTab === "defects" && <DefectsTab />}
