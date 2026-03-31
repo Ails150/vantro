@@ -113,6 +113,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const supabase = createClient()
 
   useEffect(() => {
+    if (!showAddJob && !editingJobId) return
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
     if (!key) return
     function init() {
