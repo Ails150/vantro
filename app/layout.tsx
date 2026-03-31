@@ -12,6 +12,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Vantro",
   description: "Field operations app for installers",
+  icons: {
+    icon: "/icon-32x32.png",
+    apple: "/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
