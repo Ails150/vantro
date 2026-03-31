@@ -54,7 +54,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   }
 
+
+  if (action === 'assign_to_job') {
+    const { jobId, templateId } = body
+    const { error } = await service.from('job_checklists').upsert({ job_id: jobId, template_id: templateId }, { onConflict: 'job_id,template_id' })
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'remove_from_job') {
+    const { jobId, templateId } = body
+    const { error } = await service.from('job_checklists').delete().eq('job_id', jobId).eq('template_id', templateId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'update_template') {
+    const { templateId, requires_approval, audit_only } = body
+    const { error } = await service.from('checklist_templates').update({ requires_approval, audit_only }).eq('id', templateId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true })
+  }
+
+  if (action === 'delete_template') {
+    const { templateId } = body
+    await service.from('job_checklists').delete().eq('template_id', templateId)
+    await service.from('checklist_items').delete().eq('template_id', templateId)
+    const { error } = await service.from('checklist_templates').delete().eq('id', templateId)
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    return NextResponse.json({ success: true })
+  }
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
+
 
 
