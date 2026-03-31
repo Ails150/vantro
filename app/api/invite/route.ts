@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   const { data, error } = await service.auth.admin.generateLink({
     type: 'invite',
     email,
-    options: { redirectTo: 'https://app.getvantro.com/installer/setup' }
+    options: { redirectTo: 'vantro://login?email=' + encodeURIComponent(email) }
   })
   if (error && !error.message.includes('already been registered')) {
     return NextResponse.json({ error: error.message }, { status: 400 })
@@ -88,3 +88,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
