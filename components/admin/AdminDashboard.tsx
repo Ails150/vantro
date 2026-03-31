@@ -159,7 +159,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     setResolvingAlert(null)
     setResolutionNote("")
     setSaving(false)
-    router.refresh()
+    window.location.reload()
   }
 
   async function replyToDiary(entryId: string, userId: string) {
