@@ -15,7 +15,8 @@ export async function GET(request: Request) {
     const service = await createServiceClient()
     const { data: userData } = await service.from('users').select('role, email').eq('auth_user_id', user.id).single()
     if (userData?.role === 'installer') {
-      return NextResponse.redirect(`${origin}/installer/setup?email=${encodeURIComponent(userData.email)}`)
+      const email = encodeURIComponent(userData.email || user.email || '')
+      return NextResponse.redirect(`${origin}/installer/setup?email=${email}`)
     }
     return NextResponse.redirect(`${origin}/admin`)
   }
@@ -38,5 +39,3 @@ export async function GET(request: Request) {
 
   return NextResponse.redirect(`${origin}/login?error=auth`)
 }
-
-
