@@ -31,6 +31,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [jobAddress, setJobAddress] = useState("")
   const [jobTemplateId, setJobTemplateId] = useState("")
   const [jobTemplateIds, setJobTemplateIds] = useState<string[]>([])
+  const [jobAssignedMembers, setJobAssignedMembers] = useState<string[]>([])
   const [editJobTemplateIds, setEditJobTemplateIds] = useState<string[]>([])
   const [jobLat, setJobLat] = useState(null)
   const [jobLng, setJobLng] = useState(null)
@@ -186,7 +187,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     const { error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng })
     if (error) { setFormError(error.message); setSaving(false); return }
     if (jobTemplateIds.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJob.data.id, templateId: tid }) }) } } }
-    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false)
+    if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
+    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false)
     router.refresh()
   }
 
@@ -809,6 +811,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
 
 
 
