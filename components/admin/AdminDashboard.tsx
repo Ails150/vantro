@@ -6,6 +6,7 @@ import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import SetupWizard from "./SetupWizard"
 
 interface Props {
   user: any; userData: any; jobs: any[]; signins: any[]; alerts: any[]
