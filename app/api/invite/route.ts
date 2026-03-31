@@ -68,9 +68,9 @@ export async function POST(request: Request) {
         <p style="color:#0A1A14;font-weight:700;margin-bottom:8px">Step 1 — Download the app</p>
         <a href="https://expo.dev/artifacts/eas/jv9C6GjU5CmEKDC1F4PPnA.apk" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-bottom:24px">Download Vantro for Android →</a>
         <p style="color:#4A6158;line-height:1.6;margin-bottom:4px">After downloading, <strong style="color:#0A1A14">open your notifications bar</strong> and tap the downloaded file to install it. If you see a warning about unknown sources, tap <strong style="color:#0A1A14">Settings → Allow</strong>, then come back and tap Install.</p>
-        <p style="color:#0A1A14;font-weight:700;margin-top:24px;margin-bottom:8px">Step 2 — Set up your account</p>
+        <p style="color:#0A1A14;font-weight:700;margin-top:24px;margin-bottom:8px">Step 2 — Set up your PIN</p>
         ${inviteUrl ? `<a href="${inviteUrl}" style="display:inline-block;background:#0A1A14;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem">Activate your account →</a>` : ''}
-        <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">This sets your PIN for daily sign-in. Open this link on your phone after installing the app.</p>
+        <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">Open the Vantro app, tap <strong style="color:#0A1A14">New installer? Set up here</strong> at the bottom, enter your email and choose your 4-digit PIN.</p>
         <p style="color:#888;font-size:12px;margin-top:24px">Invite link expires in 24 hours. Ask your manager to resend if expired.</p>
         <p style="color:#888;font-size:12px">Vantro · getvantro.com</p>
       </div>`

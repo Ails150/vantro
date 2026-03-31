@@ -48,6 +48,9 @@ export default function OnboardingPage() {
     const res = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ step: 'installers', installers: valid }) })
     const data = await res.json()
     if (!res.ok) { setError(data.error); setLoading(false); return }
+    for (const inst of valid) {
+      await fetch('/api/invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: inst.email, name: inst.name, role: inst.role || 'installer' }) })
+    }
     setStep('done'); setLoading(false)
   }
 
