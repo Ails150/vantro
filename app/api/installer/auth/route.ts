@@ -4,13 +4,15 @@ import bcrypt from 'bcryptjs'
 
 export async function POST(request: Request) {
   const body = await request.json()
+
   if (body.checkOnly) {
-    const service = await (await import('@/lib/supabase/server')).createServiceClient()
+    const service = await createServiceClient()
     const { data: user } = await service.from('users').select('id, pin_hash').ilike('email', body.email).single()
-    if (!user) return (await import('next/server')).NextResponse.json({ exists: false })
-    return (await import('next/server')).NextResponse.json({ exists: true, hasPin: !!user.pin_hash })
+    if (!user) return NextResponse.json({ exists: false })
+    return NextResponse.json({ exists: true, hasPin: !!user.pin_hash })
   }
-  const { pin } = await request.json()
+
+  const { pin } = body
   if (!pin || pin.length !== 4) return NextResponse.json({ error: 'Invalid PIN' }, { status: 400 })
 
   const service = await createServiceClient()
@@ -35,5 +37,3 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ token, userId: matchedUser.id, name: matchedUser.name, companyId: matchedUser.company_id, role: matchedUser.role })
 }
-
-
