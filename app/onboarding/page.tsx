@@ -109,7 +109,7 @@ export default function OnboardingPage() {
                   </div>
                 ))}
               </div>
-              <button onClick={() => setInstallers([...installers,{name:'',email:''}])} className="mt-3 text-sm text-[#00d4a0] flex items-center gap-1">+ Add another person</button>
+              <button onClick={() => setInstallers([...installers,{name:'',email:'',role:'installer'}])} className="mt-3 text-sm text-[#00d4a0] flex items-center gap-1">+ Add another person</button>
               {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3 mt-4">{error}</p>}
               <div className="flex gap-3 mt-6">
                 <button onClick={() => setStep('company')} className="flex-1 bg-[#243040] text-[#8fa3b8] rounded-xl py-3 text-sm">Back</button>
