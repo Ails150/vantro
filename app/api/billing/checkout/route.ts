@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
 
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as Stripe.CheckoutSession
+    const session = event.data.object as Stripe.Checkout.Session
     const companyId = session.metadata?.company_id
     const subscriptionId = session.subscription as string
     await service.from('users')
