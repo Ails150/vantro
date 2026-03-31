@@ -216,14 +216,14 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
       if (!res.ok) {
         const msg = data.error || ""
         if (msg.includes("duplicate") || msg.includes("unique")) {
-          setError("That email address is already on your team.")
+          setFormError("That email address is already on your team.")
         } else {
-          setError(msg || "Something went wrong. Please try again.")
+          setFormError(msg || "Something went wrong. Please try again.")
         }
         setSaving(false)
         return
       }
-    } catch(e) { setError("Something went wrong. Please try again."); setSaving(false); return }
+    } catch(e) { setFormError("Something went wrong. Please try again."); setSaving(false); return }
     setMemberName(""); setMemberEmail(""); setMemberRole("installer"); setShowAddMember(false); setSaving(false)
     router.refresh()
   }
@@ -786,6 +786,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     </div>
   )
 }
+
 
 
 
