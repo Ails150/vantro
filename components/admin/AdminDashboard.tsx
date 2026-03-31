@@ -52,6 +52,9 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [saving, setSaving] = useState(false)
   const [resolvingAlert, setResolvingAlert] = useState<string|null>(null)
   const [resolutionNote, setResolutionNote] = useState("")
+  const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
+  const [diaryReply, setDiaryReply] = useState("")
+  const [replySending, setReplySending] = useState(false)
   const [liveAlerts, setLiveAlerts] = useState<any[]>(alerts)
   const prevAlertCount = useRef(alerts.length)
 
@@ -145,6 +148,19 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     setResolutionNote("")
     setSaving(false)
     router.refresh()
+  }
+
+  async function replyToDiary(entryId: string, userId: string) {
+    if (!diaryReply.trim()) { alert("Please enter a reply"); return }
+    setReplySending(true)
+    await fetch("/api/diary/reply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entryId, userId, message: diaryReply })
+    })
+    setReplyingDiary(null)
+    setDiaryReply("")
+    setReplySending(false)
   }
 
   async function markAlertRead(id: string) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
