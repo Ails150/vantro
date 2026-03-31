@@ -679,11 +679,18 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                     </div>
                     <p className="text-sm text-gray-700">{d.entry_text}</p>
                   </div>
-                  {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-medium font-bold">"BLOCKER"</span>}
+                  {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-bold">BLOCKER</span>}
                   {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full flex-shrink-0 font-medium">Issue</span>}
                   {d.ai_alert_type === 'none' && <span className="text-xs bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full flex-shrink-0">Normal</span>}
                   {d.ai_summary && <span className="text-xs text-gray-500 italic ml-1">{d.ai_summary}</span>}
+                  <button onClick={() => { setReplyingDiary(replyingDiary === d.id ? null : d.id); setDiaryReply("") }} className="ml-auto text-xs border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 rounded-lg px-3 py-1.5 flex-shrink-0">Reply</button>
                 </div>
+                {replyingDiary === d.id && (
+                  <div className="mt-3 flex gap-2">
+                    <input value={diaryReply} onChange={e => setDiaryReply(e.target.value)} placeholder="Send a message to the installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && replyToDiary(d.id, d.user_id)} />
+                    <button onClick={() => replyToDiary(d.id, d.user_id)} disabled={replySending} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{replySending ? "Sending..." : "Send"}</button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
