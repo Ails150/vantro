@@ -10,10 +10,10 @@ import { useRouter } from "next/navigation"
 interface Props {
   user: any; userData: any; jobs: any[]; signins: any[]; alerts: any[]
   pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
-  checklistTemplates: any[]; diaryEntries: any[]; defaultTab: string
+  checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string
 }
 
-export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, defaultTab }: Props) {
+export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) {
   const [activeTab, setActiveTab] = useState(() => {
     try { return localStorage.getItem("vantro_tab") || defaultTab } catch { return defaultTab }
   })
@@ -55,6 +55,12 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
   const [diaryReply, setDiaryReply] = useState("")
   const [replySending, setReplySending] = useState(false)
+  const [toast, setToast] = useState<{message: string; type: string} | null>(null)
+
+  function showToast(message: string, type: string = "info") {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 5000)
+  }
   const [liveAlerts, setLiveAlerts] = useState<any[]>(alerts)
   const prevAlertCount = useRef(alerts.length)
 
@@ -69,7 +75,13 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         const data = await res.json()
         const newAlerts = data.alerts || []
         if (newAlerts.length > prevAlertCount.current) {
-          // New alert arrived - play sound
+          // New alert arrived - show toast
+          const newest = newAlerts[0]
+          showToast(
+            (newest?.alert_type === "blocker" ? "BLOCKER" : "ISSUE") + " — " + (newest?.jobs?.name || "Job") + ": " + newest?.message,
+            newest?.alert_type === "blocker" ? "blocker" : "issue"
+          )
+          // Play sound
           try {
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
             const osc = ctx.createOscillator()
@@ -694,6 +706,33 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
               </div>
             ))}
           </div>
+          {resolvedAlerts && resolvedAlerts.length > 0 && (
+            <div className={card + " mt-4"}>
+              <div className={cardHeader}><span className="font-semibold text-gray-500">Resolved alerts</span></div>
+              {resolvedAlerts.map((a: any) => (
+                <div key={a.id} className="px-6 py-4 border-b border-gray-50 last:border-0 opacity-70">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-400 border border-red-100 px-2 py-0.5 rounded-full font-bold">BLOCKER</span>}
+                        {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-400 border border-amber-100 px-2 py-0.5 rounded-full">ISSUE</span>}
+                        <span className="text-xs font-medium text-gray-500">{a.jobs?.name}</span>
+                        <span className={"text-xs " + sub}>{a.users?.name}</span>
+                        <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <p className="text-sm text-gray-500">{a.message}</p>
+                      {a.resolution_note && (
+                        <div className="mt-2 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 text-xs text-teal-700">
+                          <strong>Resolution:</strong> {a.resolution_note} <span className="text-gray-400 ml-2">{a.resolved_at ? new Date(a.resolved_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                        </div>
+                      )}
+                    </div>
+                    <span className="text-xs bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full flex-shrink-0">Resolved</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         )}
 
         {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
