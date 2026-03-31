@@ -48,17 +48,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true })
   }
 
-  // Installer — send branded email with APK download link
-  const { data, error } = await service.auth.admin.generateLink({
-    type: 'invite',
-    email,
-    options: { redirectTo: 'vantro://login?email=' + encodeURIComponent(email) }
-  })
-  if (error && !error.message.includes('already been registered')) {
-    return NextResponse.json({ error: error.message }, { status: 400 })
-  }
-
-  const inviteUrl = data?.properties?.action_link
+  // Installer — plain email, no Supabase auth needed
+  const inviteUrl = null
 
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
@@ -88,5 +79,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
 
 
