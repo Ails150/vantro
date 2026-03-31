@@ -52,6 +52,44 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [saving, setSaving] = useState(false)
   const [resolvingAlert, setResolvingAlert] = useState<string|null>(null)
   const [resolutionNote, setResolutionNote] = useState("")
+  const [liveAlerts, setLiveAlerts] = useState<any[]>(alerts)
+  const prevAlertCount = React.useRef(alerts.length)
+
+  React.useEffect(() => {
+    setLiveAlerts(alerts)
+  }, [alerts])
+
+  React.useEffect(() => {
+    const interval = setInterval(async () => {
+      const res = await fetch("/api/admin/alerts")
+      if (res.ok) {
+        const data = await res.json()
+        const newAlerts = data.alerts || []
+        if (newAlerts.length > prevAlertCount.current) {
+          // New alert arrived - play sound
+          try {
+            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
+            const osc = ctx.createOscillator()
+            const gain = ctx.createGain()
+            osc.connect(gain)
+            gain.connect(ctx.destination)
+            osc.frequency.value = 880
+            gain.gain.value = 0.3
+            osc.start()
+            osc.stop(ctx.currentTime + 0.3)
+            setTimeout(() => {
+              osc.frequency.value = 1100
+              osc.start(ctx.currentTime + 0.4)
+              osc.stop(ctx.currentTime + 0.6)
+            }, 400)
+          } catch {}
+        }
+        prevAlertCount.current = newAlerts.length
+        setLiveAlerts(newAlerts)
+      }
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [])
   const [formError, setFormError] = useState("")
   const router = useRouter()
   const supabase = createClient()
@@ -320,7 +358,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 {alerts.length > 0 && <span className="text-sm bg-red-50 text-red-500 px-3 py-1 rounded-full">{alerts.length} unread</span>}
               </div>
               {alerts.length === 0 ? <div className={"px-6 py-10 text-center " + sub}>No alerts - all clear</div>
-              : alerts.slice(0, 5).map((a: any) => (
+              : liveAlerts.slice(0, 5).map((a: any) => (
                 <div key={a.id} className={"px-6 py-4 border-b border-gray-50 last:border-0" + (a.alert_type === "blocker" ? " border-l-4 border-l-red-400" : "")}>
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold border border-red-200">BLOCKER</span>}
@@ -353,7 +391,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         )}
 
         {activeTab === "analytics" && <AnalyticsTab companyId={userData.company_id} teamMembers={teamMembers} jobs={jobs} />}
-        {activeTab === "approvals" && <ApprovalsTab key={activeTab + Date.now().toString().slice(0,-4)} pendingQA={pendingQA} onRefresh={() => router.refresh()} />}
+        {activeTab === "approvals" && <ApprovalsTab key={Date.now().toString()} pendingQA={pendingQA} onRefresh={() => router.refresh()} />}
 
         {activeTab === "jobs" && (
           <div className="space-y-5">
@@ -607,7 +645,10 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
           <div className={card}>
             <div className={cardHeader}>
               <span className="font-semibold">Site diary - all jobs</span>
-              <span className={"text-sm " + sub}>{diaryEntries.length} entries</span>
+              <div className="flex items-center gap-3">
+                <span className={"text-sm " + sub}>{diaryEntries.length} entries</span>
+                <button onClick={() => router.refresh()} className={"text-xs border border-gray-200 rounded-lg px-3 py-1.5 " + sub + " hover:text-gray-900"}>Refresh</button>
+              </div>
             </div>
             {diaryEntries.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No diary entries yet</div>
             : diaryEntries.map((d: any) => (
@@ -638,8 +679,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
         {activeTab === "alerts" && (
           <div className={card}>
             <div className={cardHeader}><span className="font-semibold">Vantro alerts</span></div>
-            {alerts.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No alerts - all clear</div>
-            : alerts.map((a: any) => (
+            {liveAlerts.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No alerts - all clear</div>
+            : liveAlerts.map((a: any) => (
               <div key={a.id} className={"px-6 py-5 border-b border-gray-50 last:border-0" + (a.alert_type === "blocker" ? " border-l-4 border-l-red-400" : a.alert_type === "issue" ? " border-l-4 border-l-amber-400" : "")}>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
