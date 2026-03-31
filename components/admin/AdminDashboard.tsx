@@ -686,25 +686,16 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                   </div>
                   <button onClick={() => { setResolvingAlert(resolvingAlert === a.id ? null : a.id); setResolutionNote("") }} className="text-sm bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 flex-shrink-0 font-medium">Resolve</button>
                 </div>
-              {resolvingAlert === a.id && (
+                {resolvingAlert === a.id && (
                   <div className="mt-3 flex gap-2">
-                    <input
-                      value={resolutionNote}
-                      onChange={e => setResolutionNote(e.target.value)}
-                      placeholder="Enter resolution note â€” this will be sent to the installer..."
-                      className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
-                      onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)}
-                    />
-                    <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
-                      {saving ? "Sending..." : "Send & resolve"}
-                    </button>
+                    <input value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="Enter resolution note - this will be sent to the installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)} />
+                    <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving ? "Sending..." : "Send & resolve"}</button>
                   </div>
                 )}
               </div>
             ))}
           </div>
         )}
-
       </div>
     </div>
   )
