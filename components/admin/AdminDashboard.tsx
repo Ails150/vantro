@@ -50,6 +50,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [itemVideo, setItemVideo] = useState(false)
   const [itemFailNote, setItemFailNote] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [resolvingAlert, setResolvingAlert] = useState<string|null>(null)
+  const [resolutionNote, setResolutionNote] = useState("")
   const [formError, setFormError] = useState("")
   const router = useRouter()
   const supabase = createClient()
@@ -98,6 +100,20 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   async function approveQA(id: string) { await supabase.from("qa_submissions").update({ state: "approved", reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
   async function rejectQA(id: string, note: string) { await supabase.from("qa_submissions").update({ state: "rejected", rejection_note: note, reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
   async function markAlertRead(id: string) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
+
+  async function resolveAlert(id: string) {
+    if (!resolutionNote.trim()) { alert("Please enter a resolution note"); return }
+    setSaving(true)
+    await fetch("/api/alerts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ alertId: id, resolutionNote })
+    })
+    setResolvingAlert(null)
+    setResolutionNote("")
+    setSaving(false)
+    router.refresh()
+  }
 
   async function addJob() {
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
@@ -586,6 +602,20 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                     <button onClick={() => deleteItem(item.id)} className={"text-xs " + sub + " hover:text-red-500 transition-colors"}>Remove</button>
                   </div>
                 ))}
+              {resolvingAlert === a.id && (
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      value={resolutionNote}
+                      onChange={e => setResolutionNote(e.target.value)}
+                      placeholder="Enter resolution note â€” this will be sent to the installer..."
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+                      onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)}
+                    />
+                    <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                      {saving ? "Sending..." : "Send & resolve"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -615,6 +645,20 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                   {d.ai_alert_type === 'none' && <span className="text-xs bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full flex-shrink-0">Normal</span>}
                   {d.ai_summary && <span className="text-xs text-gray-500 italic ml-1">{d.ai_summary}</span>}
                 </div>
+              {resolvingAlert === a.id && (
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      value={resolutionNote}
+                      onChange={e => setResolutionNote(e.target.value)}
+                      placeholder="Enter resolution note â€” this will be sent to the installer..."
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+                      onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)}
+                    />
+                    <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                      {saving ? "Sending..." : "Send & resolve"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -640,8 +684,22 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                     </div>
                     <div className="text-sm text-gray-700">{a.message}</div>
                   </div>
-                  <button onClick={() => markAlertRead(a.id)} className={"text-sm " + sub + " hover:text-gray-900 border border-gray-200 rounded-lg px-3 py-1.5 flex-shrink-0"}>Dismiss</button>
+                  <button onClick={() => { setResolvingAlert(resolvingAlert === a.id ? null : a.id); setResolutionNote("") }} className="text-sm bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 flex-shrink-0 font-medium">Resolve</button>
                 </div>
+              {resolvingAlert === a.id && (
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      value={resolutionNote}
+                      onChange={e => setResolutionNote(e.target.value)}
+                      placeholder="Enter resolution note â€” this will be sent to the installer..."
+                      className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+                      onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)}
+                    />
+                    <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
+                      {saving ? "Sending..." : "Send & resolve"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

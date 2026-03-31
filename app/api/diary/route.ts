@@ -67,9 +67,11 @@ export async function POST(request: Request) {
     await service.from("alerts").insert({
       company_id: resolvedCompanyId,
       job_id: jobId,
+      user_id: resolvedUserId,
       message: (aiAlertType === "blocker" ? "BLOCKER" : "ISSUE") + " - " + (aiSummary || entryText.slice(0, 100)),
       alert_type: aiAlertType,
-      is_read: false
+      is_read: false,
+      status: "open"
     })
 
     // Push notify admin and foreman
