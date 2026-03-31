@@ -3,7 +3,7 @@ import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import DefectsTab from "@/components/admin/DefectsTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
@@ -53,13 +53,13 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const [resolvingAlert, setResolvingAlert] = useState<string|null>(null)
   const [resolutionNote, setResolutionNote] = useState("")
   const [liveAlerts, setLiveAlerts] = useState<any[]>(alerts)
-  const prevAlertCount = React.useRef(alerts.length)
+  const prevAlertCount = useRef(alerts.length)
 
-  React.useEffect(() => {
+  useEffect(() => {
     setLiveAlerts(alerts)
   }, [alerts])
 
-  React.useEffect(() => {
+  useEffect(() => {
     const interval = setInterval(async () => {
       const res = await fetch("/api/admin/alerts")
       if (res.ok) {
