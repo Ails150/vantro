@@ -706,6 +706,8 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
               </div>
             ))}
           </div>
+        )}
+
           {resolvedAlerts && resolvedAlerts.length > 0 && (
             <div className={card + " mt-4"}>
               <div className={cardHeader}><span className="font-semibold text-gray-500">Resolved alerts</span></div>
