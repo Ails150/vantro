@@ -8,12 +8,12 @@ type Step = 'company' | 'installers' | 'done'
 
 export default function OnboardingPage() {
   const router = useRouter()
-  const [step, setStep] = useState<Step>('company')
+  const [step, setStep] = useState<Step>('installers')
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
   const [error, setError] = useState('')
   const [companyName, setCompanyName] = useState('')
-  const [installers, setInstallers] = useState([{ name: '', email: '' }])
+  const [installers, setInstallers] = useState([{ name: '', email: '', role: 'installer' }])
 
   useEffect(() => {
     async function checkExisting() {
@@ -28,6 +28,10 @@ export default function OnboardingPage() {
   }, [])
 
   async function saveCompany() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const metaCompany = user?.user_metadata?.company_name || companyName
+    if (!metaCompany.trim()) { setError('Enter your company name'); return }
     if (!companyName.trim()) { setError('Enter your company name'); return }
     setLoading(true); setError('')
     const slug = companyName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) + '_' + Math.random().toString(36).slice(2, 6)
@@ -100,6 +104,7 @@ export default function OnboardingPage() {
                   <div key={i} className="flex gap-2">
                     <input value={inst.name} onChange={e => { const u=[...installers]; u[i]={...u[i],name:e.target.value}; setInstallers(u) }} placeholder="Full name" className="flex-1 bg-[#243040] border border-white/5 rounded-lg px-3 py-2.5 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm"/>
                     <input value={inst.email} onChange={e => { const u=[...installers]; u[i]={...u[i],email:e.target.value}; setInstallers(u) }} placeholder="Email" type="email" className="flex-1 bg-[#243040] border border-white/5 rounded-lg px-3 py-2.5 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm"/>
+                    <select value={inst.role} onChange={e => { const u=[...installers]; u[i]={...u[i],role:e.target.value}; setInstallers(u) }} className="bg-[#243040] border border-white/5 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-[#00d4a0]/40 text-sm"><option value="installer">Installer</option><option value="foreman">Foreman</option></select>
                     {installers.length > 1 && <button onClick={() => setInstallers(installers.filter((_,idx)=>idx!==i))} className="text-[#4d6478] hover:text-red-400 px-2">-</button>}
                   </div>
                 ))}
