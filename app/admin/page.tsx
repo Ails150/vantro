@@ -22,6 +22,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const today = new Date(); today.setHours(0,0,0,0)
   const { data: signins } = await supabase.from('signins').select('*, users(name, initials)').eq('company_id', companyId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null)
   const { data: alerts } = await supabase.from('alerts').select('*, jobs(name), users(name, initials)').eq('company_id', companyId).eq('is_read', false).order('created_at', { ascending: false }).limit(20)
+  const { data: resolvedAlerts } = await supabase.from('alerts').select('*, jobs(name), users(name)').eq('company_id', companyId).eq('status', 'resolved').order('resolved_at', { ascending: false }).limit(20)
   const { data: pendingQA } = await supabase.from('qa_approvals').select('*, jobs(name, address), users(name, initials)').eq('company_id', companyId).eq('status', 'pending').order('submitted_at', { ascending: false })
   const { data: teamMembers } = await supabase.from('users').select('*').eq('company_id', companyId)
   const { data: jobAssignments } = await supabase.from('job_assignments').select('*').eq('company_id', companyId)
