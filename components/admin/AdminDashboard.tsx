@@ -446,19 +446,46 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
               <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
                 <h3 className="font-semibold">New job</h3>
                 <input value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={inp}/>
-                <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
+                <div className="relative">
+                  <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
+                  {jobAddress && (
+                    <div className={"absolute right-3 top-3 text-xs font-semibold " + (jobPlaceSelected ? "text-teal-500" : "text-red-400")}>
+                      {jobPlaceSelected ? "✓ GPS verified" : "⚠ Select from dropdown"}
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
+                  {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").length === 0 ? (
+                    <p className="text-sm text-gray-400">No team yet — <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
+                  ) : (
+                    <div className="space-y-2 mt-1">
+                      {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").map((m: any) => (
+                        <label key={m.id} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={jobAssignedMembers?.includes(m.id) || false} onChange={e => setJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="w-4 h-4 accent-teal-500"/>
+                          <span className="text-sm text-gray-700">{m.name}</span>
+                          <span className="text-xs text-gray-400">{m.role}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklists (optional)</label>
-                  <div className="space-y-2 mt-1">
-                    {checklistTemplates.map((t: any) => (
-                      <label key={t.id} className="flex items-center gap-2 cursor-pointer">
-                        <input type="checkbox" checked={jobTemplateIds?.includes(t.id) || false} onChange={e => setJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="w-4 h-4 accent-teal-500"/>
-                        <span className="text-sm text-gray-700">{t.name}</span>
-                        {t.requires_approval && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded">Approval</span>}
-                        {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Audit</span>}
-                      </label>
-                    ))}
-                  </div>
+                  {checklistTemplates.length === 0 ? (
+                    <p className="text-sm text-gray-400">No checklists yet — <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
+                  ) : (
+                    <div className="space-y-2 mt-1">
+                      {checklistTemplates.map((t: any) => (
+                        <label key={t.id} className="flex items-center gap-2 cursor-pointer">
+                          <input type="checkbox" checked={jobTemplateIds?.includes(t.id) || false} onChange={e => setJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="w-4 h-4 accent-teal-500"/>
+                          <span className="text-sm text-gray-700">{t.name}</span>
+                          {t.requires_approval && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded">Approval</span>}
+                          {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Audit</span>}
+                        </label>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
