@@ -629,23 +629,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
                 </div>
 
 
-                    <input
-                      value={resolutionNote}
-                      onChange={e => setResolutionNote(e.target.value)}
-                      placeholder="Enter resolution note â€” this will be sent to the installer..."
-                      className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
-                      onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)}
-                    />
-                    <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">
-                      {saving ? "Sending..." : "Send & resolve"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
         {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
         {activeTab === "defects" && <DefectsTab />}
 
