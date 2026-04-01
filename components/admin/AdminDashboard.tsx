@@ -328,6 +328,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "checklists", label: "Checklists" },
     { id: "diary", label: "Diary" },
     { id: "payroll", label: "Payroll" },
+    { id: "performance", label: "Performance" },
     { id: "alerts", label: "Alerts", badge: alerts.length },
     { id: "defects", label: "Defects" },
   ]
@@ -833,6 +834,42 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             </div>
           )}
 
+        {activeTab === "performance" && (
+          <div className="space-y-6">
+            <div className={card}>
+              <div className={cardHeader}>
+                <h3 className="font-semibold">Team Checklist Compliance</h3>
+                <span className={"text-sm " + sub}>Daily, weekly and monthly checklist completion per installer</span>
+              </div>
+              <div className="px-6 pb-6">
+                {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").length === 0 ? (
+                  <p className={"text-sm " + sub + " py-8 text-center"}>No installers yet.</p>
+                ) : teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").map((m: any) => {
+                  const daily = checklistTemplates.filter((t: any) => t.frequency === "daily")
+                  const weekly = checklistTemplates.filter((t: any) => t.frequency === "weekly")
+                  const monthly = checklistTemplates.filter((t: any) => t.frequency === "monthly")
+                  return (
+                    <div key={m.id} className="py-4 border-b border-gray-100 last:border-0">
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-full bg-teal-50 flex items-center justify-center text-sm font-semibold text-teal-600">{m.initials || m.name?.[0]}</div>
+                        <div><p className="font-medium text-sm">{m.name}</p><p className={"text-xs " + sub}>{m.role}</p></div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[{label:"Daily",t:daily},{label:"Weekly",t:weekly},{label:"Monthly",t:monthly}].map(({label,t}) => (
+                          <div key={label} className="bg-gray-50 rounded-xl p-3 text-center">
+                            <p className={"text-xs " + sub + " mb-1"}>{label}</p>
+                            <p className="text-lg font-semibold text-gray-800">{t.length === 0 ? "-" : t.length}</p>
+                            <p className={"text-xs " + sub}>{t.length === 0 ? "none set" : "template" + (t.length !== 1 ? "s" : "")}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        )}
         {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
         {activeTab === "defects" && <DefectsTab />}
 
