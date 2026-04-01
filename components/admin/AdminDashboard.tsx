@@ -204,9 +204,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
     if (!jobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
-    const { error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng })
+    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng }).select("id").single()
     if (error) { setFormError(error.message); setSaving(false); return }
-    if (jobTemplateIds.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJob.data.id, templateId: tid }) }) } } }
+    if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
     if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
     setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false)
     router.refresh()
