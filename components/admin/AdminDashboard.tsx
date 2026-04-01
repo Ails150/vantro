@@ -47,6 +47,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [memberRole, setMemberRole] = useState("installer")
   const [templateName, setTemplateName] = useState("")
   const [templateFrequency, setTemplateFrequency] = useState("job")
+  const [editingTemplateId, setEditingTemplateId] = useState<string|null>(null)
+  const [editTemplateName, setEditTemplateName] = useState("")
+  const [editTemplateFrequency, setEditTemplateFrequency] = useState("job")
   const [itemLabel, setItemLabel] = useState("")
   const [itemType, setItemType] = useState("tick")
   const [itemMandatory, setItemMandatory] = useState(false)
@@ -307,6 +310,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     router.refresh()
   }
 
+  async function saveEditTemplate(templateId: string) {
+    await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_template", templateId, name: editTemplateName, frequency: editTemplateFrequency }) })
+    setEditingTemplateId(null)
+    router.refresh()
+  }
   async function deleteTemplate(templateId: string) {
     if (!window.confirm("Delete this template and all its items?")) return
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_template", templateId }) })
