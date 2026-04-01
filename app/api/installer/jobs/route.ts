@@ -23,7 +23,12 @@ export async function GET(request: Request) {
     .select('job_id')
     .eq('user_id', installer.userId)
 
-  if (!assignments?.length) return NextResponse.json({ jobs: [] })
+  if (!assignments?.length) {
+    const { data: companyUser } = await service.from("users").select("company_id").eq("id", installer.userId).single()
+    if (!companyUser?.company_id) return NextResponse.json({ jobs: [] })
+    const { data: allJobs } = await service.from("jobs").select("*").eq("company_id", companyUser.company_id).eq("status", "active")
+    return NextResponse.json({ jobs: allJobs || [] })
+  }
 
   const jobIds = assignments.map((a: any) => a.job_id)
 
