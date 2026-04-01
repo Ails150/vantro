@@ -19,6 +19,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const companyId = userData.company_id
   const { data: company } = await supabase.from('companies').select('*').eq('id', companyId).single()
+  // Trial/subscription check
+  if (company) {
+    const now = new Date()
+    const trialEnds = company.trial_ends_at ? new Date(company.trial_ends_at) : null
+    const status = company.subscription_status
+    const trialExpired = trialEnds && now > trialEnds
+    const notActive = !status || status === 'trial' || status === 'cancelled' || status === 'past_due'
+    if (trialExpired && notActive) redirect('/billing')
+  }
+
   const { data: jobs } = await supabase.from('jobs').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
   const today = new Date(); today.setHours(0,0,0,0)
   const { data: signins } = await supabase.from('signins').select('*, users(name, initials)').eq('company_id', companyId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null)
