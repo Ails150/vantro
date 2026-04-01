@@ -46,6 +46,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [memberEmail, setMemberEmail] = useState("")
   const [memberRole, setMemberRole] = useState("installer")
   const [templateName, setTemplateName] = useState("")
+  const [templateFrequency, setTemplateFrequency] = useState("job")
   const [itemLabel, setItemLabel] = useState("")
   const [itemType, setItemType] = useState("tick")
   const [itemMandatory, setItemMandatory] = useState(false)
@@ -288,7 +289,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     setSaving(true); setFormError("")
     const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create_template", name: templateName.trim() }) })
     if (!res.ok) { const d = await res.json(); setFormError(d.error); setSaving(false); return }
-    setTemplateName(""); setShowAddTemplate(false); setSaving(false)
+    setTemplateName(""); setTemplateFrequency("job"); setShowAddTemplate(false); setSaving(false)
     router.refresh()
   }
 
@@ -673,6 +674,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
                 <h3 className="font-semibold">New checklist template</h3>
                 <input value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Glazing Installation QA" className={inp}/>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Frequency</label>
+                  <select value={templateFrequency} onChange={e => setTemplateFrequency(e.target.value)} className={inp}>
+                    <option value="job">Per job (QA)</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="completion">Job completion</option>
+                  </select>
+                </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
                   <button onClick={addTemplate} disabled={saving} className={btn}>{saving ? "Saving..." : "Create template"}</button>
@@ -687,6 +698,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 <div className={cardHeader}>
                   <div>
                     <span className="font-semibold">{t.name}</span>
+                    <span className="ml-2 text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full">{t.frequency === "job" || !t.frequency ? "Per job" : t.frequency.charAt(0).toUpperCase() + t.frequency.slice(1)}</span>
                     <span className={"text-sm " + sub + " ml-3"}>{t.checklist_items?.length || 0} items</span>
                   </div>
                   <div className="flex gap-2 flex-wrap items-center">
