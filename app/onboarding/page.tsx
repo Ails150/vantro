@@ -102,7 +102,7 @@ export default function OnboardingPage() {
             <div>
               <h1 className="text-xl font-semibold mb-1">Add your team</h1>
               <p className="text-[#4d6478] text-sm mb-6">Each person gets an email to set their PIN and download the app.</p>
-              <div className="space-y-2 max-h-72 overflow-y-auto">
+              <div className="space-y-4">
                 {installers.map((inst, i) => (
                   <div key={i} className="bg-[#1e2d3d] border border-white/5 rounded-xl p-4 space-y-3">
                     <input value={inst.name} onChange={e => { const u=[...installers]; u[i]={...u[i],name:e.target.value}; setInstallers(u) }} placeholder="Full name" className="w-full bg-[#243040] border border-white/5 rounded-lg px-3 py-2.5 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm"/>

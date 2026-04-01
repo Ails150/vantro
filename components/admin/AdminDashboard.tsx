@@ -115,7 +115,6 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
   const supabase = createClient()
 
   useEffect(() => {
-    if (!showAddJob && !editingJobId) return
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY
     if (!key) return
     function init() {
@@ -148,7 +147,23 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
       s.onload = init
       document.head.appendChild(s)
     }
-  }, [showAddJob, editingJobId])
+  }, [])
+
+  useEffect(() => {
+    if (!showAddJob) return
+    const interval = setInterval(() => {
+      if (!(window as any).google || !addAddressRef.current) return
+      clearInterval(interval)
+      const ac = new (window as any).google.maps.places.Autocomplete(addAddressRef.current, { types: ["address"] })
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace()
+        if (place.formatted_address) setJobAddress(place.formatted_address)
+        if (place.geometry?.location) { setJobLat(place.geometry.location.lat()); setJobLng(place.geometry.location.lng()) }
+        setJobPlaceSelected(true)
+      })
+    }, 100)
+    return () => clearInterval(interval)
+  }, [showAddJob])
 
   function switchTab(tab: string) {
     setActiveTab(tab)

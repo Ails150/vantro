@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const { data, error } = await service.auth.admin.generateLink({
       type: 'invite',
       email,
-      options: { redirectTo: 'https://app.getvantro.com/auth/callback?next=/reset-password' }
+      options: { redirectTo: 'https://app.getvantro.com/auth/callback?next=/set-password' }
     })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     const inviteUrl = data?.properties?.action_link
