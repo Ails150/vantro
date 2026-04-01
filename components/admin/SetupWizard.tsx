@@ -4,9 +4,9 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 const STEPS = [
-  { id: 'team', num: 1, title: 'Add your first team member', sub: 'Each person gets an email to download the app and set their PIN.' },
-  { id: 'checklist', num: 2, title: 'Create a checklist template', sub: 'Define the QA checks your installers complete on every job.' },
-  { id: 'job', num: 3, title: 'Add your first job', sub: 'Assign your team and checklist. GPS sign-in enforces attendance.' },
+  { id: 'team', num: 1, title: 'Add your first team member', sub: 'They will get an email to download the app and set their PIN.' },
+  { id: 'checklist', num: 2, title: 'Create a QA checklist', sub: 'Define the quality checks your team complete on every job.' },
+  { id: 'job', num: 3, title: 'Add your first job', sub: 'GPS sign-in enforces attendance. Assign team and checklists from Jobs tab.' },
 ]
 
 export default function SetupWizard({ companyId, onComplete }: { companyId: string, onComplete: () => void }) {

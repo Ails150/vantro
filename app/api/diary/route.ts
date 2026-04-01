@@ -94,7 +94,7 @@ export async function POST(request: Request) {
           body: JSON.stringify(tokens.map((token: string) => ({
             to: token,
             sound: "default",
-            title: aiAlertType === "blocker" ? "ðŸš¨ BLOCKER on site" : "âš ï¸ Issue flagged",
+            title: aiAlertType === "blocker" ? "BLOCKER on site" : "Issue flagged",
             body: (jobData?.name || "Job") + ": " + (aiSummary || entryText.slice(0, 80)),
             data: { type: "diary_alert", jobId, alertType: aiAlertType },
             channelId: "vantro",
