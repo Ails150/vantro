@@ -9,12 +9,12 @@ import { useRouter } from "next/navigation"
 import SetupWizard from "./SetupWizard"
 
 interface Props {
-  user: any; userData: any; jobs: any[]; signins: any[]; alerts: any[]
+  user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
   pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
   checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string
 }
 
-export default function AdminDashboard({ user, userData, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) {
+export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) {
   const [activeTab, setActiveTab] = useState(() => {
     try { return localStorage.getItem("vantro_tab") || defaultTab } catch { return defaultTab }
   })
