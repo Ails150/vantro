@@ -123,3 +123,18 @@ export async function POST(request: Request) {
   return NextResponse.json({ success: true, entry })
 }
 // redeploy
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const jobId = searchParams.get('jobId')
+  if (!jobId) return (await import('next/server')).NextResponse.json({ error: 'No jobId' }, { status: 400 })
+
+  const service = await (await import('@/lib/supabase/server')).createServiceClient()
+  const { data: entries } = await service
+    .from('diary_entries')
+    .select('id, entry_text, ai_alert_type, ai_summary, reply, replied_at, created_at, user_id')
+    .eq('job_id', jobId)
+    .order('created_at', { ascending: true })
+
+  return (await import('next/server')).NextResponse.json({ entries: entries || [] })
+}
