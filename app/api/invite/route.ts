@@ -66,7 +66,7 @@ export async function POST(request: Request) {
         <p style="color:#4A6158;line-height:1.6;margin-bottom:8px">Hi ${name || 'there'},</p>
         <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">Your manager has added you as an <strong style="color:#0A1A14">Installer</strong> on Vantro. Use the app to sign in to jobs, log your diary and complete QA checklists on site.</p>
         <p style="color:#0A1A14;font-weight:700;margin-bottom:8px">Step 1 — Download the app</p>
-        <a href="https://expo.dev/artifacts/eas/sSYMwxNgfv8wCxZ6wU6pF1.apk" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-bottom:24px">Download Vantro for Android →</a>
+        <a href="https://play.google.com/apps/internaltest/4701479895906224951/join?hl=en-US" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-bottom:24px">Download Vantro on Google Play →</a>
         <p style="color:#4A6158;line-height:1.6;margin-bottom:4px">After downloading, <strong style="color:#0A1A14">open your notifications bar</strong> and tap the downloaded file to install it. If you see a warning about unknown sources, tap <strong style="color:#0A1A14">Settings → Allow</strong>, then come back and tap Install.</p>
         <p style="color:#0A1A14;font-weight:700;margin-top:24px;margin-bottom:8px">Step 2 — Set up your PIN</p>
         ${inviteUrl ? `<a href="${inviteUrl}" style="display:inline-block;background:#0A1A14;color:#fff;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem">Activate your account →</a>` : ''}
