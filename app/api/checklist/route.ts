@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   }
 
   if (action === 'update_template') {
-    const { templateId, requires_approval, audit_only } = body
+    const { templateId, requires_approval, audit_only, name, frequency } = body
     const updateData: any = { requires_approval, audit_only }; if (name) updateData.name = name; if (frequency) updateData.frequency = frequency; const { error } = await service.from('checklist_templates').update(updateData).eq('id', templateId)
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })
