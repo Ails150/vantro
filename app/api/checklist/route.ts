@@ -23,8 +23,8 @@ export async function POST(request: Request) {
   const { action } = body
 
   if (action === 'create_template') {
-    const { name } = body
-    const { data, error } = await service.from('checklist_templates').insert({ name, company_id: userData.company_id }).select().single()
+    const { name, frequency } = body
+    const { data, error } = await service.from('checklist_templates').insert({ name, company_id: userData.company_id, frequency: frequency || 'job' }).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ template: data })
   }
@@ -90,6 +90,7 @@ export async function POST(request: Request) {
   }
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
 }
+
 
 
 
