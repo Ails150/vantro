@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import SetupWizard from "./SetupWizard"
 
-interface Props = {
+interface Props {
   user: any; userData: any; jobs: any[]; signins: any[]; alerts: any[]
   pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
   checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string
