@@ -6,7 +6,6 @@ import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import SetupWizard from "./SetupWizard"
 
 interface Props {
   user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
@@ -110,7 +109,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return () => clearInterval(interval)
   }, [])
   const [formError, setFormError] = useState("")
-  const [showWizard, setShowWizard] = useState(!company?.setup_complete)
   const router = useRouter()
   const supabase = createClient()
 
