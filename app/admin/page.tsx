@@ -18,6 +18,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   if (userError || !userData || !userData.company_id) redirect('/onboarding')
 
   const companyId = userData.company_id
+  const { data: company } = await supabase.from('companies').select('*').eq('id', companyId).single()
   const { data: jobs } = await supabase.from('jobs').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
   const today = new Date(); today.setHours(0,0,0,0)
   const { data: signins } = await supabase.from('signins').select('*, users(name, initials)').eq('company_id', companyId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null)
@@ -33,6 +34,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     <AdminDashboard
       user={user}
       userData={userData}
+      company={company}
       jobs={jobs || []}
       signins={signins || []}
       alerts={alerts || []} resolvedAlerts={resolvedAlerts || []}

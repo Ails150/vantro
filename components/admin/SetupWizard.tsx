@@ -43,6 +43,8 @@ export default function SetupWizard({ companyId, onComplete }: { companyId: stri
     const supabase = createClient()
     const { error: e } = await supabase.from('jobs').insert({ company_id: companyId, name: jobName.trim(), status: 'active' })
     if (e) { setError(e.message); setLoading(false); return }
+    const supabase = createClient()
+    await supabase.from('companies').update({ setup_complete: true }).eq('id', companyId)
     setLoading(false); onComplete()
   }
 

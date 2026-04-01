@@ -110,7 +110,7 @@ export default function AdminDashboard({ user, userData, jobs, signins, alerts, 
     return () => clearInterval(interval)
   }, [])
   const [formError, setFormError] = useState("")
-  const [showWizard, setShowWizard] = useState(jobs.length === 0 && teamMembers.filter((m: any) => m.role !== "admin").length === 0 && checklistTemplates.length === 0)
+  const [showWizard, setShowWizard] = useState(!company?.setup_complete)
   const router = useRouter()
   const supabase = createClient()
 
