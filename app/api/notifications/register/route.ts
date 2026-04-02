@@ -6,7 +6,7 @@ function getInstallerFromToken(request: Request) {
   if (!auth?.startsWith("Bearer ")) return null
   try {
     const payload = JSON.parse(Buffer.from(auth.slice(7), "base64").toString())
-    if (payload.exp < Date.now()) return null
+    if (payload.exp * 1000 < Date.now()) return null
     return payload
   } catch { return null }
 }
