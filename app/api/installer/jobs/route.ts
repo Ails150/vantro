@@ -50,7 +50,7 @@ export async function GET(request: Request) {
   const jobsWithData = await Promise.all((jobs).map(async (j: any) => {
     const { data: checklists } = await service
       .from('job_checklists')
-      .select('id, template_id, checklist_templates(name), checklist_items(id, label, item_type, mandatory, order_index)')
+      .select('id, template_id, checklist_templates(name), checklist_items(id, label, item_type, mandatory, sort_order)')
       .eq('job_id', j.id)
     return {
       ...j,
@@ -61,4 +61,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ jobs: jobsWithData })
 }
+
 

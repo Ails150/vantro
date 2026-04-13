@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     const template = jc.checklist_templates
     if (template?.checklist_items) {
       template.checklist_items
-        .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+        .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
         .forEach((item: any) => allItems.push({ ...item, template_name: template.name }))
     }
   })
@@ -74,4 +74,5 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
 
