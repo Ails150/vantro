@@ -562,7 +562,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); setEditJobPlaceSelected(true); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); supabase.from('job_checklists').select('template_id').eq('job_id', j.id).then(({data}:{data:any}) => { if(data) setEditJobTemplateIds(data.map((jc:any) => jc.template_id)) }); setEditJobPlaceSelected(true); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
