@@ -226,7 +226,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (error) { setFormError(error.message); setSaving(false); return }
     await supabase.from("job_checklists").delete().eq("job_id", jobId)
     if (editJobTemplateIds.length > 0) {
-      await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid, company_id: userData.company_id })))
+      await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid })))
     }
     setEditingJobId(null); setSaving(false)
     window.location.reload()
