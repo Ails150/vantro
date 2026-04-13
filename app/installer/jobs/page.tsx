@@ -29,6 +29,8 @@ export default function InstallerJobsPage() {
   const [qaPhotos, setQaPhotos] = useState<Record<string, File|null>>({})
   const [qaPhotoPreview, setQaPhotoPreview] = useState<Record<string, string>>({})
   const [qaUploading, setQaUploading] = useState<Record<string, boolean>>({})
+  const [qaVideos, setQaVideos] = useState<Record<string, File|null>>({})
+  const [qaVideoPreview, setQaVideoPreview] = useState<Record<string, string>>({})
   const [signInTime, setSignInTime] = useState<Date|null>(null)
   const [lastActivity, setLastActivity] = useState<Date>(new Date())
   const [elapsed, setElapsed] = useState("")
@@ -259,6 +261,14 @@ export default function InstallerJobsPage() {
     const preview = URL.createObjectURL(file)
     setQaPhotoPreview(prev => ({...prev, [itemId]: preview}))
     setQaPhotos(prev => ({...prev, [itemId]: file}))
+    setQaUploading(prev => ({...prev, [itemId]: false}))
+  }
+
+  async function uploadVideo(itemId: string, file: File) {
+    setQaUploading(prev => ({...prev, [itemId]: true}))
+    const preview = URL.createObjectURL(file)
+    setQaVideoPreview(prev => ({...prev, [itemId]: preview}))
+    setQaVideos(prev => ({...prev, [itemId]: file}))
     setQaUploading(prev => ({...prev, [itemId]: false}))
   }
 
@@ -512,7 +522,7 @@ export default function InstallerJobsPage() {
                           <button onClick={() => submitQAItem(item.id, 'submitted')} className="bg-[#00d4a0] text-[#0f1923] rounded-lg px-4 py-2 text-sm font-semibold">Submit</button>
                         </div>
                       )}
-                      {(item.item_type === 'photo' || item.requires_photo) && state === 'pending' && (
+                      {(item.item_type === 'photo' || item.requires_photo || item.requires_video) && state === 'pending' && (
                         <div className="mt-2 space-y-2">
                           {qaPhotoPreview[item.id] && <img src={qaPhotoPreview[item.id]} alt="Preview" className="w-full h-40 object-cover rounded-lg"/>}
                           <label className="w-full flex items-center justify-center gap-2 bg-[#243040] border border-white/5 rounded-lg py-3 text-sm text-[#00d4a0] cursor-pointer">
