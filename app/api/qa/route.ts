@@ -22,7 +22,7 @@ export async function GET(request: Request) {
 
   const { data: jobChecklists } = await service
     .from('job_checklists')
-    .select('checklist_template_id, checklist_templates(id, name, checklist_items(*))')
+    .select('template_id, checklist_templates(id, name, checklist_items(*))')
     .eq('job_id', jobId)
 
   if (!jobChecklists?.length) return NextResponse.json({ items: [], submissions: [] })
@@ -74,3 +74,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
