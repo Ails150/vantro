@@ -29,7 +29,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     if (trialExpired && notActive) redirect('/billing')
   }
 
-  const { data: jobs } = await supabase.from('jobs').select('*').eq('company_id', companyId).order('created_at', { ascending: false })
+  const { data: jobs } = await supabase.from('jobs').select('*, job_checklists(template_id)').eq('company_id', companyId).order('created_at', { ascending: false })
   const today = new Date(); today.setHours(0,0,0,0)
   const { data: signins } = await supabase.from('signins').select('*, users(name, initials)').eq('company_id', companyId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null)
   const { data: alerts } = await supabase.from('alerts').select('*, jobs(name), users(name, initials)').eq('company_id', companyId).eq('is_read', false).order('created_at', { ascending: false }).limit(20)
