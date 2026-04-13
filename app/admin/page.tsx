@@ -47,7 +47,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       user={user}
       userData={userData}
       company={company}
-      jobs={jobsWithChecklists || []}
+      jobs={jobs || []}
       signins={signins || []}
       alerts={alerts || []} resolvedAlerts={resolvedAlerts || []}
       pendingQA={pendingQA || []}
