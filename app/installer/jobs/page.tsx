@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
@@ -140,7 +140,7 @@ export default function InstallerJobsPage() {
         }
         setSignInTime(new Date())
         setGpsStatus('confirmed')
-        setGpsMessage(`GPS confirmed · ${data.distanceMetres}m from site · ±${Math.round(accuracy)}m accuracy`)
+        setGpsMessage(`GPS confirmed Â· ${data.distanceMetres}m from site Â· Â±${Math.round(accuracy)}m accuracy`)
         setJobs(prev => prev.map(j => j.id === job.id ? { ...j, signed_in: true } : j))
       },
       (err) => {
@@ -343,7 +343,7 @@ export default function InstallerJobsPage() {
           {gpsStatus === 'checking' && <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin flex-shrink-0"/>}
           {gpsStatus === 'confirmed' && <div className="w-2 h-2 rounded-full bg-[#00d4a0] flex-shrink-0"/>}
           {gpsStatus === 'blocked' && <div className="w-2 h-2 rounded-full bg-red-400 flex-shrink-0"/>}
-          <span>{gpsStatus === 'checking' ? 'Checking your location...' : gpsMessage}{gpsStatus === 'confirmed' && elapsed ? ' · ' + elapsed : ''}</span>
+          <span>{gpsStatus === 'checking' ? 'Checking your location...' : gpsMessage}{gpsStatus === 'confirmed' && elapsed ? ' Â· ' + elapsed : ''}</span>
         </div>
       )}
 
@@ -409,7 +409,7 @@ export default function InstallerJobsPage() {
                 <span className="text-xs text-[#4d6478]">{diaryText.length} characters</span>
                 <button onClick={submitDiary} disabled={!diaryText.trim() || diaryLoading}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${diarySuccess ? 'bg-[#00d4a0]/10 text-[#00d4a0] border border-[#00d4a0]/20' : 'bg-[#00d4a0] text-[#0f1923] hover:bg-[#00a87e] disabled:opacity-40'}`}>
-                  {diarySuccess ? 'Submitted ✓' : diaryLoading ? 'Submitting...' : 'Submit entry'}
+                  {diarySuccess ? 'Submitted âœ“' : diaryLoading ? 'Submitting...' : 'Submit entry'}
                 </button>
               </div>
             </div>
@@ -512,7 +512,7 @@ export default function InstallerJobsPage() {
                           <button onClick={() => submitQAItem(item.id, 'submitted')} className="bg-[#00d4a0] text-[#0f1923] rounded-lg px-4 py-2 text-sm font-semibold">Submit</button>
                         </div>
                       )}
-                      {item.item_type === 'photo' && state === 'pending' && (
+                      {(item.item_type === 'photo' || item.requires_photo) && state === 'pending' && (
                         <div className="mt-2 space-y-2">
                           {qaPhotoPreview[item.id] && <img src={qaPhotoPreview[item.id]} alt="Preview" className="w-full h-40 object-cover rounded-lg"/>}
                           <label className="w-full flex items-center justify-center gap-2 bg-[#243040] border border-white/5 rounded-lg py-3 text-sm text-[#00d4a0] cursor-pointer">
@@ -544,3 +544,5 @@ export default function InstallerJobsPage() {
     </div>
   )
 }
+
+
