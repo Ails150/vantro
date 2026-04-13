@@ -826,7 +826,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           </div>
         )}
 
-          {resolvedAlerts && resolvedAlerts.length > 0 && (
+          {activeTab === 'alerts' && resolvedAlerts && resolvedAlerts.length > 0 && (
             <div className={card + " mt-4"}>
               <div className={cardHeader}><span className="font-semibold text-gray-500">Resolved alerts</span></div>
               {resolvedAlerts.map((a: any) => (
