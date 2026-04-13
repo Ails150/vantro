@@ -229,7 +229,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid, company_id: userData.company_id })))
     }
     setEditingJobId(null); setSaving(false)
-    router.refresh()
+    window.location.reload()
   }
 
   async function deleteJob(jobId: string, jobName: string) {
