@@ -219,11 +219,15 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!editJobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), checklist_template_id: editJobTemplateId || null, lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime }).eq("id", jobId)
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
     if (error) { setFormError(error.message); setSaving(false); return }
+    await supabase.from("job_checklists").delete().eq("job_id", jobId)
+    if (editJobTemplateIds.length > 0) {
+      await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid, company_id: userData.company_id })))
+    }
     setEditingJobId(null); setSaving(false)
     router.refresh()
   }
