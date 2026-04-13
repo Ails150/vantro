@@ -482,7 +482,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                   {jobAddress && (
                     <div className={"absolute right-3 top-3 text-xs font-semibold " + (jobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                      {jobPlaceSelected ? "? GPS verified" : "Ã¢Å¡Â  Select from dropdown"}
+                      {jobPlaceSelected ? "? GPS verified" : "? Select from dropdown"}
                     </div>
                   )}
                 </div>
