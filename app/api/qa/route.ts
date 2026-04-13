@@ -20,28 +20,30 @@ export async function GET(request: Request) {
 
   const service = await createServiceClient()
 
-  // Get all templates assigned to this job
   const { data: jobChecklists } = await service
     .from('job_checklists')
-    .select('template_id, checklist_templates(id, name, requires_approval, audit_only, checklist_items(*))')
+    .select('checklist_template_id, checklist_templates(id, name, checklist_items(*))')
     .eq('job_id', jobId)
 
-  if (!jobChecklists?.length) return NextResponse.json({ checklists: [] })
+  if (!jobChecklists?.length) return NextResponse.json({ items: [], submissions: [] })
 
-  // Get all submissions for this job by this installer
+  const allItems: any[] = []
+  jobChecklists.forEach((jc: any) => {
+    const template = jc.checklist_templates
+    if (template?.checklist_items) {
+      template.checklist_items
+        .sort((a: any, b: any) => (a.order_index || 0) - (b.order_index || 0))
+        .forEach((item: any) => allItems.push({ ...item, template_name: template.name }))
+    }
+  })
+
   const { data: submissions } = await service
     .from('qa_submissions')
     .select('*')
     .eq('job_id', jobId)
     .eq('user_id', installer.userId)
 
-  const checklists = jobChecklists.map((jc: any) => ({
-    ...jc.checklist_templates,
-    items: jc.checklist_templates.checklist_items?.sort((a: any, b: any) => a.sort_order - b.sort_order) || [],
-    submissions: submissions?.filter((s: any) => s.template_id === jc.template_id) || []
-  }))
-
-  return NextResponse.json({ checklists })
+  return NextResponse.json({ items: allItems, submissions: submissions || [] })
 }
 
 export async function POST(request: Request) {
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
   const { data: existing } = await service.from('qa_submissions').select('id')
-    .eq('job_id', jobId).eq('user_id', installer.userId).eq('checklist_item_id', itemId).single()
+    .eq('job_id', jobId).eq('user_id', installer.userId).eq('checklist_item_id', itemId).maybeSingle()
 
   if (existing) {
     await service.from('qa_submissions').update({
