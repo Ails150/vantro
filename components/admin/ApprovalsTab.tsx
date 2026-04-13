@@ -94,7 +94,7 @@ export default function ApprovalsTab({ pendingQA, onRefresh }: Props) {
                         <div className="flex-1">
                           <div className="font-medium text-sm">{sub.checklist_items?.label}</div>
                           <div className={"text-xs text-gray-500 mt-0.5 capitalize"}>{sub.checklist_items?.item_type?.replace("_", " ")}</div>
-                          {sub.notes && <div className="text-sm text-gray-600 mt-1">{sub.notes}</div>}
+                          {sub.notes && <div className="text-sm text-gray-600 mt-1">{sub.notes}</div>}{sub.photo_url && <img src={sub.photo_url} alt="QA photo" className="mt-2 rounded-lg w-full max-h-48 object-cover"/>}
                         </div>
                         <span className={"text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 " + (sub.state === "pass" || sub.state === "submitted" ? "bg-teal-50 text-teal-600" : sub.state === "fail" ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-500")}>
                           {sub.state === "submitted" ? "Done" : sub.state}
