@@ -22,20 +22,10 @@ export async function GET(request: Request) {
 
   const { data: jobChecklists } = await service
     .from('job_checklists')
-    .select('template_id, checklist_templates(id, name, checklist_items(*))')
+    .select('template_id, checklist_templates(id, name, requires_approval, audit_only, checklist_items(*))')
     .eq('job_id', jobId)
 
-  if (!jobChecklists?.length) return NextResponse.json({ items: [], submissions: [] })
-
-  const allItems: any[] = []
-  jobChecklists.forEach((jc: any) => {
-    const template = jc.checklist_templates
-    if (template?.checklist_items) {
-      template.checklist_items
-        .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
-        .forEach((item: any) => allItems.push({ ...item, template_name: template.name }))
-    }
-  })
+  if (!jobChecklists?.length) return NextResponse.json({ checklists: [], items: [], submissions: [] })
 
   const { data: submissions } = await service
     .from('qa_submissions')
@@ -43,7 +33,15 @@ export async function GET(request: Request) {
     .eq('job_id', jobId)
     .eq('user_id', installer.userId)
 
-  return NextResponse.json({ items: allItems, submissions: submissions || [] })
+  const checklists = jobChecklists.map((jc: any) => ({
+    ...jc.checklist_templates,
+    items: jc.checklist_templates?.checklist_items?.sort((a: any, b: any) => (a.sort_order||0) - (b.sort_order||0)) || [],
+    submissions: submissions?.filter((s: any) => s.template_id === jc.template_id) || []
+  }))
+
+  const allItems = checklists.flatMap((c: any) => c.items.map((i: any) => ({ ...i, template_name: c.name })))
+
+  return NextResponse.json({ checklists, items: allItems, submissions: submissions || [] })
 }
 
 export async function POST(request: Request) {
@@ -74,5 +72,3 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
-
-
