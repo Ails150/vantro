@@ -17,28 +17,24 @@ export async function GET(request: Request) {
 
   const service = await createServiceClient()
 
-  // Get jobs assigned to this installer
   const { data: assignments } = await service
     .from('job_assignments')
     .select('job_id')
     .eq('user_id', installer.userId)
 
+  let jobs: any[] = []
+
   if (!assignments?.length) {
     const { data: companyUser } = await service.from("users").select("company_id").eq("id", installer.userId).single()
     if (!companyUser?.company_id) return NextResponse.json({ jobs: [] })
     const { data: allJobs } = await service.from("jobs").select("*").eq("company_id", companyUser.company_id).eq("status", "active")
-    return NextResponse.json({ jobs: allJobs || [] })
+    jobs = allJobs || []
+  } else {
+    const jobIds = assignments.map((a: any) => a.job_id)
+    const { data: assignedJobs } = await service.from('jobs').select('*').in('id', jobIds).eq('status', 'active')
+    jobs = assignedJobs || []
   }
 
-  const jobIds = assignments.map((a: any) => a.job_id)
-
-  const { data: jobs } = await service
-    .from('jobs')
-    .select('*')
-    .in('id', jobIds)
-    .eq('status', 'active')
-
-  // Check which jobs this installer is signed into today
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
@@ -51,10 +47,17 @@ export async function GET(request: Request) {
 
   const signedInJobIds = new Set(signins?.map((s: any) => s.job_id) || [])
 
-  const jobsWithStatus = (jobs || []).map((j: any) => ({
-    ...j,
-    signed_in: signedInJobIds.has(j.id)
+  const jobsWithData = await Promise.all((jobs).map(async (j: any) => {
+    const { data: checklists } = await service
+      .from('job_checklists')
+      .select('id, checklist_template_id, checklist_templates(name), checklist_items(id, label, item_type, mandatory, order_index)')
+      .eq('job_id', j.id)
+    return {
+      ...j,
+      signed_in: signedInJobIds.has(j.id),
+      checklists: checklists || []
+    }
   }))
 
-  return NextResponse.json({ jobs: jobsWithStatus })
+  return NextResponse.json({ jobs: jobsWithData })
 }
