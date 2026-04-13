@@ -66,8 +66,8 @@ export async function POST(request: Request) {
         <p style="color:#4A6158;line-height:1.6;margin-bottom:8px">Hi ${name || 'there'},</p>
         <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">Your manager has added you as an <strong style="color:#0A1A14">Installer</strong> on Vantro. Use the app to sign in to jobs, log your diary and complete QA checklists on site.</p>
         <p style="color:#0A1A14;font-weight:700;margin-bottom:8px">Step 1 — Download the app</p>
-        <a href="https://play.google.com/apps/internaltest/4701479895906224951/join?hl=en-US" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-bottom:24px">Download Vantro on Google Play →</a>
-        <p style="color:#4A6158;line-height:1.6;margin-bottom:4px">Tap the button above on your Android phone. Join the test programme and install Vantro from the Play Store.</p>
+        <a href="https://play.google.com/store/apps/details?id=com.getvantro.app" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-bottom:24px">Download Vantro on Google Play →</a>
+        <p style="color:#4A6158;line-height:1.6;margin-bottom:4px">Tap the button above on your Android phone. Download and install Vantro from the Play Store.</p>
         <p style="color:#0A1A14;font-weight:700;margin-top:24px;margin-bottom:8px">Step 2 — Set up your PIN</p>
         
         <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">Open the Vantro app, tap <strong style="color:#0A1A14">New installer? Set up here</strong> at the bottom, enter your email address and choose a 4-digit PIN. You are now ready to sign in to jobs on site.</p>
@@ -79,6 +79,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
 
 
 
