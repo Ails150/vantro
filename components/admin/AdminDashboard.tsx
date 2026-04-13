@@ -462,7 +462,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 const assigned = getAssigned(j.id)
                 return (
                   <div key={j.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
-                    <div className="flex-1"><div className="font-semibold">{j.name}</div><div className={"text-sm " + sub}>{j.address}</div></div>
+                    <div className="flex-1"><div className="font-semibold">{j.name}</div><div className={"text-sm " + sub}>{j.address}</div></div>{(j.job_checklists||[]).length > 0 && <div className="flex gap-1 mt-1">{(j.job_checklists||[]).map((jc:any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 border border-teal-200 rounded-full px-2 py-0.5">{checklistTemplates.find((t:any)=>t.id===jc.template_id)?.name||""}</span>)}</div>}
                     {assigned.length > 0 && <div className="flex gap-1">{assigned.map((a: any) => <div key={a.id} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{a.initials}</div>)}</div>}
                     <span className={"text-sm px-3 py-1 rounded-full font-medium " + (j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500")}>{j.status}</span>
                   </div>
@@ -562,7 +562,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); supabase.from('job_checklists').select('template_id').eq('job_id', j.id).then(({data}:{data:any}) => { if(data) setEditJobTemplateIds(data.map((jc:any) => jc.template_id)) }); setEditJobPlaceSelected(true); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobPlaceSelected(true); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
