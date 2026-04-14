@@ -4,6 +4,7 @@ import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import DefectsTab from "@/components/admin/DefectsTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import ComplianceTab from "@/components/admin/ComplianceTab"
+import SettingsTab from "@/components/admin/SettingsTab"
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -28,6 +29,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [editJobName, setEditJobName] = useState("")
   const [editJobAddress, setEditJobAddress] = useState("")
   const [jobStartTime, setJobStartTime] = useState("08:00")
+  const [jobSignOutTime, setJobSignOutTime] = useState("17:00")
+  const [editJobSignOutTime, setEditJobSignOutTime] = useState("17:00")
+  const [assigningAll, setAssigningAll] = useState(false)
   const [editJobStartTime, setEditJobStartTime] = useState("08:00")
   const [editJobTemplateId, setEditJobTemplateId] = useState("")
   const [jobName, setJobName] = useState("")
@@ -207,11 +211,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
     if (!jobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
-    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime }).select("id").single()
+    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime }).select("id").single()
     if (error) { setFormError(error.message); setSaving(false); return }
     if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
     if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
-    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00")
+    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00")
     router.refresh()
   }
 
@@ -220,7 +224,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!editJobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime }).eq("id", jobId)
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
@@ -346,6 +350,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "performance", label: "Performance" },
     { id: "alerts", label: "Alerts", badge: alerts.length },
     { id: "defects", label: "Defects" },
+    { id: "settings", label: "Settings" },
   ]
 
   const inp = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
@@ -496,6 +501,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <label className="block text-sm font-medium text-gray-600 mb-1">Shift start time</label>
                   <input type="time" value={jobStartTime} onChange={e => setJobStartTime(e.target.value)} className={inp}/>
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Sign-out time (expected finish)</label>
+                  <input type="time" value={jobSignOutTime} onChange={e => setJobSignOutTime(e.target.value)} className={inp}/>
+                </div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
                   {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").length === 0 ? (
                     <p className="text-sm text-gray-400">No team yet Ã¢â‚¬â€ <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
@@ -563,7 +572,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobPlaceSelected(true); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobPlaceSelected(true); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -585,6 +594,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                               <option value="completed">Completed</option>
                               <option value="cancelled">Cancelled</option>
                             </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Sign-out time</label>
+                            <input type="time" value={editJobSignOutTime} onChange={e => setEditJobSignOutTime(e.target.value)} className={inp}/>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Checklists</label>
@@ -611,7 +624,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     {isAssigning && (
                       <div className="px-6 pb-5">
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                          <p className={"text-sm " + sub + " mb-3"}>Click to assign or unassign</p>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className={"text-sm " + sub}>Click to assign or unassign</p>
+                            <button onClick={async () => { setAssigningAll(true); await fetch("/api/admin/assign-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId: j.id }) }); setAssigningAll(false); window.location.reload() }} disabled={assigningAll} className="text-xs bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 font-medium disabled:opacity-50">{assigningAll ? "Assigning..." : "Assign all installers"}</button>
+                          </div>
                           {installers.length === 0 ? <p className={"text-sm " + sub}>No installers yet</p>
                           : <div className="flex flex-wrap gap-2">
                             {installers.map((m: any) => {
@@ -858,6 +874,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "performance" && (<ComplianceTab companyId={userData.company_id} teamMembers={teamMembers} />)}
         {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
         {activeTab === "defects" && <DefectsTab />}
+        {activeTab === "settings" && <SettingsTab />}
 
         {activeTab === "alerts" && (
           <div className={card}>
