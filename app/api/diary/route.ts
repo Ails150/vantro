@@ -1,16 +1,9 @@
+import { verifyInstallerToken } from '@/lib/auth'
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import Anthropic from "@anthropic-ai/sdk"
 
-function getInstallerFromToken(request: Request) {
-  const auth = request.headers.get("authorization")
-  if (!auth?.startsWith("Bearer ")) return null
-  try {
-    const payload = JSON.parse(Buffer.from(auth.slice(7), "base64").toString())
-    if (payload.exp < Date.now()) return null
-    return payload
-  } catch { return null }
-}
+
 
 export async function POST(request: Request) {
   const service = await createServiceClient()
@@ -22,7 +15,7 @@ export async function POST(request: Request) {
 
   const auth = request.headers.get("authorization")
   if (auth?.startsWith("Bearer ")) {
-    const installer = getInstallerFromToken(request)
+    const installer = verifyInstallerToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     resolvedUserId = installer.userId
     resolvedCompanyId = installer.companyId

@@ -1,15 +1,6 @@
+import { verifyInstallerToken } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
-
-function getInstallerFromToken(request: Request) {
-  const auth = request.headers.get('authorization')
-  if (!auth?.startsWith('Bearer ')) return null
-  try {
-    const payload = JSON.parse(Buffer.from(auth.slice(7), 'base64').toString())
-    if (payload.exp < Date.now()) return null
-    return payload
-  } catch { return null }
-}
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -46,7 +37,7 @@ export async function POST(request: Request) {
   // Check if installer token or admin session
   let userId, companyId
   if (auth?.startsWith('Bearer ')) {
-    const installer = getInstallerFromToken(request)
+    const installer = verifyInstallerToken(request)
     if (!installer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     userId = installer.userId
     const { data: u } = await service.from('users').select('company_id').eq('id', userId).single()
