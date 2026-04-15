@@ -1,4 +1,5 @@
-﻿"use client"
+import MemberSchedule from "@/components/admin/MemberSchedule"
+"use client"
 import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import DefectsTab from "@/components/admin/DefectsTab"
