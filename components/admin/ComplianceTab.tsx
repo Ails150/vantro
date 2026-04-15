@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState, useEffect } from "react"
 
 interface Props {
@@ -148,21 +148,46 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
             {breadcrumbLoading && <div className="text-center py-8 text-gray-400">Loading trail...</div>}
             {!breadcrumbLoading && breadcrumbs.length === 0 && <div className="text-center py-8 text-gray-400">No breadcrumb data for this session</div>}
             {!breadcrumbLoading && breadcrumbs.length > 0 && (
-              <div className="space-y-1">
-                {breadcrumbs.map((log: any, i: number) => {
-                  const onSite = log.within_range
-                  return (
-                    <div key={log.id || i}>
-                      <div className="flex items-center gap-3 py-2">
-                        <div className={"w-3 h-3 rounded-full flex-shrink-0 " + (onSite ? "bg-teal-400" : log.distance_from_site_metres > 500 ? "bg-red-400" : "bg-amber-400")} />
+              <div>
+                <div ref={(el) => {
+                  if (!el || !(window as any).google || !breadcrumbs.length) return
+                  const google = (window as any).google
+                  const center = { lat: breadcrumbs[0].lat, lng: breadcrumbs[0].lng }
+                  const map = new google.maps.Map(el, { zoom: 15, center, mapTypeId: "roadmap", styles: [{ featureType: "poi", stylers: [{ visibility: "off" }] }] })
+                  const path = breadcrumbs.map((b: any) => ({ lat: b.lat, lng: b.lng }))
+                  new google.maps.Polyline({ path, geodesic: true, strokeColor: "#00d4a0", strokeOpacity: 1.0, strokeWeight: 3, map })
+                  breadcrumbs.forEach((b: any, i: number) => {
+                    const isFirst = i === 0
+                    const isLast = i === breadcrumbs.length - 1
+                    const onSite = b.within_range
+                    const color = isFirst ? "#00d4a0" : isLast ? "#6366f1" : onSite ? "#00d4a0" : b.distance_from_site_metres > 500 ? "#ef4444" : "#f59e0b"
+                    new google.maps.Marker({
+                      position: { lat: b.lat, lng: b.lng },
+                      map,
+                      icon: { path: google.maps.SymbolPath.CIRCLE, scale: isFirst || isLast ? 8 : 5, fillColor: color, fillOpacity: 1, strokeColor: "#fff", strokeWeight: 2 },
+                      title: formatTime(b.logged_at) + " — " + (b.distance_from_site_metres != null ? b.distance_from_site_metres + "m from site" : "")
+                    })
+                  })
+                }} style={{ width: "100%", height: "400px", borderRadius: "12px" }} />
+                <div className="mt-3 flex items-center gap-4 text-xs text-gray-500">
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-teal-400 inline-block" /> On site</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-amber-400 inline-block" /> Near site</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-400 inline-block" /> Off site</span>
+                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-indigo-500 inline-block" /> Last point</span>
+                </div>
+                <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
+                  {breadcrumbs.map((log: any, i: number) => {
+                    const onSite = log.within_range
+                    return (
+                      <div key={log.id || i} className="flex items-center gap-3 py-1">
+                        <div className={"w-2 h-2 rounded-full flex-shrink-0 " + (onSite ? "bg-teal-400" : log.distance_from_site_metres > 500 ? "bg-red-400" : "bg-amber-400")} />
                         <span className="text-xs text-gray-500 min-w-[44px]">{formatTime(log.logged_at)}</span>
-                        <span className="text-sm flex-1">{log.distance_from_site_metres != null ? (log.distance_from_site_metres >= 1000 ? (log.distance_from_site_metres / 1000).toFixed(1) + "km from site" : log.distance_from_site_metres + "m from site") : "Location logged"}</span>
+                        <span className="text-xs flex-1">{log.distance_from_site_metres != null ? (log.distance_from_site_metres >= 1000 ? (log.distance_from_site_metres / 1000).toFixed(1) + "km from site" : log.distance_from_site_metres + "m from site") : "Location logged"}</span>
                         <span className={"text-xs font-medium " + (onSite ? "text-teal-600" : log.distance_from_site_metres > 500 ? "text-red-500" : "text-amber-600")}>{onSite ? "On site" : "Off site"}</span>
                       </div>
-                      {i < breadcrumbs.length - 1 && <div className="ml-[5px] w-[1px] h-3 bg-gray-200" />}
-                    </div>
-                  )
-                })}
+                    )
+                  })}
+                </div>
               </div>
             )}
           </div>
