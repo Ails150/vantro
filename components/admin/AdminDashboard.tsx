@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import DefectsTab from "@/components/admin/DefectsTab"
@@ -92,7 +92,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           // New alert arrived - show toast
           const newest = newAlerts[0]
           showToast(
-            (newest?.alert_type === "blocker" ? "BLOCKER" : "ISSUE") + " ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â " + (newest?.jobs?.name || "Job") + ": " + newest?.message,
+            (newest?.alert_type === "blocker" ? "BLOCKER" : "ISSUE") + " ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â " + (newest?.jobs?.name || "Job") + ": " + newest?.message,
             newest?.alert_type === "blocker" ? "blocker" : "issue"
           )
           // Play sound
@@ -221,7 +221,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   async function updateJob(jobId: string) {
     if (!editJobName.trim()) { setFormError("Enter a job name"); return }
-    if (!editJobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
+    if (!editJobPlaceSelected && !editJobLat) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
     const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime }).eq("id", jobId)
@@ -507,7 +507,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 </div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
                   {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").length === 0 ? (
-                    <p className="text-sm text-gray-400">No team yet Ã¢â‚¬â€ <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
+                    <p className="text-sm text-gray-400">No team yet ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
                   ) : (
                     <div className="space-y-2 mt-1">
                       {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").map((m: any) => (
@@ -523,7 +523,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklists (optional)</label>
                   {checklistTemplates.length === 0 ? (
-                    <p className="text-sm text-gray-400">No checklists yet Ã¢â‚¬â€ <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
+                    <p className="text-sm text-gray-400">No checklists yet ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
                   ) : (
                     <div className="space-y-2 mt-1">
                       {checklistTemplates.map((t: any) => (
@@ -636,7 +636,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " ÃƒÂ¢Ã…â€œÃ¢â‚¬Å“"}
+                                  {m.name}{isAssigned && " ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ"}
                                 </button>
                               )
                             })}
@@ -664,7 +664,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <label className="block text-sm font-medium text-gray-600 mb-1">Role</label>
                   <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
                     <option value="installer">Installer - PIN app access only</option>
-                    <option value="foreman">Foreman ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â PIN app + alert emails</option>
+                    <option value="foreman">Foreman ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â PIN app + alert emails</option>
                   </select>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
@@ -910,5 +910,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     </div>
   )
 }
+
 
 
