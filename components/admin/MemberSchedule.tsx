@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import { useState } from "react"
 
 const DAYS = [
@@ -40,7 +40,7 @@ export default function MemberSchedule({ member, onSave, onCancel }: { member: a
 
   return (
     <div className="px-6 pb-5 pt-3 border-t border-gray-100 bg-gray-50">
-      <p className="text-xs text-gray-500 mb-4">Set {member.name}{"'"s"} working days and hours. GPS tracking window is 3 hours before sign-out.</p>
+      <p className="text-xs text-gray-500 mb-4">Set {member.name}'s working days and hours. GPS tracking window is 3 hours before sign-out.</p>
       <div className="space-y-2">
         {DAYS.map(d => (
           <div key={d.key} className="flex items-center gap-3">
