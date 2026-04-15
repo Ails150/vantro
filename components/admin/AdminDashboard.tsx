@@ -96,7 +96,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           // New alert arrived - show toast
           const newest = newAlerts[0]
           showToast(
-            (newest?.alert_type === "blocker" ? "BLOCKER" : "ISSUE") + " ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â " + (newest?.jobs?.name || "Job") + ": " + newest?.message,
+            (newest?.alert_type === "blocker" ? "BLOCKER" : "ISSUE") + " ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â " + (newest?.jobs?.name || "Job") + ": " + newest?.message,
             newest?.alert_type === "blocker" ? "blocker" : "issue"
           )
           // Play sound
@@ -528,7 +528,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 </div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
                   {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").length === 0 ? (
-                    <p className="text-sm text-gray-400">No team yet ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
+                    <p className="text-sm text-gray-400">No team yet ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
                   ) : (
                     <div className="space-y-2 mt-1">
                       {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").map((m: any) => (
@@ -544,7 +544,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklists (optional)</label>
                   {checklistTemplates.length === 0 ? (
-                    <p className="text-sm text-gray-400">No checklists yet ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
+                    <p className="text-sm text-gray-400">No checklists yet ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
                   ) : (
                     <div className="space-y-2 mt-1">
                       {checklistTemplates.map((t: any) => (
@@ -657,7 +657,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œ"}
+                                  {m.name}{isAssigned && " ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“"}
                                 </button>
                               )
                             })}
@@ -685,7 +685,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <label className="block text-sm font-medium text-gray-600 mb-1">Role</label>
                   <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
                     <option value="installer">Installer - PIN app access only</option>
-                    <option value="foreman">Foreman ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â PIN app + alert emails</option>
+                    <option value="foreman">Foreman ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â PIN app + alert emails</option>
                   </select>
                 </div>
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
@@ -720,22 +720,20 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     )}
                   </div>
                     {editingScheduleId === m.id && (
-                      <div className="px-6 pb-5 pt-3 border-t border-gray-100 bg-gray-50">
-                        <p className="text-xs text-gray-500 mb-3">Override default schedule for {m.name}. Leave blank to use company defaults.</p>
-                        <div className="flex gap-2 mb-3 flex-wrap">
-                          {[{key:"mon",label:"Mon"},{key:"tue",label:"Tue"},{key:"wed",label:"Wed"},{key:"thu",label:"Thu"},{key:"fri",label:"Fri"},{key:"sat",label:"Sat"},{key:"sun",label:"Sun"}].map(d => (
-                            <button key={d.key} onClick={() => setScheduleDays((prev: string[]) => prev.includes(d.key) ? prev.filter((x: string) => x !== d.key) : [...prev, d.key])} className={"px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors " + (scheduleDays.includes(d.key) ? "bg-teal-400 text-white border-teal-400" : "bg-white text-gray-400 border-gray-200")}>{d.label}</button>
-                          ))}
-                        </div>
-                        <div className="flex gap-3 mb-3">
-                          <div><label className="block text-xs text-gray-500 mb-1">Sign-in time</label><input type="time" value={scheduleSignIn} onChange={e => setScheduleSignIn(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" /></div>
-                          <div><label className="block text-xs text-gray-500 mb-1">Sign-out time</label><input type="time" value={scheduleSignOut} onChange={e => setScheduleSignOut(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" /></div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button onClick={() => saveSchedule(m.id)} className="bg-teal-400 text-white text-xs font-bold rounded-lg px-4 py-2">Save schedule</button>
-                          <button onClick={() => setEditingScheduleId(null)} className="border border-gray-200 text-gray-500 text-xs rounded-lg px-4 py-2">Cancel</button>
-                        </div>
-                      </div>
+                      <MemberSchedule
+                        member={m}
+                        onSave={async (schedule) => {
+                          await fetch("/api/admin/team/schedule", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ userId: m.id, weekly_schedule: schedule })
+                          })
+                          setEditingScheduleId(null)
+                          router.refresh()
+                        }}
+                        onCancel={() => setEditingScheduleId(null)}
+                      />
+                    )}
                     )}
                 </div>
               ))}
@@ -950,6 +948,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     </div>
   )
 }
+
 
 
 

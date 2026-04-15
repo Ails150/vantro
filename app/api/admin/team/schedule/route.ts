@@ -6,13 +6,13 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { userId, sign_in_time, sign_out_time, working_days } = await request.json()
+  const { userId, weekly_schedule } = await request.json()
 
   const { data: admin } = await supabase.from("users").select("company_id, role").eq("auth_user_id", user.id).single()
   if (!admin || !["admin","foreman"].includes(admin.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { error } = await supabase.from("users")
-    .update({ sign_in_time, sign_out_time, working_days })
+    .update({ weekly_schedule })
     .eq("id", userId)
     .eq("company_id", admin.company_id)
 

@@ -1,4 +1,4 @@
-import { verifyInstallerToken } from '@/lib/auth'
+﻿import { verifyInstallerToken } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -76,5 +76,7 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-  return NextResponse.json({ success: true, distanceMetres, withinRange })
+  // Fetch installer weekly schedule
+  const { data: installerUser } = await service.from('users').select('weekly_schedule').eq('id', installer.userId).single()
+  return NextResponse.json({ success: true, distanceMetres, withinRange, weeklySchedule: installerUser?.weekly_schedule || null })
 }
