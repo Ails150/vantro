@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import DefectsTab from "@/components/admin/DefectsTab"
@@ -713,11 +713,30 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <div className="flex gap-2">
                         <button onClick={() => resendInvite(m.email, m.name)} className="text-xs border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-lg px-3 py-1.5 transition-colors">Resend invite</button>
                         <button onClick={() => resetPin(m.id)} className="text-xs border border-gray-200 text-gray-600 hover:border-amber-300 hover:text-amber-600 rounded-lg px-3 py-1.5 transition-colors">Reset PIN</button>
+                          <button onClick={() => editingScheduleId === m.id ? setEditingScheduleId(null) : openSchedule(m)} className={"text-xs border rounded-lg px-3 py-1.5 transition-colors " + (editingScheduleId === m.id ? "border-teal-400 text-teal-600 bg-teal-50" : "border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600")}>Schedule</button>
                         <button onClick={() => toggleActive(m.id, m.is_active !== false)} className={"text-xs border rounded-lg px-3 py-1.5 transition-colors " + (m.is_active === false ? "border-teal-200 text-teal-600 hover:bg-teal-50" : "border-gray-200 text-gray-600 hover:border-amber-300 hover:text-amber-600")}>{m.is_active === false ? "Reactivate" : "Suspend"}</button>
                         <button onClick={() => removeMember(m.id, m.auth_user_id)} className="text-xs border border-red-200 text-red-500 hover:bg-red-50 rounded-lg px-3 py-1.5 transition-colors">Remove</button>
                       </div>
                     )}
                   </div>
+                    {editingScheduleId === m.id && (
+                      <div className="px-6 pb-5 pt-3 border-t border-gray-100 bg-gray-50">
+                        <p className="text-xs text-gray-500 mb-3">Override default schedule for {m.name}. Leave blank to use company defaults.</p>
+                        <div className="flex gap-2 mb-3 flex-wrap">
+                          {[{key:"mon",label:"Mon"},{key:"tue",label:"Tue"},{key:"wed",label:"Wed"},{key:"thu",label:"Thu"},{key:"fri",label:"Fri"},{key:"sat",label:"Sat"},{key:"sun",label:"Sun"}].map(d => (
+                            <button key={d.key} onClick={() => setScheduleDays((prev: string[]) => prev.includes(d.key) ? prev.filter((x: string) => x !== d.key) : [...prev, d.key])} className={"px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors " + (scheduleDays.includes(d.key) ? "bg-teal-400 text-white border-teal-400" : "bg-white text-gray-400 border-gray-200")}>{d.label}</button>
+                          ))}
+                        </div>
+                        <div className="flex gap-3 mb-3">
+                          <div><label className="block text-xs text-gray-500 mb-1">Sign-in time</label><input type="time" value={scheduleSignIn} onChange={e => setScheduleSignIn(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" /></div>
+                          <div><label className="block text-xs text-gray-500 mb-1">Sign-out time</label><input type="time" value={scheduleSignOut} onChange={e => setScheduleSignOut(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm" /></div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => saveSchedule(m.id)} className="bg-teal-400 text-white text-xs font-bold rounded-lg px-4 py-2">Save schedule</button>
+                          <button onClick={() => setEditingScheduleId(null)} className="border border-gray-200 text-gray-500 text-xs rounded-lg px-4 py-2">Cancel</button>
+                        </div>
+                      </div>
+                    )}
                 </div>
               ))}
             </div>
@@ -931,6 +950,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     </div>
   )
 }
+
 
 
 
