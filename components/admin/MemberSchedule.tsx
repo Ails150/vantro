@@ -67,3 +67,4 @@ export default function MemberSchedule({ member, onSave, onCancel }: { member: a
     </div>
   )
 }
+
