@@ -52,6 +52,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [memberName, setMemberName] = useState("")
   const [memberEmail, setMemberEmail] = useState("")
   const [memberRole, setMemberRole] = useState("installer")
+  const [editingScheduleId, setEditingScheduleId] = useState<string|null>(null)
+  const [scheduleSignIn, setScheduleSignIn] = useState("08:00")
+  const [scheduleSignOut, setScheduleSignOut] = useState("17:00")
+  const [scheduleDays, setScheduleDays] = useState<string[]>(["mon","tue","wed","thu","fri"])
   const [templateName, setTemplateName] = useState("")
   const [templateFrequency, setTemplateFrequency] = useState("job")
   const [editingTemplateId, setEditingTemplateId] = useState<string|null>(null)
@@ -330,6 +334,23 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!window.confirm("Delete this template and all its items?")) return
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_template", templateId }) })
     router.refresh()
+  }
+
+  async function saveSchedule(userId: string) {
+    await fetch("/api/admin/team/schedule", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, sign_in_time: scheduleSignIn, sign_out_time: scheduleSignOut, working_days: scheduleDays })
+    })
+    setEditingScheduleId(null)
+    router.refresh()
+  }
+
+  function openSchedule(m: any) {
+    setEditingScheduleId(m.id)
+    setScheduleSignIn(m.sign_in_time ? m.sign_in_time.slice(0,5) : "08:00")
+    setScheduleSignOut(m.sign_out_time ? m.sign_out_time.slice(0,5) : "17:00")
+    setScheduleDays(m.working_days || ["mon","tue","wed","thu","fri"])
   }
 
   const installers = teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman")
@@ -910,6 +931,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     </div>
   )
 }
+
 
 
 

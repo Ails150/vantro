@@ -1,8 +1,15 @@
-"use client"
+﻿"use client"
 import { useState, useEffect } from "react"
 
+const DAYS = [
+  { key: "mon", label: "Mon" }, { key: "tue", label: "Tue" }, { key: "wed", label: "Wed" },
+  { key: "thu", label: "Thu" }, { key: "fri", label: "Fri" }, { key: "sat", label: "Sat" }, { key: "sun", label: "Sun" }
+]
+
 export default function SettingsTab() {
+  const [signInTime, setSignInTime] = useState("08:00")
   const [signOutTime, setSignOutTime] = useState("17:00")
+  const [workingDays, setWorkingDays] = useState(["mon","tue","wed","thu","fri"])
   const [gracePeriod, setGracePeriod] = useState(60)
   const [geofenceRadius, setGeofenceRadius] = useState(150)
   const [loading, setLoading] = useState(true)
@@ -13,6 +20,8 @@ export default function SettingsTab() {
     fetch("/api/admin/settings").then(r => r.json()).then(data => {
       const c = data.company || {}
       if (c.default_sign_out_time) setSignOutTime(c.default_sign_out_time.slice(0, 5))
+      if (c.default_sign_in_time) setSignInTime(c.default_sign_in_time.slice(0, 5))
+      if (c.default_working_days) setWorkingDays(c.default_working_days)
       if (c.grace_period_minutes != null) setGracePeriod(c.grace_period_minutes)
       if (c.geofence_radius_metres != null) setGeofenceRadius(c.geofence_radius_metres)
       setLoading(false)
@@ -24,10 +33,14 @@ export default function SettingsTab() {
     await fetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ default_sign_out_time: signOutTime, grace_period_minutes: gracePeriod, geofence_radius_metres: geofenceRadius })
+      body: JSON.stringify({ default_sign_in_time: signInTime, default_sign_out_time: signOutTime, default_working_days: workingDays, grace_period_minutes: gracePeriod, geofence_radius_metres: geofenceRadius })
     })
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
+  }
+
+  function toggleDay(day: string) {
+    setWorkingDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day])
   }
 
   if (loading) return <div className="text-center py-12 text-gray-400">Loading settings...</div>
@@ -43,9 +56,24 @@ export default function SettingsTab() {
         </div>
         <div className="px-6 py-5 space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Default sign-out time</label>
-            <input type="time" value={signOutTime} onChange={e => setSignOutTime(e.target.value)} className={inp} />
-            <p className="text-xs text-gray-400 mt-1">Installers will receive reminders to sign out starting at this time</p>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Default working days</label>
+            <div className="flex gap-2">
+              {[{ key: "mon", label: "Mon" }, { key: "tue", label: "Tue" }, { key: "wed", label: "Wed" }, { key: "thu", label: "Thu" }, { key: "fri", label: "Fri" }, { key: "sat", label: "Sat" }, { key: "sun", label: "Sun" }].map(d => (
+                <button key={d.key} onClick={() => toggleDay(d.key)} className={"px-3 py-2 rounded-xl text-xs font-bold border transition-colors " + (workingDays.includes(d.key) ? "bg-teal-400 text-white border-teal-400" : "bg-white text-gray-400 border-gray-200 hover:border-teal-300")}>{d.label}</button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Default working days for all team members. Override per person in Team tab.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Default sign-in time</label>
+              <input type="time" value={signInTime} onChange={e => setSignInTime(e.target.value)} className={inp} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Default sign-out time</label>
+              <input type="time" value={signOutTime} onChange={e => setSignOutTime(e.target.value)} className={inp} />
+              <p className="text-xs text-gray-400 mt-1">Reminders sent at this time</p>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Grace period (minutes)</label>
