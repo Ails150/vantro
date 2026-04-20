@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/browser"
 
 export default function AuditTab({ jobs }: { jobs: any[] }) {
   const [selectedJob, setSelectedJob] = useState("")
@@ -24,6 +23,7 @@ export default function AuditTab({ jobs }: { jobs: any[] }) {
   }
 
   function exportHTML() {
+    const refId = "VTR-" + job.name.replace(/\s+/g, "").toUpperCase().slice(0,8) + "-" + (preview.period.from || "ALL").replace(/-/g,"") + "-" + (preview.period.to || "NOW").replace(/-/g,"") + "-" + Date.now()
     if (!preview) return
     const job = preview.job
     const rows = (entries: any[]) => entries.length === 0 ? '<p style="color:#888">None recorded</p>' : ''
@@ -56,7 +56,7 @@ export default function AuditTab({ jobs }: { jobs: any[] }) {
   <strong>Address:</strong> ${job.address}<br>
   <strong>Period:</strong> ${preview.period.from || 'All time'} to ${preview.period.to || 'now'}<br>
   <strong>Generated:</strong> ${new Date(preview.generated).toLocaleString('en-GB')}<br>
-  <strong>Report produced by:</strong> Vantro — getvantro.com
+  <strong>Report Reference:</strong> ${refId}<br>\n  <strong>Report produced by:</strong> Vantro — getvantro.com
 </div>
 
 <h2>Attendance & GPS Sign-ins (${preview.signins.length} records)</h2>
