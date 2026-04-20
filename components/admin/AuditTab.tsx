@@ -23,9 +23,9 @@ export default function AuditTab({ jobs }: { jobs: any[] }) {
   }
 
   function exportHTML() {
-    const refId = "VTR-" + job.name.replace(/\s+/g, "").toUpperCase().slice(0,8) + "-" + (preview.period.from || "ALL").replace(/-/g,"") + "-" + (preview.period.to || "NOW").replace(/-/g,"") + "-" + Date.now()
     if (!preview) return
     const job = preview.job
+    const refId = "VTR-" + job.name.replace(/\s+/g, "").toUpperCase().slice(0,8) + "-" + (preview.period.from || "ALL").replace(/-/g,"") + "-" + (preview.period.to || "NOW").replace(/-/g,"") + "-" + Date.now()
     const rows = (entries: any[]) => entries.length === 0 ? '<p style="color:#888">None recorded</p>' : ''
 
     const html = `<!DOCTYPE html>
