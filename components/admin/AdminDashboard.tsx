@@ -2,6 +2,7 @@
 import MemberSchedule from "@/components/admin/MemberSchedule"
 import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
+import AuditTab from './AuditTab'
 import DefectsTab from "@/components/admin/DefectsTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import ComplianceTab from "@/components/admin/ComplianceTab"
@@ -366,6 +367,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "approvals", label: "Approvals", badge: pendingQA.length },
     { id: "team", label: "Team" },
     { id: "checklists", label: "Checklists" },
+      { id: "audit", label: "Audit" },
     { id: "jobs", label: "Jobs" },
     { id: "diary", label: "Diary" },
     { id: "payroll", label: "Payroll" },
@@ -911,7 +913,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
         {activeTab === "performance" && (<ComplianceTab companyId={userData.company_id} teamMembers={teamMembers} />)}
         {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
-        {activeTab === "defects" && <DefectsTab />}
+        {activeTab === "audit" && <AuditTab jobs={jobs} />}
+          {activeTab === "defects" && <DefectsTab />}
         {activeTab === "settings" && <SettingsTab />}
 
         {activeTab === "alerts" && (

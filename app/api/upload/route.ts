@@ -1,38 +1,36 @@
-import { verifyInstallerToken } from '@/lib/auth'
-import { NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
+import { NextResponse } from "next/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { verifyInstallerToken } from "@/lib/auth"
 
 export async function POST(request: Request) {
+  const auth = request.headers.get("authorization")
+  if (!auth?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const installer = verifyInstallerToken(request)
-  if (!installer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const formData = await request.formData()
-  const file = formData.get('file') as File
-  const jobId = formData.get('jobId') as string
-  const itemId = formData.get('itemId') as string
+  try {
+    const formData = await request.formData()
+    const file = formData.get("file") as File
+    const bucket = formData.get("bucket") as string || "diary-media"
+    const path = formData.get("path") as string
 
-  if (!file || !jobId) return NextResponse.json({ error: 'Missing file or jobId' }, { status: 400 })
+    if (!file || !path) return NextResponse.json({ error: "Missing file or path" }, { status: 400 })
 
-  const service = await createServiceClient()
-  const { data: job } = await service.from('jobs').select('company_id').eq('id', jobId).single()
-  if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    const service = await createServiceClient()
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
 
-  const ext = file.name.split('.').pop() || 'jpg'
-  const filename = `${job.company_id}/${jobId}/${itemId || 'diary'}/${Date.now()}.${ext}`
-
-  const arrayBuffer = await file.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
-
-  const { data, error } = await service.storage
-    .from('vantro-media')
-    .upload(filename, buffer, {
-      contentType: file.type,
-      upsert: false
+    const { error } = await service.storage.from(bucket).upload(path, buffer, {
+      contentType: file.type || "image/jpeg",
+      upsert: true
     })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  const { data: urlData } = service.storage.from('vantro-media').getPublicUrl(filename)
+    const { data: { publicUrl } } = service.storage.from(bucket).getPublicUrl(path)
 
-  return NextResponse.json({ url: urlData.publicUrl, path: filename })
+    return NextResponse.json({ url: publicUrl })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
+  }
 }
