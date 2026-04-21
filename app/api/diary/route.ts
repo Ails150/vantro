@@ -6,7 +6,7 @@ import Anthropic from "@anthropic-ai/sdk"
 export async function POST(request: Request) {
   const service = await createServiceClient()
   const body = await request.json()
-  const { jobId, entryText, photoUrls } = body
+  const { jobId, entryText, photoUrls, videoUrl } = body
 
   let resolvedUserId: string
   let resolvedCompanyId: string
@@ -51,7 +51,8 @@ export async function POST(request: Request) {
     entry_text: entryText,
     ai_alert_type: aiAlertType,
     ai_summary: aiSummary,
-    photo_urls: photoUrls || []
+    photo_urls: photoUrls || [],
+    video_url: videoUrl || null
   }).select().single()
 
   if (aiAlertType && aiAlertType !== "none") {
