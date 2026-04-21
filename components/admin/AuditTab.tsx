@@ -165,7 +165,10 @@ ${preview.qa.map((q: any) => `<tr>
             </div>
             <button onClick={exportHTML}
               style={{ padding: '10px 20px', background: '#00d4a0', color: '#0f1923', border: 'none', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-              ⬇ Download Report
+              ⬇ Download Report</button>
+            <button onClick={emailReport}
+              style={{ padding: '10px 20px', background: '#1a2635', color: '#00d4a0', border: '1px solid #00d4a0', borderRadius: 10, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
+              ✉ Email Report
             </button>
           </div>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -174,6 +177,7 @@ ${preview.qa.map((q: any) => `<tr>
               { label: 'Diary entries', value: preview.diary.length, color: '#00d4a0' },
               { label: 'Photos', value: preview.diary.reduce((n: number, e: any) => n + (e.photo_urls?.length || 0), 0), color: '#00d4a0' },
               { label: 'QA responses', value: preview.qa.length, color: '#00d4a0' },
+              { label: 'GPS Points', value: preview.breadcrumbs?.length || 0, color: '#00d4a0' },
               { label: 'Blockers/Issues', value: preview.diary.filter((e: any) => e.ai_alert_type && e.ai_alert_type !== 'none').length, color: '#f87171' },
             ].map(stat => (
               <div key={stat.label} style={{ background: '#0f1923', borderRadius: 10, padding: '10px 16px', minWidth: 100 }}>

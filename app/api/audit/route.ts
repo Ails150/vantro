@@ -36,7 +36,15 @@ export async function GET(request: Request) {
   if (to) signinsQuery = signinsQuery.lte('signed_in_at', to + 'T23:59:59Z')
   const { data: signins } = await signinsQuery
 
-  let qaQuery = service.from('checklist_responses')
+  let breadcrumbQuery = service.from('location_logs')
+    .select('lat, lng, recorded_at, accuracy, users(name)')
+    .eq('job_id', jobId)
+    .order('recorded_at', { ascending: true })
+  if (from) breadcrumbQuery = breadcrumbQuery.gte('recorded_at', from)
+  if (to) breadcrumbQuery = breadcrumbQuery.lte('recorded_at', to + 'T23:59:59Z')
+  const { data: breadcrumbs } = await breadcrumbQuery
+
+  let qaQuery = service.from('qa_submissions')
     .select('created_at, result, note, photo_url, checklist_items(label), users(name)')
     .eq('job_id', jobId)
     .order('created_at', { ascending: true })
@@ -50,6 +58,7 @@ export async function GET(request: Request) {
     diary: diary || [],
     signins: signins || [],
     qa: qa || [],
+    breadcrumbs: breadcrumbs || [],
     generated: new Date().toISOString()
   })
 }
