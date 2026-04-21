@@ -75,6 +75,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
   const [diaryReply, setDiaryReply] = useState("")
   const [replySending, setReplySending] = useState(false)
+  const [invitingJobId, setInvitingJobId] = useState<string|null>(null)
+  const [inviteName, setInviteName] = useState("")
+  const [inviteEmail, setInviteEmail] = useState("")
+  const [inviteSending, setInviteSending] = useState(false)
   const [toast, setToast] = useState<{message: string; type: string} | null>(null)
 
   function showToast(message: string, type: string = "info") {
@@ -196,6 +200,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     setResolutionNote("")
     setSaving(false)
     window.location.reload()
+  }
+
+  async function sendClientInvite(jobId: string) {
+    if (!inviteName.trim() || !inviteEmail.trim()) { alert("Enter name and email"); return }
+    setInviteSending(true)
+    const res = await fetch("/api/client/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: inviteName, email: inviteEmail, jobId }) })
+    const data = await res.json()
+    setInviteSending(false)
+    if (data.success) { setInvitingJobId(null); setInviteName(""); setInviteEmail(""); setToast({ message: "Client invite sent!", type: "success" }) }
+    else { alert(data.error || "Failed to send invite") }
   }
 
   async function replyToDiary(entryId: string, userId: string) {
