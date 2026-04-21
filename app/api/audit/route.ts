@@ -21,7 +21,7 @@ export async function GET(request: Request) {
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
   let diaryQuery = service.from('diary_entries')
-    .select('id, entry_text, ai_alert_type, ai_summary, photo_urls, created_at, users(name)')
+    .select('id, entry_text, ai_alert_type, ai_summary, photo_urls, video_url, created_at, users(name)')
     .eq('job_id', jobId)
     .order('created_at', { ascending: true })
   if (from) diaryQuery = diaryQuery.gte('created_at', from)

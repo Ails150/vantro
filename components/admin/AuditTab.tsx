@@ -81,7 +81,7 @@ ${preview.signins.map((s: any) => {
 <h2>Site Diary (${preview.diary.length} entries)</h2>
 ${preview.diary.length === 0 ? '<p style="color:#888">No diary entries in this period</p>' : `
 <table>
-<tr><th>Time</th><th>Installer</th><th>Entry</th><th>AI Classification</th><th>Photos</th></tr>
+<tr><th>Time</th><th>Installer</th><th>Entry</th><th>AI Classification</th><th>Photos</th><th>Video</th></tr>
 ${preview.diary.map((e: any) => `<tr>
   <td>${new Date(e.created_at).toLocaleString('en-GB')}</td>
   <td>${e.users?.name || 'Unknown'}</td>
