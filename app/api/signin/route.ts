@@ -1,4 +1,4 @@
-﻿import { verifyInstallerToken } from '@/lib/auth'
+import { verifyInstallerToken } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 
@@ -20,7 +20,6 @@ export async function POST(request: Request) {
   const { data: job } = await service.from('jobs').select('lat, lng, company_id, name, sign_out_time').eq('id', jobId).single()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-  // Get company defaults
   const { data: company } = await service.from('companies')
     .select('geofence_radius_metres, default_sign_out_time')
     .eq('id', job.company_id).single()
@@ -42,7 +41,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // Block if already signed in to ANY job
   const today = new Date(); today.setHours(0,0,0,0)
   const { data: existing } = await service.from('signins')
     .select('id, job_id, jobs(name)')
@@ -60,7 +58,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `You are already signed in to ${otherJobName}. Sign out first.` }, { status: 400 })
   }
 
-  // Determine expected sign-out time: job override > company default
   const expectedSignOutTime = job.sign_out_time || company?.default_sign_out_time || null
 
   const { error } = await service.from('signins').insert({
@@ -76,7 +73,6 @@ export async function POST(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-  // Fetch installer weekly schedule
   const { data: installerUser } = await service.from('users').select('weekly_schedule').eq('id', installer.userId).single()
   return NextResponse.json({ success: true, distanceMetres, withinRange, weeklySchedule: installerUser?.weekly_schedule || null })
 }
