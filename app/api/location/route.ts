@@ -11,10 +11,16 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 export async function POST(request: Request) {
+  const auth = request.headers.get('authorization') || ''
+  const tokenSample = auth.slice(0, 30)
+  const tokenLength = auth.length
+  const hasJwtSecret = !!process.env.JWT_SECRET
+  const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+
   const installer = verifyInstallerToken(request)
   if (!installer) {
-    console.error('[location] token verification failed')
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    console.error('[location] 401 — token prefix:', tokenSample, 'length:', tokenLength, 'JWT_SECRET set:', hasJwtSecret, 'SERVICE_ROLE set:', hasServiceRole)
+    return NextResponse.json({ error: 'Unauthorized', debug: { tokenLength, hasJwtSecret } }, { status: 401 })
   }
 
   const { lat, lng, accuracy } = await request.json()
