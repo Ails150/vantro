@@ -17,13 +17,28 @@ export async function POST(request: Request) {
   const { entryId, userId, message } = await request.json()
   if (!message?.trim()) return NextResponse.json({ error: "Message required" }, { status: 400 })
 
+  // Save the reply to the diary entry
+  const { error: updateErr } = await service.from("diary_entries")
+    .update({
+      reply: message.trim(),
+      replied_at: new Date().toISOString(),
+      replied_by: adminUser.id,
+    })
+    .eq("id", entryId)
+    .eq("company_id", adminUser.company_id)
+
+  if (updateErr) {
+    console.error("[diary/reply] update failed", updateErr)
+    return NextResponse.json({ error: "Failed to save reply", detail: updateErr.message }, { status: 500 })
+  }
+
   // Get the installer's push token and email
   const { data: installer } = await service.from("users")
     .select("push_token, email, name")
     .eq("id", userId)
     .single()
 
-  if (!installer) return NextResponse.json({ error: "Installer not found" }, { status: 404 })
+  if (!installer) return NextResponse.json({ success: true, warning: "Reply saved but installer not found" })
 
   // Get the diary entry for context
   const { data: entry } = await service.from("diary_entries")
