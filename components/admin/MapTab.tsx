@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow } from "@vis.gl/react-google-maps"
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || ""
+const GOOGLE_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || ""
 
 interface MapData {
   signins: any[]
@@ -88,7 +89,7 @@ export default function MapTab() {
           <Map
             defaultCenter={center}
             defaultZoom={data.jobs.length > 0 ? 12 : 6}
-            mapId="vantro-map"
+            mapId={GOOGLE_MAP_ID}
             style={{ width: "100%", height: "100%" }}
             gestureHandling="greedy"
             disableDefaultUI={false}
