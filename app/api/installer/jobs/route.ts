@@ -50,7 +50,17 @@ export async function GET(request: Request) {
     }
   }))
 
-  return NextResponse.json({ jobs: jobsWithData })
+  // Fetch company-level settings the mobile app needs
+  const { data: meRow } = await service.from("users").select("company_id").eq("id", installer.userId).single()
+  let companySettings: any = { background_gps_enabled: true }
+  if (meRow?.company_id) {
+    const { data: companyRow } = await service.from("companies").select("background_gps_enabled").eq("id", meRow.company_id).single()
+    if (companyRow?.background_gps_enabled != null) {
+      companySettings.background_gps_enabled = companyRow.background_gps_enabled
+    }
+  }
+
+  return NextResponse.json({ jobs: jobsWithData, company_settings: companySettings })
 }
 
 

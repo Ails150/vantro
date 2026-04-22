@@ -12,6 +12,7 @@ export default function SettingsTab() {
   const [workingDays, setWorkingDays] = useState(["mon","tue","wed","thu","fri"])
   const [gracePeriod, setGracePeriod] = useState(60)
   const [geofenceRadius, setGeofenceRadius] = useState(150)
+  const [backgroundGps, setBackgroundGps] = useState(true)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -24,6 +25,7 @@ export default function SettingsTab() {
       if (c.default_working_days) setWorkingDays(c.default_working_days)
       if (c.grace_period_minutes != null) setGracePeriod(c.grace_period_minutes)
       if (c.geofence_radius_metres != null) setGeofenceRadius(c.geofence_radius_metres)
+      if (c.background_gps_enabled != null) setBackgroundGps(c.background_gps_enabled)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
@@ -33,7 +35,7 @@ export default function SettingsTab() {
     await fetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ default_sign_in_time: signInTime, default_sign_out_time: signOutTime, default_working_days: workingDays, grace_period_minutes: gracePeriod, geofence_radius_metres: geofenceRadius })
+      body: JSON.stringify({ default_sign_in_time: signInTime, default_sign_out_time: signOutTime, default_working_days: workingDays, grace_period_minutes: gracePeriod, geofence_radius_metres: geofenceRadius, background_gps_enabled: backgroundGps })
     })
     setSaving(false); setSaved(true)
     setTimeout(() => setSaved(false), 3000)
@@ -98,6 +100,21 @@ export default function SettingsTab() {
               <option value={500}>500m</option>
             </select>
             <p className="text-xs text-gray-400 mt-1">Installers must be within this distance of the job site to sign in and out</p>
+          </div>
+          <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700">Background GPS tracking</label>
+              <p className="text-xs text-gray-400 mt-1">Log GPS breadcrumbs every 30 minutes while signed in, even when the app is in the background. Required for full compliance trail.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setBackgroundGps(!backgroundGps)}
+              className={"relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors " + (backgroundGps ? "bg-teal-400" : "bg-gray-200")}
+              aria-pressed={backgroundGps}
+              aria-label="Toggle background GPS tracking"
+            >
+              <span className={"inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform " + (backgroundGps ? "translate-x-6" : "translate-x-1")} />
+            </button>
           </div>
           <div className="flex items-center gap-3 pt-2">
             <button onClick={save} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white font-bold rounded-xl px-6 py-2.5 text-sm transition-colors disabled:opacity-50">
