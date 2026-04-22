@@ -3,6 +3,7 @@ import MemberSchedule from "@/components/admin/MemberSchedule"
 import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import AuditTab from './AuditTab'
+import MapTab from './MapTab'
 import DefectsTab from "@/components/admin/DefectsTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import ComplianceTab from "@/components/admin/ComplianceTab"
