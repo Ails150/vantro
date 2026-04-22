@@ -11,17 +11,8 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 export async function POST(request: Request) {
-  const auth = request.headers.get('authorization') || ''
-  const tokenSample = auth.slice(0, 30)
-  const tokenLength = auth.length
-  const hasJwtSecret = !!process.env.JWT_SECRET
-  const hasServiceRole = !!process.env.SUPABASE_SERVICE_ROLE_KEY
-
   const installer = verifyInstallerToken(request)
-  if (!installer) {
-    console.error('[location] 401 — token prefix:', tokenSample, 'length:', tokenLength, 'JWT_SECRET set:', hasJwtSecret, 'SERVICE_ROLE set:', hasServiceRole)
-    return NextResponse.json({ error: 'Unauthorized', debug: { tokenLength, hasJwtSecret } }, { status: 401 })
-  }
+  if (!installer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { lat, lng, accuracy } = await request.json()
   if (!lat || !lng) return NextResponse.json({ error: 'Missing coordinates' }, { status: 400 })
@@ -29,21 +20,14 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
   const today = new Date(); today.setHours(0,0,0,0)
 
-  const { data: signin, error: signinErr } = await service.from('signins')
+  const { data: signin } = await service.from('signins')
     .select('id, job_id, jobs(lat, lng)')
     .eq('user_id', installer.userId)
     .gte('signed_in_at', today.toISOString())
     .is('signed_out_at', null)
     .maybeSingle()
 
-  if (signinErr) {
-    console.error('[location] signin lookup failed', signinErr)
-    return NextResponse.json({ error: 'Signin lookup failed', detail: signinErr.message }, { status: 500 })
-  }
-  if (!signin) {
-    console.log('[location] no active signin for user', installer.userId)
-    return NextResponse.json({ error: 'Not signed in' }, { status: 400 })
-  }
+  if (!signin) return NextResponse.json({ error: 'Not signed in' }, { status: 400 })
 
   const { data: me } = await service.from('users').select('company_id').eq('id', installer.userId).single()
   if (!me?.company_id) return NextResponse.json({ error: 'No company' }, { status: 400 })
