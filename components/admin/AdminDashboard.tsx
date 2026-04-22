@@ -930,6 +930,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "performance" && (<ComplianceTab companyId={userData.company_id} teamMembers={teamMembers} />)}
         {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
         {activeTab === "audit" && <AuditTab jobs={jobs} />}
+        {activeTab === "map" && <MapTab />}
           {activeTab === "defects" && <DefectsTab />}
         {activeTab === "settings" && <SettingsTab />}
 
