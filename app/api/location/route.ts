@@ -6,7 +6,9 @@ function getInstallerFromToken(request: Request) {
   if (!auth?.startsWith('Bearer ')) return null
   try {
     const payload = JSON.parse(Buffer.from(auth.slice(7), 'base64').toString())
-    if (payload.exp < Date.now()) return null
+    // exp may be in seconds (JWT standard) or milliseconds - handle both
+    const expMs = payload.exp < 10_000_000_000 ? payload.exp * 1000 : payload.exp
+    if (expMs < Date.now()) return null
     return payload
   } catch { return null }
 }
@@ -29,15 +31,21 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
   const today = new Date(); today.setHours(0,0,0,0)
 
-  // Find active signin
-  const { data: signin } = await service.from('signins')
-    .select('id, job_id, company_id, jobs(lat, lng)')
+  const { data: signin, error: signinErr } = await service.from('signins')
+    .select('id, job_id, jobs(lat, lng)')
     .eq('user_id', installer.userId)
     .gte('signed_in_at', today.toISOString())
     .is('signed_out_at', null)
     .maybeSingle()
 
+  if (signinErr) {
+    console.error('[location] signin lookup failed', signinErr)
+    return NextResponse.json({ error: 'Signin lookup failed', detail: signinErr.message }, { status: 500 })
+  }
   if (!signin) return NextResponse.json({ error: 'Not signed in' }, { status: 400 })
+
+  const { data: me } = await service.from('users').select('company_id').eq('id', installer.userId).single()
+  if (!me?.company_id) return NextResponse.json({ error: 'No company' }, { status: 400 })
 
   const job = signin.jobs as any
   let distanceFromSite = 0
@@ -48,16 +56,21 @@ export async function POST(request: Request) {
     withinRange = distanceFromSite <= 150
   }
 
-  await service.from('location_logs').insert({
+  const { error: insertErr } = await service.from('location_logs').insert({
     signin_id: signin.id,
     user_id: installer.userId,
-    company_id: signin.company_id,
+    company_id: me.company_id,
     job_id: signin.job_id,
     lat, lng,
     accuracy_metres: accuracy ? Math.round(accuracy) : null,
     distance_from_site_metres: distanceFromSite,
     within_range: withinRange,
   })
+
+  if (insertErr) {
+    console.error('[location] insert failed', insertErr)
+    return NextResponse.json({ error: 'Insert failed', detail: insertErr.message }, { status: 500 })
+  }
 
   return NextResponse.json({ success: true, distanceFromSite, withinRange })
 }
