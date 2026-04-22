@@ -122,7 +122,7 @@ export async function GET(request: Request) {
             const timeStr = `${soh}:${som.toString().padStart(2, "0")}`
             await sendPushNotification(
               [user.push_token],
-              "Please sign out",
+              "Sign out reminder",
               `Your sign-out time was ${timeStr}. Please return to site and sign out. If you do not sign out within ${graceRemaining} minutes, your hours will be recorded as zero.`,
               { type: "signout_reminder", jobId: signin.job_id }
             )
@@ -130,17 +130,17 @@ export async function GET(request: Request) {
             // Grace period expired â€” auto-close with zero hours
             await service.from("signins").update({
               signed_out_at: now.toISOString(),
-              hours_worked: 0,
+              hours_worked: Math.max(0, parseFloat(((now.getTime() - new Date(signin.signed_in_at).getTime()) / 3600000).toFixed(2))),
               auto_closed: true,
-              auto_closed_reason: "cutoff_zero",
+              auto_closed_reason: "auto_closed_gps",
               flagged: true,
               flag_reason: `Did not sign out. Expected: ${soh}:${som.toString().padStart(2, "0")}. Auto-closed after ${gracePeriod} min grace. Zero hours.`,
             }).eq("id", signin.id)
 
             await sendPushNotification(
               [user.push_token],
-              "Hours recorded as zero",
-              `You did not sign out of ${job?.name}. Your hours for today have been recorded as zero. Please speak to your manager.`,
+              "Shift auto-closed",
+              `Your shift at ${job?.name} was automatically closed. Hours recorded based on your start time. Please speak to your manager if incorrect.`,
               { type: "auto_cutoff", jobId: signin.job_id }
             )
 
@@ -154,8 +154,8 @@ export async function GET(request: Request) {
             if (admins && admins.length > 0) {
               await sendPushNotification(
                 admins.map((a: any) => a.push_token).filter(Boolean),
-                "Zero hours recorded",
-                `${user?.name} did not sign out of ${job?.name}. Zero hours recorded automatically.`,
+                "Shift auto-closed",
+                `${user?.name} did not sign out of ${job?.name}. Hours auto-recorded. Please review.`,
                 { type: "admin_auto_cutoff" }
               )
             }
