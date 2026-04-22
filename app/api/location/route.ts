@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-
-function getInstallerFromToken(request: Request) {
-  const auth = request.headers.get('authorization')
-  if (!auth?.startsWith('Bearer ')) return null
-  try {
-    const payload = JSON.parse(Buffer.from(auth.slice(7), 'base64').toString())
-    // exp may be in seconds (JWT standard) or milliseconds - handle both
-    const expMs = payload.exp < 10_000_000_000 ? payload.exp * 1000 : payload.exp
-    if (expMs < Date.now()) return null
-    return payload
-  } catch { return null }
-}
+import { verifyInstallerToken } from '@/lib/auth'
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000
@@ -22,8 +11,11 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 export async function POST(request: Request) {
-  const installer = getInstallerFromToken(request)
-  if (!installer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const installer = verifyInstallerToken(request)
+  if (!installer) {
+    console.error('[location] token verification failed')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
   const { lat, lng, accuracy } = await request.json()
   if (!lat || !lng) return NextResponse.json({ error: 'Missing coordinates' }, { status: 400 })
@@ -42,7 +34,10 @@ export async function POST(request: Request) {
     console.error('[location] signin lookup failed', signinErr)
     return NextResponse.json({ error: 'Signin lookup failed', detail: signinErr.message }, { status: 500 })
   }
-  if (!signin) return NextResponse.json({ error: 'Not signed in' }, { status: 400 })
+  if (!signin) {
+    console.log('[location] no active signin for user', installer.userId)
+    return NextResponse.json({ error: 'Not signed in' }, { status: 400 })
+  }
 
   const { data: me } = await service.from('users').select('company_id').eq('id', installer.userId).single()
   if (!me?.company_id) return NextResponse.json({ error: 'No company' }, { status: 400 })
