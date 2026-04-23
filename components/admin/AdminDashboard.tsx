@@ -74,6 +74,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [resolvingAlert, setResolvingAlert] = useState<string|null>(null)
   const [resolutionNote, setResolutionNote] = useState("")
   const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
+  const [lightboxUrl, setLightboxUrl] = useState<string|null>(null)
   const [diaryReply, setDiaryReply] = useState("")
   const [replySending, setReplySending] = useState(false)
   const [invitingJobId, setInvitingJobId] = useState<string|null>(null)
@@ -925,6 +926,20 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <span className={"text-xs " + sub}>{new Date(d.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                     </div>
                     <p className="text-sm text-gray-700">{d.entry_text}</p>
+                    {d.photo_urls && d.photo_urls.length > 0 && (
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {d.photo_urls.map((url: string, i: number) => (
+                          <button key={i} onClick={() => setLightboxUrl(url)} className="focus:outline-none">
+                            <img src={url} className="w-16 h-16 object-cover rounded-lg border border-gray-200 hover:border-teal-400 transition-colors" alt="" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {d.video_url && (
+                      <div className="mt-2">
+                        <iframe src={d.video_url} className="w-full max-w-sm aspect-video rounded-lg border border-gray-200" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                      </div>
+                    )}
                   </div>
                   {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-bold">BLOCKER</span>}
                   {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full flex-shrink-0 font-medium">Issue</span>}
@@ -1011,6 +1026,13 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         </div>
       </div>
     </div>
+
+    {lightboxUrl && (
+      <div onClick={() => setLightboxUrl(null)} className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8 cursor-pointer">
+        <img src={lightboxUrl} className="max-w-full max-h-full object-contain rounded-lg" alt="" />
+        <button onClick={() => setLightboxUrl(null)} className="absolute top-4 right-4 text-white text-3xl font-bold hover:text-gray-300">x</button>
+      </div>
+    )}
     </div>
   )
 }
