@@ -103,3 +103,33 @@ Entry: ${entryText}`
     return NextResponse.json({ error: "Server error" }, { status: 500 })
   }
 }
+
+export async function GET(request: Request) {
+  try {
+    const installer = verifyInstallerToken(request)
+    if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const { searchParams } = new URL(request.url)
+    const jobId = searchParams.get("jobId")
+    if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
+
+    const service = createServiceClient()
+
+    const { data: entries, error } = await service
+      .from("diary_entries")
+      .select("id, entry_text, photo_urls, video_url, created_at, alert_type, summary, urgency, user_id, users(name)")
+      .eq("company_id", installer.companyId)
+      .eq("job_id", jobId)
+      .order("created_at", { ascending: true })
+
+    if (error) {
+      console.error("Diary GET error:", error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+
+    return NextResponse.json({ entries: entries || [] })
+  } catch (e: any) {
+    console.error("Diary GET exception:", e)
+    return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 })
+  }
+}
