@@ -455,15 +455,56 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         ))}
       </div>
 
-      <div className="flex border-b border-gray-200 px-2 md:px-8 bg-white overflow-x-auto">
-        {tabs.map(tab => (
-          <button key={tab.id} onClick={() => switchTab(tab.id)}
-            className={"flex items-center gap-2 px-3 md:px-4 py-4 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap " + (activeTab === tab.id ? "border-teal-400 text-teal-600" : "border-transparent text-gray-500 hover:text-gray-900")}>
-            {tab.label}
-            {tab.badge ? <span className="bg-teal-50 text-teal-600 text-xs font-bold px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
-          </button>
-        ))}
-      </div>
+      <div className="flex">
+        {/* Left Sidebar */}
+        <div className="w-64 bg-white border-r border-gray-200 min-h-screen">
+          <div className="p-6 space-y-6">
+            {/* Setup Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Setup</h3>
+              <nav className="space-y-1">
+                {setupTabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => switchTab(tab.id)}
+                    className={w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between 1{
+                      activeTab === tab.id 
+                        ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }}
+                  >
+                    <span>{tab.label}</span>
+                    {tab.badge ? <span className="bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            {/* Monitoring Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Monitoring</h3>
+              <nav className="space-y-1">
+                {monitoringTabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => switchTab(tab.id)}
+                    className={w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between 1{
+                      activeTab === tab.id 
+                        ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }}
+                  >
+                    <span>{tab.label}</span>
+                    {tab.badge ? <span className="bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
+                  </button>
+                ))}
+              </nav>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1">
 
       <div className="px-4 md:px-8 py-4 md:py-6 max-w-6xl">
 
@@ -967,6 +1008,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           </div>
         )}
 
+        </div>
       </div>
     </div>
   )
