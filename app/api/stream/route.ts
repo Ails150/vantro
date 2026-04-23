@@ -28,7 +28,10 @@ export async function POST(request: Request) {
     )
 
     const data = await res.json()
-    if (!data.success) return NextResponse.json({ error: "Upload failed" }, { status: 500 })
+    if (!data.success) {
+      console.error("Cloudflare Stream upload failed:", JSON.stringify(data))
+      return NextResponse.json({ error: "Upload failed", cfError: data.errors || data.messages || "unknown", cfRaw: data }, { status: 500 })
+    }
 
     const video = data.result
     return NextResponse.json({
