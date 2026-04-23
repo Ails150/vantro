@@ -117,7 +117,7 @@ export async function GET(request: Request) {
 
     const { data: entries, error } = await service
       .from("diary_entries")
-      .select("id, entry_text, photo_urls, video_url, created_at, alert_type, summary, urgency, user_id, users(name)")
+      .select("id, entry_text, photo_urls, video_url, created_at, alert_type, summary, urgency, user_id")
       .eq("company_id", installer.companyId)
       .eq("job_id", jobId)
       .order("created_at", { ascending: true })
