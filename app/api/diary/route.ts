@@ -23,8 +23,8 @@ const anthropic = new Anthropic({
 
 export async function POST(request: Request) {
   try {
-    const { entryText, jobId, lat, lng } = await request.json()
-    if (!entryText?.trim()) return NextResponse.json({ error: "Entry text required" }, { status: 400 })
+    const { entryText, jobId, lat, lng, photoUrls, videoUrl } = await request.json()
+    if (!entryText?.trim() && (!photoUrls || photoUrls.length === 0) && !videoUrl) return NextResponse.json({ error: "Entry requires text, photo, or video" }, { status: 400 })
 
     const installer = verifyInstallerToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -38,7 +38,9 @@ export async function POST(request: Request) {
         user_id: payload.userId,
         company_id: payload.companyId,
         job_id: jobId,
-        entry_text: entryText,
+        entry_text: entryText || '',
+        photo_urls: photoUrls || [],
+        video_url: videoUrl || null,
         lat,
         lng,
         created_at: new Date().toISOString()
