@@ -376,21 +376,24 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return teamMembers.filter((m: any) => ids.includes(m.id))
   }
 
-  const tabs = [
+  const setupTabs = [
+    { id: "team", label: "Team" },
+    { id: "jobs", label: "Jobs" },
+    { id: "checklists", label: "Checklists" },
+    { id: "settings", label: "Settings" },
+    { id: "alerts", label: "Alerts", badge: alerts.length },
+  ]
+
+  const monitoringTabs = [
     { id: "overview", label: "Overview" },
     { id: "analytics", label: "Analytics" },
-    { id: "approvals", label: "Approvals", badge: pendingQA.length },
-    { id: "team", label: "Team" },
-    { id: "checklists", label: "Checklists" },
-      { id: "audit", label: "Audit" },
-    { id: "map", label: "Map" },
-    { id: "jobs", label: "Jobs" },
-    { id: "diary", label: "Diary" },
-    { id: "payroll", label: "Payroll" },
     { id: "performance", label: "Performance" },
-    { id: "alerts", label: "Alerts", badge: alerts.length },
+    { id: "payroll", label: "Payroll" },
+    { id: "map", label: "Map" },
+    { id: "audit", label: "Audit" },
+    { id: "approvals", label: "Approvals", badge: pendingQA.length },
+    { id: "diary", label: "Diary" },
     { id: "defects", label: "Defects" },
-    { id: "settings", label: "Settings" },
   ]
 
   const inp = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
