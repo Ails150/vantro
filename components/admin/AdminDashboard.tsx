@@ -404,7 +404,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "approvals", label: "Approvals", badge: pendingQA.length },
     { id: "diary", label: "Diary" },
     { id: "defects", label: "Defects" },
-  ]
 
   const inp = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
   const card = "bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
