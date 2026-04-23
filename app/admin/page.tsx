@@ -41,7 +41,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: teamMembers } = await supabase.from('users').select('*').eq('company_id', companyId)
   const { data: jobAssignments } = await supabase.from('job_assignments').select('*').eq('company_id', companyId)
   const { data: checklistTemplates } = await supabase.from('checklist_templates').select('*, checklist_items(*)').eq('company_id', companyId).order('created_at', { ascending: false })
-  const { data: diaryEntries } = await supabase.from('diary_entries').select('*, jobs(name), users(name, initials, id)').eq('company_id', companyId).order('created_at', { ascending: false }).limit(50)
+  const { data: diaryEntries } = await supabase.from('diary_entries').select('*, jobs(name)').eq('company_id', companyId).order('created_at', { ascending: false }).limit(50)
 
   return (
     <AdminDashboard
