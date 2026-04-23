@@ -51,17 +51,37 @@ export async function POST(request: Request) {
     .maybeSingle()
 
   if (existing) {
-    // Same job today - legitimate re-sign-in (e.g. app reopened)
     const today = new Date(); today.setHours(0,0,0,0)
     const existingDate = new Date(existing.signed_in_at)
     const isSameJobToday = existing.job_id === jobId && existingDate >= today
 
     if (isSameJobToday) {
-      return NextResponse.json({ success: true, distanceMetres, withinRange, alreadySignedIn: true })
+      // Re-fetch full shift shape
+      const { data: full } = await service
+        .from('signins')
+        .select('id, job_id, signed_in_at, expected_sign_out_time, company_id, jobs(name, lat, lng)')
+        .eq('id', existing.id)
+        .single()
+      const j = full?.jobs as any
+      return NextResponse.json({
+        success: true,
+        distanceMetres,
+        withinRange,
+        alreadySignedIn: true,
+        activeShift: full ? {
+          signinId: full.id,
+          jobId: full.job_id,
+          jobName: j?.name || null,
+          jobLat: j?.lat || null,
+          jobLng: j?.lng || null,
+          signedInAt: full.signed_in_at,
+          expectedSignOutTime: full.expected_sign_out_time,
+          companyId: full.company_id,
+        } : null
+      })
     }
 
     // Orphan signin from previous day OR different job - auto-close the old one
-    // Use last on-site breadcrumb as sign-out time, or expected sign-out time, or now
     const oldJob = existing.jobs as any
     let closeAt = new Date()
     let closeReason = 'auto_orphan_on_new_signin'
@@ -100,7 +120,7 @@ export async function POST(request: Request) {
 
   const expectedSignOutTime = job.sign_out_time || company?.default_sign_out_time || null
 
-  const { error } = await service.from('signins').insert({
+  const { data: inserted, error } = await service.from('signins').insert({
     job_id: jobId,
     user_id: installer.userId,
     company_id: job.company_id,
@@ -109,10 +129,26 @@ export async function POST(request: Request) {
     distance_from_site_metres: distanceMetres,
     within_range: withinRange,
     expected_sign_out_time: expectedSignOutTime,
-  })
+  }).select('id, signed_in_at').single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
   const { data: installerUser } = await service.from('users').select('weekly_schedule').eq('id', installer.userId).single()
-  return NextResponse.json({ success: true, distanceMetres, withinRange, weeklySchedule: installerUser?.weekly_schedule || null })
+
+  return NextResponse.json({
+    success: true,
+    distanceMetres,
+    withinRange,
+    weeklySchedule: installerUser?.weekly_schedule || null,
+    activeShift: {
+      signinId: inserted?.id || null,
+      jobId: jobId,
+      jobName: job.name,
+      jobLat: job.lat,
+      jobLng: job.lng,
+      signedInAt: inserted?.signed_in_at || new Date().toISOString(),
+      expectedSignOutTime: expectedSignOutTime,
+      companyId: job.company_id,
+    }
+  })
 }
