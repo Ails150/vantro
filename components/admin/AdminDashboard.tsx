@@ -16,7 +16,6 @@ interface Props {
   user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
   pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
   checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string
-}
 
 export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) {
   const [activeTab, setActiveTab] = useState(() => {
@@ -105,7 +104,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   function showToast(message: string, type: string = "info") {
     setToast({ message, type })
     setTimeout(() => setToast(null), 5000)
-  }
   const [liveAlerts, setLiveAlerts] = useState<any[]>(alerts)
   const prevAlertCount = useRef(alerts.length)
 
@@ -142,11 +140,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               osc.start(ctx.currentTime + 0.4)
               osc.stop(ctx.currentTime + 0.6)
             }, 400)
-          } catch {}
-        }
         prevAlertCount.current = newAlerts.length
         setLiveAlerts(newAlerts)
-      }
     }, 30000)
     return () => clearInterval(interval)
   }, [])
@@ -164,21 +159,15 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         ac.addListener("place_changed", () => {
           const place = ac.getPlace()
           if (place.formatted_address) setJobAddress(place.formatted_address)
-          if (place.geometry?.location) { setJobLat(place.geometry.location.lat()); setJobLng(place.geometry.location.lng()) }
           setJobPlaceSelected(true)
         })
-      }
       if (editAddressRef.current) {
         const ac2 = new (window as any).google.maps.places.Autocomplete(editAddressRef.current, { types: ["address"] })
         ac2.addListener("place_changed", () => {
           const place = ac2.getPlace()
           if (place.formatted_address) setEditJobAddress(place.formatted_address)
-          if (place.geometry?.location) { setEditJobLat(place.geometry.location.lat()); setEditJobLng(place.geometry.location.lng()) }
           setEditJobPlaceSelected(true)
         })
-      }
-    }
-    if ((window as any).google) { init(); return }
     if (!document.getElementById("gmaps")) {
       const s = document.createElement("script")
       s.id = "gmaps"
@@ -186,7 +175,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       s.async = true
       s.onload = init
       document.head.appendChild(s)
-    }
   }, [])
 
   useEffect(() => {
@@ -198,7 +186,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       ac.addListener("place_changed", () => {
         const place = ac.getPlace()
         if (place.formatted_address) setJobAddress(place.formatted_address)
-        if (place.geometry?.location) { setJobLat(place.geometry.location.lat()); setJobLng(place.geometry.location.lng()) }
         setJobPlaceSelected(true)
       })
     }, 100)
@@ -207,34 +194,22 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   function switchTab(tab: string) {
     setActiveTab(tab)
-    try { localStorage.setItem("vantro_tab", tab) } catch {}
-  }
 
-  async function handleSignOut() { await supabase.auth.signOut(); router.push("/login") }
-  async function approveQA(id: string) { await supabase.from("qa_submissions").update({ state: "approved", reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
-  async function rejectQA(id: string, note: string) { await supabase.from("qa_submissions").update({ state: "rejected", rejection_note: note, reviewed_at: new Date().toISOString() }).eq("id", id); router.refresh() }
   async function resolveAlert(id: string) {
-    if (!resolutionNote.trim()) { alert("Please enter a resolution note"); return }
     setSaving(true)
     await fetch("/api/alerts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ alertId: id, resolutionNote }) })
     setResolvingAlert(null)
     setResolutionNote("")
     setSaving(false)
     window.location.reload()
-  }
 
   async function sendClientInvite(jobId: string) {
-    if (!inviteName.trim() || !inviteEmail.trim()) { alert("Enter name and email"); return }
     setInviteSending(true)
     const res = await fetch("/api/client/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: inviteName, email: inviteEmail, jobId }) })
     const data = await res.json()
     setInviteSending(false)
-    if (data.success) { setInvitingJobId(null); setInviteName(""); setInviteEmail(""); setToast({ message: "Client invite sent!", type: "success" }) }
-    else { alert(data.error || "Failed to send invite") }
-  }
 
   async function replyToDiary(entryId: string, userId: string) {
-    if (!diaryReply.trim()) { alert("Please enter a reply"); return }
     setReplySending(true)
     await fetch("/api/diary/reply", {
       method: "POST",
@@ -244,53 +219,34 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     setReplyingDiary(null)
     setDiaryReply("")
     setReplySending(false)
-  }
 
-  async function markAlertRead(id: string) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
 
   async function addJob() {
-    if (!jobName.trim()) { setFormError("Enter a job name"); return }
-    if (!jobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
     const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime }).select("id").single()
-    if (error) { setFormError(error.message); setSaving(false); return }
-    if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
-    if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
     setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00")
     router.refresh()
-  }
 
   async function updateJob(jobId: string) {
-    if (!editJobName.trim()) { setFormError("Enter a job name"); return }
-    if (!editJobPlaceSelected && !editJobLat) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
     const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime }).eq("id", jobId)
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
-    }
-    if (error) { setFormError(error.message); setSaving(false); return }
     await supabase.from("job_checklists").delete().eq("job_id", jobId)
     if (editJobTemplateIds.length > 0) {
       await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid })))
-    }
     setEditingJobId(null); setSaving(false)
     window.location.reload()
-  }
 
   async function deleteJob(jobId: string, jobName: string) {
     if (!window.confirm("Delete job: " + jobName + "? This cannot be undone.")) return
     const res = await fetch("/api/jobs/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId }) })
-    if (res.ok) { window.location.href = "/admin?tab=jobs" }
-    else { const d = await res.json(); alert("Failed to delete: " + d.error) }
-  }
 
   async function addMember() {
-    if (!memberName.trim() || !memberEmail.trim()) { setFormError("Enter name and email"); return }
     setSaving(true); setFormError("")
     const initials = memberName.trim().split(" ").map((n: any) => n[0]).join("").toUpperCase().slice(0, 2)
     const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: memberRole, is_active: true })
-    if (error) { setFormError(error.message); setSaving(false); return }
     try {
       const res = await fetch("/api/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: memberEmail.trim(), name: memberName.trim(), role: memberRole }) })
       const data = await res.json()
@@ -300,78 +256,56 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           setFormError("That email address is already on your team.")
         } else {
           setFormError(msg || "Something went wrong. Please try again.")
-        }
         setSaving(false)
         return
-      }
-    } catch(e) { setFormError("Something went wrong. Please try again."); setSaving(false); return }
     setMemberName(""); setMemberEmail(""); setMemberRole("installer"); setShowAddMember(false); setSaving(false)
     router.refresh()
-  }
 
   async function removeMember(userId: string, authUserId: string) {
     if (!window.confirm("Remove this member from your team? This cannot be undone.")) return
     const res = await fetch("/api/team/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ authUserId, userId }) })
     if (res.ok) window.location.reload()
-  }
 
   async function resendInvite(email: string, name: string) {
     const res = await fetch("/api/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, name }) })
-    if (res.ok) { alert("Invite sent to " + email) }
-    else { const d = await res.json(); alert("Failed: " + d.error) }
-  }
 
   async function resetPin(userId: string) {
     if (!window.confirm("Reset this installer PIN? They will need to set a new one.")) return
     await supabase.from("users").update({ pin_hash: null }).eq("id", userId)
     alert("PIN reset. They will need to set a new PIN on next login.")
-  }
 
   async function toggleActive(userId: string, current: boolean) {
     await supabase.from("users").update({ is_active: !current }).eq("id", userId)
     router.refresh()
-  }
 
   async function toggleAssignment(jobId: string, userId: string) {
     const existing = jobAssignments.find((a) => a.job_id === jobId && a.user_id === userId)
-    if (existing) { await supabase.from("job_assignments").delete().eq("id", existing.id) }
-    else { await supabase.from("job_assignments").insert({ job_id: jobId, user_id: userId, company_id: userData.company_id }) }
     router.refresh()
-  }
 
   async function addTemplate() {
-    if (!templateName.trim()) { setFormError("Enter template name"); return }
     setSaving(true); setFormError("")
     const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "create_template", name: templateName.trim() }) })
-    if (!res.ok) { const d = await res.json(); setFormError(d.error); setSaving(false); return }
     setTemplateName(""); setTemplateFrequency("job"); setShowAddTemplate(false); setSaving(false)
     router.refresh()
-  }
 
   async function addItem(templateId: string) {
-    if (!itemLabel.trim()) { setFormError("Enter item label"); return }
     setSaving(true); setFormError("")
     const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_item", templateId, label: itemLabel.trim(), item_type: itemType, is_mandatory: itemMandatory, requires_photo: itemPhoto, requires_video: itemVideo, fail_note_required: itemFailNote }) })
-    if (!res.ok) { const d = await res.json(); setFormError(d.error); setSaving(false); return }
     setItemLabel(""); setItemType("tick"); setItemMandatory(false); setItemPhoto(false); setItemVideo(false); setItemFailNote(false); setShowAddItem(null); setSaving(false)
     router.refresh()
-  }
 
   async function deleteItem(itemId: string) {
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_item", itemId }) })
     router.refresh()
-  }
 
   async function saveEditTemplate(templateId: string) {
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_template", templateId, name: editTemplateName, frequency: editTemplateFrequency }) })
     setEditingTemplateId(null)
     router.refresh()
-  }
   async function deleteTemplate(templateId: string) {
     if (!window.confirm("Delete this template and all its items?")) return
     await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "delete_template", templateId }) })
     router.refresh()
-  }
 
   async function saveSchedule(userId: string) {
     await fetch("/api/admin/team/schedule", {
@@ -381,29 +315,19 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     })
     setEditingScheduleId(null)
     router.refresh()
-  }
 
   function openSchedule(m: any) {
     setEditingScheduleId(m.id)
     setScheduleSignIn(m.sign_in_time ? m.sign_in_time.slice(0,5) : "08:00")
     setScheduleSignOut(m.sign_out_time ? m.sign_out_time.slice(0,5) : "17:00")
     setScheduleDays(m.working_days || ["mon","tue","wed","thu","fri"])
-  }
 
   const installers = teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman")
   const getAssigned = (jobId: string) => {
     const ids = jobAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
     return teamMembers.filter((m: any) => ids.includes(m.id))
-  }
 
 
-    { id: "performance", label: "Performance" },
-    { id: "payroll", label: "Payroll" },
-    { id: "map", label: "Map" },
-    { id: "audit", label: "Audit" },
-    { id: "approvals", label: "Approvals", badge: pendingQA.length },
-    { id: "diary", label: "Diary" },
-    { id: "defects", label: "Defects" },
 
   const inp = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
   const card = "bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
@@ -416,13 +340,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { value: "photo", label: "Photo required" },
     { value: "pass_fail", label: "Pass / Fail" },
     { value: "measurement", label: "Measurement" },
-  ]
 
   const roleColors: any = {
     admin: "bg-purple-50 text-purple-700",
     foreman: "bg-blue-50 text-blue-700",
     installer: "bg-gray-100 text-gray-600",
-  }
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -461,58 +383,43 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             <div className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">{s.label}</div>
             <div className={"text-3xl md:text-4xl font-bold " + s.color}>{s.value}</div>
           </div>
-        ))}
       </div>
 
       <div className="flex">
-        {/* Left Sidebar */}
         <div className="w-64 bg-white border-r border-gray-200 min-h-screen">
           <div className="p-6 space-y-6">
-            {/* Setup Section */}
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Setup</h3>
               <nav className="space-y-1">
                 {setupTabs.map(tab => (
                   <button
-                    key={tab.id}
-                    onClick={() => switchTab(tab.id)}
                     className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
                       activeTab === tab.id 
                         ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }}
                   >
                     <span>{tab.label}</span>
-                    {tab.badge ? <span className="bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
                   </button>
-                ))}
               </nav>
             </div>
 
-            {/* Dashboard Section */}
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Dashboard</h3>
               <nav className="space-y-1">
                 {operationsTabs.map(tab => (
                   <button
-                    key={tab.id}
-                    onClick={() => switchTab(tab.id)}
                     className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
                       activeTab === tab.id 
                         ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }}
                   >
                     <span>{tab.label}</span>
-                    {tab.badge ? <span className="bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
                   </button>
-                ))}
               </nav>
             </div>
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="flex-1">
 
       <div className="px-4 md:px-8 py-4 md:py-6 max-w-6xl">
@@ -531,25 +438,20 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <div className="flex-1"><div className="font-semibold">{s.users?.name}</div><div className={"text-sm " + sub}>In at {new Date(s.signed_in_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div></div>
                   <span className="text-sm text-teal-500 font-medium">On site</span>
                 </div>
-              ))}
             </div>
             <div className={card}>
               <div className={cardHeader}>
                 <span className="font-semibold">Recent alerts</span>
-                {alerts.length > 0 && <span className="text-sm bg-red-50 text-red-500 px-3 py-1 rounded-full">{alerts.length} unread</span>}
               </div>
               {alerts.length === 0 ? <div className={"px-6 py-10 text-center " + sub}>No alerts - all clear</div>
               : liveAlerts.slice(0, 5).map((a: any) => (
                 <div key={a.id} className={"px-6 py-4 border-b border-gray-50 last:border-0" + (a.alert_type === "blocker" ? " border-l-4 border-l-red-400" : "")}>
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold border border-red-200">"BLOCKER"</span>}
-                    {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">ISSUE</span>}
                     <span className={"text-xs font-medium text-gray-700"}>{a.jobs?.name}</span>
                     <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
                   <div className="text-sm text-gray-600">{a.message}</div>
                 </div>
-              ))}
             </div>
             <div className={card + " md:col-span-2"}>
               <div className={cardHeader}>
@@ -561,18 +463,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 const assigned = getAssigned(j.id)
                 return (
                   <div key={j.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
-                    <div className="flex-1"><div className="font-semibold">{j.name}</div><div className={"text-sm " + sub}>{j.address}</div></div>{(j.job_checklists||[]).length > 0 && <div className="flex gap-1 mt-1">{(j.job_checklists||[]).map((jc:any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 border border-teal-200 rounded-full px-2 py-0.5">{checklistTemplates.find((t:any)=>t.id===jc.template_id)?.name||""}</span>)}</div>}
-                    {assigned.length > 0 && <div className="flex gap-1">{assigned.map((a: any) => <div key={a.id} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{a.initials}</div>)}</div>}
                     <span className={"text-sm px-3 py-1 rounded-full font-medium " + (j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500")}>{j.status}</span>
                   </div>
                 )
-              })}
             </div>
           </div>
-        )}
 
-        {activeTab === "analytics" && <AnalyticsTab companyId={userData.company_id} teamMembers={teamMembers} jobs={jobs} />}
-        {activeTab === "approvals" && <ApprovalsTab key={Date.now().toString()} pendingQA={pendingQA} onRefresh={() => router.refresh()} />}
 
         {activeTab === "jobs" && (
           <div className="space-y-5">
@@ -585,9 +481,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                   {jobAddress && (
                     <div className={"absolute right-3 top-3 text-xs font-semibold " + (jobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                      {jobPlaceSelected ? "? GPS verified" : "? Select from dropdown"}
                     </div>
-                  )}
                 </div>
                 <div>
                 <div>
@@ -609,9 +503,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <span className="text-sm text-gray-700">{m.name}</span>
                           <span className="text-xs text-gray-400">{m.role}</span>
                         </label>
-                      ))}
                     </div>
-                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklists (optional)</label>
@@ -623,29 +515,20 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <label key={t.id} className="flex items-center gap-2 cursor-pointer">
                           <input type="checkbox" checked={jobTemplateIds?.includes(t.id) || false} onChange={e => setJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="w-4 h-4 accent-teal-500"/>
                           <span className="text-sm text-gray-700">{t.name}</span>
-                          {t.requires_approval && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded">Approval</span>}
-                          {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Audit</span>}
                         </label>
-                      ))}
                     </div>
-                  )}
                 </div>
-                {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
                   <button onClick={addJob} disabled={saving} className={btn}>{saving ? "Saving..." : "Save job"}</button>
                   <button onClick={() => setShowAddJob(false)} className={btnGhost}>Cancel</button>
                 </div>
               </div>
-            )}
             <div className={card}>
               <div className="px-6 pt-5 pb-3 flex gap-2 flex-wrap border-b border-gray-100">
                 {["all","active","on_hold","completed","cancelled"].map((f: any) => (
-                  <button key={f} onClick={() => setJobFilter(f)}
                     className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors " + (jobFilter === f ? "bg-teal-400 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>
-                    {f === "all" ? "All" : f === "on_hold" ? "On hold" : f.charAt(0).toUpperCase() + f.slice(1)}
                     <span className="ml-1 opacity-70">{f === "all" ? jobs.length : jobs.filter((j: any) => j.status === f).length}</span>
                   </button>
-                ))}
               </div>
               {jobs.filter((j: any) => jobFilter === "all" || j.status === jobFilter).length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No jobs</div>
               : jobs.filter((j: any) => jobFilter === "all" || j.status === jobFilter).map((j: any) => {
@@ -658,18 +541,13 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <div className="flex-1">
                         <div className="font-semibold">{j.name}</div>
                         <div className={"text-sm " + sub + " mt-0.5"}>{j.address}</div>
-                        {(j.job_checklists || []).map((jc: any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full mr-1">{checklistTemplates.find((t:any) => t.id === jc.template_id)?.name}</span>)}
                         {assigned.length > 0 && (
                           <div className="flex gap-2 mt-2 flex-wrap">
-                            {assigned.map((a: any) => <span key={a.id} className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-lg font-medium">{a.name}</span>)}
                           </div>
-                        )}
                       </div>
                       <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobPlaceSelected(true); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
-                        {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
-                        {isAssigning ? "Done" : "Assign"}
                       </button>
                       <span className={"text-sm px-3 py-1 rounded-full font-medium flex-shrink-0 " + (j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500")}>{j.status}</span>
                     </div>
@@ -699,13 +577,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                 <label key={t.id} className="flex items-center gap-2 cursor-pointer">
                                   <input type="checkbox" checked={editJobTemplateIds?.includes(t.id) || false} onChange={e => setEditJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="w-4 h-4 accent-teal-500"/>
                                   <span className="text-sm text-gray-700">{t.name}</span>
-                                  {t.requires_approval && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded">Approval</span>}
-                                  {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Audit</span>}
                                 </label>
-                              ))}
                             </div>
                           </div>
-                          {formError && <p className="text-sm text-red-500">{formError}</p>}
                           <div className="flex gap-3">
                             <button onClick={() => updateJob(j.id)} disabled={saving} className={btn}>{saving ? "Saving..." : "Save changes"}</button>
                             <button onClick={() => setEditingJobId(null)} className={btnGhost}>Cancel</button>
@@ -713,7 +587,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         </div>
                       </div>
-                    )}
                     {isAssigning && (
                       <div className="px-6 pb-5">
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
@@ -726,23 +599,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             {installers.map((m: any) => {
                               const isAssigned = jobAssignments.some((a) => a.job_id === j.id && a.user_id === m.id)
                               return (
-                                <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦ÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã¢â‚¬Å“"}
                                 </button>
                               )
-                            })}
-                          </div>}
                         </div>
                       </div>
-                    )}
                   </div>
                 )
-              })}
             </div>
           </div>
-        )}
 
         {activeTab === "team" && (
           <div className="space-y-5">
@@ -760,13 +626,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <option value="foreman">Foreman - PIN app + alert emails</option>
                   </select>
                 </div>
-                {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
                   <button onClick={addMember} disabled={saving} className={btn}>{saving ? "Saving..." : "Save and send invite"}</button>
                   <button onClick={() => setShowAddMember(false)} className={btnGhost}>Cancel</button>
                 </div>
               </div>
-            )}
             <div className={card}>
               <div className={cardHeader}><span className="font-semibold">Team members</span></div>
               {teamMembers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No team members yet</div>
@@ -777,8 +641,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <div className="flex-1">
                       <div className={"font-semibold " + (m.is_active === false ? "text-gray-400" : "")}>{m.name}</div>
                       <div className={"text-sm mt-0.5 " + sub}>{m.email || "No email"}</div>
-                      {m.is_active === false && <span className="text-xs text-amber-500">Suspended</span>}
-                      {!m.pin_hash && m.role === "installer" && <span className="text-xs text-red-400 ml-2">PIN not set</span>}
                     </div>
                     <span className={"text-sm px-3 py-1 rounded-full capitalize font-medium flex-shrink-0 " + (roleColors[m.role] || "bg-gray-100 text-gray-600")}>{m.role}</span>
                     {(m.role === "installer" || m.role === "foreman") && (
@@ -789,11 +651,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <button onClick={() => toggleActive(m.id, m.is_active !== false)} className={"text-xs border rounded-lg px-3 py-1.5 transition-colors " + (m.is_active === false ? "border-teal-200 text-teal-600 hover:bg-teal-50" : "border-gray-200 text-gray-600 hover:border-amber-300 hover:text-amber-600")}>{m.is_active === false ? "Reactivate" : "Suspend"}</button>
                         <button onClick={() => removeMember(m.id, m.auth_user_id)} className="text-xs border border-red-200 text-red-500 hover:bg-red-50 rounded-lg px-3 py-1.5 transition-colors">Remove</button>
                       </div>
-                    )}
                   </div>
                     {editingScheduleId === m.id && (
                       <MemberSchedule
-                        member={m}
                         onSave={async (schedule) => {
                           await fetch("/api/admin/team/schedule", {
                             method: "POST",
@@ -802,15 +662,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           })
                           setEditingScheduleId(null)
                           router.refresh()
-                        }}
-                        onCancel={() => setEditingScheduleId(null)}
                       />
-                    )}
                 </div>
-              ))}
             </div>
           </div>
-        )}
 
         {activeTab === "checklists" && (
           <div className="space-y-5">
@@ -829,13 +684,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <option value="completion">Job completion</option>
                   </select>
                 </div>
-                {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
                   <button onClick={addTemplate} disabled={saving} className={btn}>{saving ? "Saving..." : "Create template"}</button>
                   <button onClick={() => setShowAddTemplate(false)} className={btnGhost}>Cancel</button>
                 </div>
               </div>
-            )}
             {checklistTemplates.length === 0 ? (
               <div className={card}><div className={"px-6 py-16 text-center " + sub}>No checklist templates yet. Create one to attach to jobs.</div></div>
             ) : checklistTemplates.map((t: any) => (
@@ -858,7 +711,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <button onClick={() => { setShowAddItem(t.id); setFormError("") }} className="text-sm bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 rounded-xl px-3 py-1.5 font-medium">+ Add item</button>
                     <button onClick={() => { setEditingTemplateId(t.id); setEditTemplateName(t.name); setEditTemplateFrequency(t.frequency || "job") }} className="text-sm bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-xl px-3 py-1.5 font-medium">Edit</button>
                     <button onClick={() => deleteTemplate(t.id)} className="text-sm bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-1.5 font-medium">Delete</button>
-                    {editingTemplateId === t.id && (<div className="w-full mt-3 p-3 bg-gray-50 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-end"><div className="flex-1 min-w-[160px]"><label className="block text-xs font-medium text-gray-600 mb-1">Name</label><input value={editTemplateName} onChange={e => setEditTemplateName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" /></div><div><label className="block text-xs font-medium text-gray-600 mb-1">Frequency</label><select value={editTemplateFrequency} onChange={e => setEditTemplateFrequency(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm"><option value="job">Per job (QA)</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div><button onClick={() => saveEditTemplate(t.id)} className="text-sm bg-teal-500 text-white rounded-xl px-4 py-1.5 font-medium">Save</button><button onClick={() => setEditingTemplateId(null)} className="text-sm text-gray-500 px-3 py-1.5">Cancel</button></div>)}
                   </div>
                 </div>
                 {showAddItem === t.id && (
@@ -868,7 +720,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <div>
                       <label className="block text-sm font-medium text-gray-600 mb-1">Type</label>
                       <select value={itemType} onChange={e => setItemType(e.target.value)} className={inp}>
-                        {itemTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </div>
                     <div className="flex flex-wrap gap-4">
@@ -882,15 +733,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <input type="checkbox" checked={opt.state} onChange={e => opt.set(e.target.checked)} className="w-4 h-4 accent-teal-500"/>
                           <span className="text-sm text-gray-700">{opt.label}</span>
                         </label>
-                      ))}
                     </div>
-                    {formError && <p className="text-sm text-red-500">{formError}</p>}
                     <div className="flex gap-3">
                       <button onClick={() => addItem(t.id)} disabled={saving} className={btn}>{saving ? "Saving..." : "Add item"}</button>
                       <button onClick={() => setShowAddItem(null)} className={btnGhost}>Cancel</button>
                     </div>
                   </div>
-                )}
                 {(!t.checklist_items || t.checklist_items.length === 0) ? (
                   <div className={"px-6 py-8 text-center " + sub + " text-sm"}>No items yet</div>
                 ) : t.checklist_items.sort((a: any, b: any) => a.sort_order - b.sort_order).map((item: any) => (
@@ -899,19 +747,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <div className="font-medium text-sm">{item.label}</div>
                       <div className="flex gap-2 mt-1 flex-wrap">
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{itemTypeOptions.find(o => o.value === item.item_type)?.label || item.item_type}</span>
-                        {item.is_mandatory && <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full">Mandatory</span>}
-                        {item.requires_photo && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Photo</span>}
-                        {item.requires_video && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">Video</span>}
-                        {item.fail_note_required && <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full">Note on fail</span>}
                       </div>
                     </div>
                     <button onClick={() => deleteItem(item.id)} className={"text-xs " + sub + " hover:text-red-500 transition-colors"}>Remove</button>
                   </div>
-                ))}
               </div>
-            ))}
           </div>
-        )}
 
         {activeTab === "diary" && (
           <div className={card}>
@@ -935,10 +776,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     </div>
                     <p className="text-sm text-gray-700">{d.entry_text}</p>
                   </div>
-                  {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-bold">BLOCKER</span>}
-                  {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full flex-shrink-0 font-medium">Issue</span>}
-                  {d.ai_alert_type === 'none' && <span className="text-xs bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full flex-shrink-0">Normal</span>}
-                  {d.ai_summary && <span className="text-xs text-gray-500 italic ml-1">{d.ai_summary}</span>}
                   <button onClick={() => { setReplyingDiary(replyingDiary === d.id ? null : d.id); setDiaryReply("") }} className="ml-auto text-xs border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 rounded-lg px-3 py-1.5 flex-shrink-0">Reply</button>
                 </div>
                 {replyingDiary === d.id && (
@@ -946,11 +783,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <input value={diaryReply} onChange={e => setDiaryReply(e.target.value)} placeholder="Send a message to the installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && replyToDiary(d.id, d.user_id)} />
                     <button onClick={() => replyToDiary(d.id, d.user_id)} disabled={replySending} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{replySending ? "Sending..." : "Send"}</button>
                   </div>
-                )}
               </div>
-            ))}
           </div>
-        )}
 
           {activeTab === 'alerts' && resolvedAlerts && resolvedAlerts.length > 0 && (
             <div className={card + " mt-4"}>
@@ -960,8 +794,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-400 border border-red-100 px-2 py-0.5 rounded-full font-bold">BLOCKER</span>}
-                        {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-400 border border-amber-100 px-2 py-0.5 rounded-full">ISSUE</span>}
                         <span className="text-xs font-medium text-gray-500">{a.jobs?.name}</span>
                         <span className={"text-xs " + sub}>{a.users?.name}</span>
                         <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
@@ -971,21 +803,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <div className="mt-2 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 text-xs text-teal-700">
                           <strong>Resolution:</strong> {a.resolution_note} <span className="text-gray-400 ml-2">{a.resolved_at ? new Date(a.resolved_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</span>
                         </div>
-                      )}
                     </div>
                     <span className="text-xs bg-green-50 text-green-600 border border-green-200 px-2 py-0.5 rounded-full flex-shrink-0">Resolved</span>
                   </div>
                 </div>
-              ))}
             </div>
-          )}
 
-        {activeTab === "performance" && (<ComplianceTab companyId={userData.company_id} teamMembers={teamMembers} />)}
-        {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
-        {activeTab === "audit" && <AuditTab jobs={jobs} />}
-        {activeTab === "map" && <MapTab />}
-          {activeTab === "defects" && <DefectsTab />}
-        {activeTab === "settings" && <SettingsTab />}
 
         {activeTab === "alerts" && (
           <div className={card}>
@@ -996,10 +819,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">"BLOCKER"</span>}
-                      {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
                       <span className={"text-xs font-semibold " + (a.alert_type === "blocker" ? "text-red-600" : "text-gray-700")}>{a.jobs?.name}</span>
-                      {a.users?.name && <span className="text-xs text-gray-400">logged by {a.users.name}</span>}
                       <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                     </div>
                     <div className="text-sm text-gray-700">{a.message}</div>
@@ -1011,17 +831,13 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="Enter resolution note - sent to installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)} />
                   <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving ? "Sending..." : "Send & resolve"}</button>
                 </div>
-              )}
               </div>
-            ))}
           </div>
-        )}
 
         </div>
       </div>
     </div>
   )
-}
 
 
 
