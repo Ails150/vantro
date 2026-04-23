@@ -41,21 +41,61 @@ export async function POST(request: Request) {
     }
   }
 
-  const today = new Date(); today.setHours(0,0,0,0)
+  // CHECK FOR ANY OPEN SIGNIN (no date filter - orphans from previous days must be caught)
   const { data: existing } = await service.from('signins')
-    .select('id, job_id, jobs(name)')
+    .select('id, job_id, signed_in_at, jobs(name, lat, lng)')
     .eq('user_id', installer.userId)
-    .gte('signed_in_at', today.toISOString())
     .is('signed_out_at', null)
+    .order('signed_in_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
   if (existing) {
-    if (existing.job_id === jobId) {
+    // Same job today - legitimate re-sign-in (e.g. app reopened)
+    const today = new Date(); today.setHours(0,0,0,0)
+    const existingDate = new Date(existing.signed_in_at)
+    const isSameJobToday = existing.job_id === jobId && existingDate >= today
+
+    if (isSameJobToday) {
       return NextResponse.json({ success: true, distanceMetres, withinRange, alreadySignedIn: true })
     }
-    const otherJobName = (existing.jobs as any)?.name || 'another job'
-    return NextResponse.json({ error: `You are already signed in to ${otherJobName}. Sign out first.` }, { status: 400 })
+
+    // Orphan signin from previous day OR different job - auto-close the old one
+    // Use last on-site breadcrumb as sign-out time, or expected sign-out time, or now
+    const oldJob = existing.jobs as any
+    let closeAt = new Date()
+    let closeReason = 'auto_orphan_on_new_signin'
+
+    if (oldJob?.lat && oldJob?.lng) {
+      const { data: breadcrumbs } = await service
+        .from('location_logs')
+        .select('lat, lng, logged_at')
+        .eq('user_id', installer.userId)
+        .gte('logged_at', existing.signed_in_at)
+        .order('logged_at', { ascending: false })
+        .limit(100)
+
+      if (breadcrumbs && breadcrumbs.length > 0) {
+        const lastOnSite = breadcrumbs.find((b: any) => {
+          const dist = haversine(b.lat, b.lng, oldJob.lat, oldJob.lng)
+          return dist <= radius
+        })
+        if (lastOnSite) {
+          closeAt = new Date(lastOnSite.logged_at)
+        }
+      }
+    }
+
+    const hoursWorked = Math.max(0, (closeAt.getTime() - new Date(existing.signed_in_at).getTime()) / 3600000)
+
+    await service.from('signins').update({
+      signed_out_at: closeAt.toISOString(),
+      hours_worked: parseFloat(hoursWorked.toFixed(2)),
+      auto_closed: true,
+      auto_closed_reason: closeReason,
+      flagged: true,
+      flag_reason: `Orphan signin auto-closed when user signed into new job. Review required.`,
+    }).eq('id', existing.id)
   }
 
   const expectedSignOutTime = job.sign_out_time || company?.default_sign_out_time || null
