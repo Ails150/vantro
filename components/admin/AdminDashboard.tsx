@@ -29,7 +29,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "alerts", label: "Alerts", badge: alerts.length },
   ]
 
-  const monitoringTabs = [
+  const operationsTabs = [
     { id: "overview", label: "Overview" },
     { id: "analytics", label: "Analytics" },
     { id: "performance", label: "Performance" },
@@ -500,7 +500,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Dashboard</h3>
               <nav className="space-y-1">
-                {monitoringTabs.map(tab => (
+                {operationsTabs.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => switchTab(tab.id)}
