@@ -26,22 +26,11 @@ export async function POST(request: Request) {
     const { entryText, jobId, lat, lng } = await request.json()
     if (!entryText?.trim()) return NextResponse.json({ error: "Entry text required" }, { status: 400 })
 
-    const authHeader = request.headers.get("authorization")
-    if (!authHeader?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    
-    const token = authHeader.substring(7)
-    let payload
-    try {
-      payload = JSON.parse(Buffer.from(token, "base64").toString())
-    } catch {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 })
-    }
-    
-    if (!payload.userId || !payload.companyId || Date.now() > payload.exp) {
-      return NextResponse.json({ error: "Token expired" }, { status: 401 })
-    }
+    const installer = verifyInstallerToken(request)
+    if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const payload = { userId: installer.userId, companyId: installer.companyId }
 
-    const service = createServiceClient()
+        const service = createServiceClient()
     
     const { data: diary, error: diaryError } = await service
       .from("diary_entries")
