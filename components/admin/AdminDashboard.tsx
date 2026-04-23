@@ -396,13 +396,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return teamMembers.filter((m: any) => ids.includes(m.id))
   }
 
-    { id: "jobs", label: "Jobs" },
-    { id: "checklists", label: "Checklists" },
-    { id: "settings", label: "Settings" },
-    { id: "alerts", label: "Alerts", badge: alerts.length },
-  ]
 
-    { id: "analytics", label: "Analytics" },
     { id: "performance", label: "Performance" },
     { id: "payroll", label: "Payroll" },
     { id: "map", label: "Map" },
