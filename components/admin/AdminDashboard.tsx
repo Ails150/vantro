@@ -13,11 +13,22 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 
 interface Props {
-  user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
-  pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
-  checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string
+  user: any
+  userData: any
+  company: any
+  jobs: any[]
+  signins: any[]
+  alerts: any[]
+  pendingQA: any[]
+  teamMembers: any[]
+  jobAssignments: any[]
+  checklistTemplates: any[]
+  diaryEntries: any[]
+  resolvedAlerts: any[]
+  defaultTab: string
+}
 
-export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) {
+export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) { user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) {
   const [activeTab, setActiveTab] = useState(() => {
   
   const setupTabs = [
