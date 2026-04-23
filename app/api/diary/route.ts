@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { verifyInstallerToken } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
 
 
