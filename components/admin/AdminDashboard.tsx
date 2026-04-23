@@ -20,6 +20,26 @@ interface Props {
 
 export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) {
   const [activeTab, setActiveTab] = useState(() => {
+  
+  const setupTabs = [
+    { id: "team", label: "Team" },
+    { id: "jobs", label: "Jobs" },
+    { id: "checklists", label: "Checklists" },
+    { id: "settings", label: "Settings" },
+    { id: "alerts", label: "Alerts", badge: alerts.length },
+  ]
+
+  const monitoringTabs = [
+    { id: "overview", label: "Overview" },
+    { id: "analytics", label: "Analytics" },
+    { id: "performance", label: "Performance" },
+    { id: "payroll", label: "Payroll" },
+    { id: "map", label: "Map" },
+    { id: "audit", label: "Audit" },
+    { id: "approvals", label: "Approvals", badge: pendingQA.length },
+    { id: "diary", label: "Diary" },
+    { id: "defects", label: "Defects" },
+  ]
     try { return localStorage.getItem("vantro_tab") || defaultTab } catch { return defaultTab }
   })
   const [showAddJob, setShowAddJob] = useState(false)
