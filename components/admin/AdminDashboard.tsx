@@ -396,16 +396,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return teamMembers.filter((m: any) => ids.includes(m.id))
   }
 
-  const setupTabs = [
-    { id: "team", label: "Team" },
     { id: "jobs", label: "Jobs" },
     { id: "checklists", label: "Checklists" },
     { id: "settings", label: "Settings" },
     { id: "alerts", label: "Alerts", badge: alerts.length },
   ]
 
-  const monitoringTabs = [
-    { id: "overview", label: "Overview" },
     { id: "analytics", label: "Analytics" },
     { id: "performance", label: "Performance" },
     { id: "payroll", label: "Payroll" },
@@ -487,7 +483,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <button
                     key={tab.id}
                     onClick={() => switchTab(tab.id)}
-                    className={w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between 1{
+                    className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
                       activeTab === tab.id 
                         ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
@@ -500,15 +496,15 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               </nav>
             </div>
 
-            {/* Monitoring Section */}
+            {/* Dashboard Section */}
             <div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Monitoring</h3>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Dashboard</h3>
               <nav className="space-y-1">
                 {monitoringTabs.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => switchTab(tab.id)}
-                    className={w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between 1{
+                    className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
                       activeTab === tab.id 
                         ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
