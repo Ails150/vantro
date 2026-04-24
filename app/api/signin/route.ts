@@ -118,7 +118,13 @@ export async function POST(request: Request) {
     }).eq('id', existing.id)
   }
 
-  const expectedSignOutTime = job.sign_out_time || company?.default_sign_out_time || null
+  // Sign-out time: user weekly schedule (per day) overrides company default
+    const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+    const todayKey = dayKeys[new Date().getDay()]
+    const { data: userRow } = await service.from('users').select('weekly_schedule').eq('id', installer.userId).single()
+    const daySchedule = userRow?.weekly_schedule?.[todayKey]
+    const userSignOut = daySchedule?.working ? daySchedule?.sign_out : null
+    const expectedSignOutTime = userSignOut || company?.default_sign_out_time || null
 
   const { data: inserted, error } = await service.from('signins').insert({
     job_id: jobId,
