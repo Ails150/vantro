@@ -174,6 +174,14 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-sm">{group.user.name}</div>
                         <div className="text-xs text-gray-500 flex items-center gap-3 flex-wrap mt-0.5">
+                          <span>{(() => {
+                            const dates = group.entries.map((e: any) => new Date(e.signed_in_at)).sort((a, b) => a.getTime() - b.getTime());
+                            const first = dates[0];
+                            const last = dates[dates.length - 1];
+                            const fmt = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                            if (first.toDateString() === last.toDateString()) return fmt(first);
+                            return fmt(first) + ' – ' + fmt(last);
+                          })()}</span>
                           <span>{stats.days} day{stats.days !== 1 ? "s" : ""}</span>
                           <span>{stats.hours.toFixed(1)}h total</span>
                           {stats.onSite && <span className="text-blue-600 font-semibold">On site now</span>}
