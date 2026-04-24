@@ -75,6 +75,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [alertFilter, setAlertFilter] = useState<'all'|'blocker'|'issue'|'24h'>('all')
   const [showResolved, setShowResolved] = useState(false)
   const [expandedJobGroups, setExpandedJobGroups] = useState<Set<string>>(new Set())
+  const [diaryFilter, setDiaryFilter] = useState<'all'|'blocker'|'issue'|'photos'|'videos'|'24h'>('all')
+  const [diarySearch, setDiarySearch] = useState('')
   const [resolutionNote, setResolutionNote] = useState("")
   const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string|null>(null)
@@ -910,54 +912,134 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
         {activeTab === "diary" && (
           <div className={card}>
-            <div className={cardHeader}>
-              <span className="font-semibold">Site diary - all jobs</span>
-              <div className="flex items-center gap-3">
-                <span className={"text-sm " + sub}>{diaryEntries.length} entries</span>
-                <button onClick={() => router.refresh()} className={"text-xs border border-gray-200 rounded-lg px-3 py-1.5 " + sub + " hover:text-gray-900"}>Refresh</button>
+            <div className={cardHeader + " flex-col items-stretch gap-3"}>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <span className="font-semibold">Site diary - all jobs</span>
+                <div className="flex items-center gap-3">
+                  <span className={"text-sm " + sub}>{diaryEntries.length} entries</span>
+                  <button onClick={() => router.refresh()} className={"text-xs border border-gray-200 rounded-lg px-3 py-1.5 " + sub + " hover:text-gray-900"}>Refresh</button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  value={diarySearch}
+                  onChange={e => setDiarySearch(e.target.value)}
+                  placeholder="Search installer, job, or note..."
+                  className="flex-1 min-w-[200px] bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal-400"
+                />
+                {(['all','blocker','issue','photos','videos','24h'] as const).map(f => {
+                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'photos' ? 'With photos' : f === 'videos' ? 'With videos' : 'Last 24h'
+                  return (
+                    <button
+                      key={f}
+                      onClick={() => setDiaryFilter(f)}
+                      className={"text-xs px-3 py-1.5 rounded-full border " + (diaryFilter === f ? "bg-teal-500 text-white border-teal-500 font-semibold" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300")}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
-            {diaryEntries.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No diary entries yet</div>
-            : diaryEntries.map((d: any) => (
-              <div key={d.id} className="px-6 py-5 border-b border-gray-50 last:border-0">
-                <div className="flex items-start gap-4">
-                  <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold flex-shrink-0">{d.users?.initials || "?"}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="font-semibold text-sm">{d.users?.name || "Unknown"}</span>
-                      <span className={"text-xs " + sub}>{d.jobs?.name}</span>
-                      <span className={"text-xs " + sub}>{new Date(d.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            {(() => {
+              const now = Date.now()
+              const q = diarySearch.trim().toLowerCase()
+              const filtered = diaryEntries.filter((d: any) => {
+                if (diaryFilter === 'blocker' && d.ai_alert_type !== 'blocker') return false
+                if (diaryFilter === 'issue' && d.ai_alert_type !== 'issue') return false
+                if (diaryFilter === 'photos' && (!d.photo_urls || d.photo_urls.length === 0)) return false
+                if (diaryFilter === 'videos' && !d.video_url) return false
+                if (diaryFilter === '24h' && new Date(d.created_at).getTime() < now - 86400000) return false
+                if (q) {
+                  const hay = [
+                    d.users?.name || '',
+                    d.jobs?.name || '',
+                    d.entry_text || '',
+                    d.ai_summary || '',
+                  ].join(' ').toLowerCase()
+                  if (!hay.includes(q)) return false
+                }
+                return true
+              })
+              if (diaryEntries.length === 0) {
+                return <div className={"px-6 py-16 text-center " + sub}>No diary entries yet</div>
+              }
+              if (filtered.length === 0) {
+                return <div className={"px-6 py-16 text-center " + sub}>No entries match this filter</div>
+              }
+              return filtered.map((d: any) => {
+                const hasText = d.entry_text && d.entry_text.trim().length > 0
+                const hasPhotos = d.photo_urls && d.photo_urls.length > 0
+                const hasVideo = !!d.video_url
+                return (
+                  <div key={d.id} className={"px-6 py-5 border-b border-gray-50 last:border-0" + (d.ai_alert_type === 'blocker' ? ' border-l-4 border-l-red-400' : d.ai_alert_type === 'issue' ? ' border-l-4 border-l-amber-400' : '')}>
+                    <div className="flex items-start gap-4">
+                      <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold flex-shrink-0">{d.users?.initials || "?"}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <span className="font-semibold text-sm">{d.users?.name || "Unknown"}</span>
+                          <span className="text-xs font-medium text-gray-700">{d.jobs?.name || "Unknown job"}</span>
+                          <span className={"text-xs " + sub}>{new Date(d.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                          {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">BLOCKER</span>}
+                          {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
+                        </div>
+                        {hasText ? (
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{d.entry_text}</p>
+                        ) : (
+                          <p className="text-sm text-gray-400 italic">(no notes)</p>
+                        )}
+                        {d.ai_summary && d.ai_summary !== d.entry_text && (
+                          <p className="text-xs text-gray-500 italic mt-1">{d.ai_summary}</p>
+                        )}
+                        {hasPhotos && (
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            {d.photo_urls.map((url: string, i: number) => (
+                              <button key={i} onClick={() => setLightboxUrl(url)} className="focus:outline-none relative">
+                                <img
+                                  src={url}
+                                  className="w-16 h-16 object-cover rounded-lg border border-gray-200 hover:border-teal-400 transition-colors"
+                                  alt=""
+                                  onError={(e) => {
+                                    const img = e.currentTarget
+                                    img.style.display = 'none'
+                                    const ph = img.nextElementSibling as HTMLElement | null
+                                    if (ph) ph.style.display = 'flex'
+                                  }}
+                                />
+                                <span style={{display:'none'}} className="w-16 h-16 rounded-lg border border-dashed border-gray-300 bg-gray-50 text-[10px] text-gray-400 items-center justify-center text-center px-1">Photo unavailable</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {hasVideo && (
+                          <div className="mt-2">
+                            <iframe src={d.video_url} className="w-full max-w-sm aspect-video rounded-lg border border-gray-200" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                          </div>
+                        )}
+                        {d.reply && (
+                          <div className="mt-3 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-xs bg-teal-500 text-white px-2 py-0.5 rounded-full font-semibold">Replied</span>
+                              {d.replied_at && <span className="text-xs text-teal-700">{new Date(d.replied_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
+                            </div>
+                            <p className="text-sm text-teal-900">{d.reply}</p>
+                          </div>
+                        )}
+                      </div>
+                      {!d.reply && (
+                        <button onClick={() => { setReplyingDiary(replyingDiary === d.id ? null : d.id); setDiaryReply("") }} className="text-xs border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 rounded-lg px-3 py-1.5 flex-shrink-0">Reply</button>
+                      )}
                     </div>
-                    <p className="text-sm text-gray-700">{d.entry_text}</p>
-                    {d.photo_urls && d.photo_urls.length > 0 && (
-                      <div className="flex gap-2 mt-2 flex-wrap">
-                        {d.photo_urls.map((url: string, i: number) => (
-                          <button key={i} onClick={() => setLightboxUrl(url)} className="focus:outline-none">
-                            <img src={url} className="w-16 h-16 object-cover rounded-lg border border-gray-200 hover:border-teal-400 transition-colors" alt="" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    {d.video_url && (
-                      <div className="mt-2">
-                        <iframe src={d.video_url} className="w-full max-w-sm aspect-video rounded-lg border border-gray-200" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                    {replyingDiary === d.id && (
+                      <div className="mt-3 flex gap-2 ml-13">
+                        <input value={diaryReply} onChange={e => setDiaryReply(e.target.value)} placeholder="Send a message to the installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && replyToDiary(d.id, d.user_id)} />
+                        <button onClick={() => replyToDiary(d.id, d.user_id)} disabled={replySending} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{replySending ? "Sending..." : "Send"}</button>
                       </div>
                     )}
                   </div>
-                  {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-1 rounded-full flex-shrink-0 font-bold">BLOCKER</span>}
-                  {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-1 rounded-full flex-shrink-0 font-medium">Issue</span>}
-                  {d.ai_alert_type === 'none' && <span className="text-xs bg-gray-50 text-gray-400 border border-gray-200 px-2 py-1 rounded-full flex-shrink-0">Normal</span>}
-                  {d.ai_summary && <span className="text-xs text-gray-500 italic ml-1">{d.ai_summary}</span>}
-                  <button onClick={() => { setReplyingDiary(replyingDiary === d.id ? null : d.id); setDiaryReply("") }} className="ml-auto text-xs border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 rounded-lg px-3 py-1.5 flex-shrink-0">Reply</button>
-                </div>
-                {replyingDiary === d.id && (
-                  <div className="mt-3 flex gap-2">
-                    <input value={diaryReply} onChange={e => setDiaryReply(e.target.value)} placeholder="Send a message to the installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && replyToDiary(d.id, d.user_id)} />
-                    <button onClick={() => replyToDiary(d.id, d.user_id)} disabled={replySending} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{replySending ? "Sending..." : "Send"}</button>
-                  </div>
-                )}
-              </div>
-            ))}
+                )
+              })
+            })()}
           </div>
         )}
 
