@@ -43,3 +43,17 @@ next-env.d.ts
 # One-off patch scripts
 fix_*.py
 check_*.py
+
+# Local scratch scripts
+*_fix.py
+*_cleanup.py
+add_*.py
+cleanup_*.py
+emergency_*.py
+final_*.py
+real_*.py
+nuclear_*.py
+aggressive_*.py
+clean_dashboard.tsx
+load_test.js
+*_backup.tsx
