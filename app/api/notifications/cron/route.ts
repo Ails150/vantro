@@ -188,7 +188,7 @@ export async function GET(request: Request) {
           auto_closed: true,
           auto_closed_reason: closeReason,
           flagged: true,
-          flag_reason: `Did not sign out manually. Closed at ${closeReason === "auto_last_onsite" ? "last on-site breadcrumb" : "scheduled sign-out time"}. Review required.`,
+          flag_reason: `No sign-out received. Closed at ${closeReason === "auto_last_onsite" ? "the last GPS point on-site" : "the scheduled sign-out time"}. Please review hours.`,
         }).eq("id", signin.id)
 
         if (user?.push_token) {

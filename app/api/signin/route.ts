@@ -114,7 +114,7 @@ export async function POST(request: Request) {
       auto_closed: true,
       auto_closed_reason: closeReason,
       flagged: true,
-      flag_reason: `Orphan signin auto-closed when user signed into new job. Review required.`,
+      flag_reason: `Signed in elsewhere without signing out first. Please review hours.`,
     }).eq('id', existing.id)
   }
 
