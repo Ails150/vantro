@@ -72,6 +72,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [itemFailNote, setItemFailNote] = useState(false)
   const [saving, setSaving] = useState(false)
   const [resolvingAlert, setResolvingAlert] = useState<string|null>(null)
+  const [alertFilter, setAlertFilter] = useState<'all'|'blocker'|'issue'|'24h'>('all')
+  const [showResolved, setShowResolved] = useState(false)
+  const [expandedJobGroups, setExpandedJobGroups] = useState<Set<string>>(new Set())
   const [resolutionNote, setResolutionNote] = useState("")
   const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
   const [lightboxUrl, setLightboxUrl] = useState<string|null>(null)
@@ -104,7 +107,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           // New alert arrived - show toast
           const newest = newAlerts[0]
           showToast(
-            (newest?.alert_type === "blocker" ? "BLOCKER" : "ISSUE") + " ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¾Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â " + (newest?.jobs?.name || "Job") + ": " + newest?.message,
+            (newest?.alert_type === "blocker" ? "BLOCKER" : "ISSUE") + " - " + (newest?.jobs?.name || "Unknown job") + (newest?.jobs?.name || "Job") + ": " + newest?.message,
             newest?.alert_type === "blocker" ? "blocker" : "issue"
           )
           // Play sound
@@ -958,10 +961,148 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           </div>
         )}
 
+        {activeTab === "performance" && (<ComplianceTab companyId={userData.company_id} teamMembers={teamMembers} />)}
+        {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
+        {activeTab === "audit" && <AuditTab jobs={jobs} />}
+        {activeTab === "map" && <MapTab />}
+          {activeTab === "defects" && <DefectsTab />}
+        {activeTab === "settings" && <SettingsTab />}
+
+        {activeTab === "alerts" && (
+          <div className={card}>
+            <div className={cardHeader + " flex items-center justify-between flex-wrap gap-3"}>
+              <span className="font-semibold">Alerts</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {(['all','blocker','issue','24h'] as const).map(f => {
+                  const filtered = liveAlerts.filter((a: any) => {
+                    if (f === 'all') return true
+                    if (f === 'blocker') return a.alert_type === 'blocker'
+                    if (f === 'issue') return a.alert_type === 'issue'
+                    if (f === '24h') return new Date(a.created_at).getTime() > Date.now() - 86400000
+                    return true
+                  })
+                  const count = filtered.length
+                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : 'Last 24h'
+                  return (
+                    <button key={f} onClick={() => setAlertFilter(f)} className={"text-xs px-3 py-1.5 rounded-full border " + (alertFilter === f ? "bg-teal-500 text-white border-teal-500 font-semibold" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300")}>
+                      {label} {count > 0 && <span className="ml-1 opacity-80">({count})</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            {(() => {
+              const filtered = liveAlerts.filter((a: any) => {
+                if (alertFilter === 'all') return true
+                if (alertFilter === 'blocker') return a.alert_type === 'blocker'
+                if (alertFilter === 'issue') return a.alert_type === 'issue'
+                if (alertFilter === '24h') return new Date(a.created_at).getTime() > Date.now() - 86400000
+                return true
+              })
+              if (filtered.length === 0) {
+                return <div className={"px-6 py-16 text-center " + sub}>No alerts match this filter</div>
+              }
+              // Group by job
+              const byJob: Record<string, any[]> = {}
+              filtered.forEach((a: any) => {
+                const jobName = a.jobs?.name || 'Unknown job'
+                if (!byJob[jobName]) byJob[jobName] = []
+                byJob[jobName].push(a)
+              })
+              // If more than 3 jobs, show grouped view; else flat list
+              const jobNames = Object.keys(byJob)
+              if (jobNames.length > 3) {
+                return (
+                  <div>
+                    {jobNames.map((jobName) => {
+                      const group = byJob[jobName]
+                      const isExpanded = expandedJobGroups.has(jobName)
+                      const blockerCount = group.filter(a => a.alert_type === 'blocker').length
+                      const issueCount = group.filter(a => a.alert_type === 'issue').length
+                      return (
+                        <div key={jobName} className="border-b border-gray-50 last:border-0">
+                          <button
+                            onClick={() => {
+                              const s = new Set(expandedJobGroups)
+                              if (s.has(jobName)) s.delete(jobName); else s.add(jobName)
+                              setExpandedJobGroups(s)
+                            }}
+                            className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 text-left"
+                          >
+                            <div className="flex items-center gap-3 flex-wrap">
+                              <span className="text-gray-400 text-sm">{isExpanded ? 'v' : '>'}</span>
+                              <span className="font-semibold text-gray-700">{jobName}</span>
+                              {blockerCount > 0 && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">{blockerCount} BLOCKER{blockerCount > 1 ? 'S' : ''}</span>}
+                              {issueCount > 0 && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">{issueCount} ISSUE{issueCount > 1 ? 'S' : ''}</span>}
+                            </div>
+                            <span className="text-xs text-gray-400">{group.length} alert{group.length > 1 ? 's' : ''}</span>
+                          </button>
+                          {isExpanded && group.map((a: any) => (
+                            <div key={a.id} className={"px-6 py-4 bg-gray-50/50 border-t border-gray-100" + (a.alert_type === "blocker" ? " border-l-4 border-l-red-400" : a.alert_type === "issue" ? " border-l-4 border-l-amber-400" : "")}>
+                              <div className="flex items-start justify-between gap-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                    {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">BLOCKER</span>}
+                                    {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
+                                    {a.users?.name && <span className="text-xs text-gray-500">logged by {a.users.name}</span>}
+                                    <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                                  </div>
+                                  <div className="text-sm text-gray-700">{a.message}</div>
+                                </div>
+                                <button onClick={() => { setResolvingAlert(resolvingAlert === a.id ? null : a.id); setResolutionNote("") }} className="text-sm bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 flex-shrink-0 font-medium">Resolve</button>
+                              </div>
+                              {resolvingAlert === a.id && (
+                                <div className="mt-3 flex gap-2">
+                                  <input value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="Enter resolution note..." className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)} />
+                                  <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving ? "Sending..." : "Send & resolve"}</button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              }
+              // Flat list view (3 or fewer jobs)
+              return filtered.map((a: any) => (
+                <div key={a.id} className={"px-6 py-5 border-b border-gray-50 last:border-0" + (a.alert_type === "blocker" ? " border-l-4 border-l-red-400" : a.alert_type === "issue" ? " border-l-4 border-l-amber-400" : "")}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">BLOCKER</span>}
+                        {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
+                        <span className={"text-xs font-semibold " + (a.alert_type === "blocker" ? "text-red-600" : "text-gray-700")}>{a.jobs?.name}</span>
+                        {a.users?.name && <span className="text-xs text-gray-400">logged by {a.users.name}</span>}
+                        <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                      </div>
+                      <div className="text-sm text-gray-700">{a.message}</div>
+                    </div>
+                    <button onClick={() => { setResolvingAlert(resolvingAlert === a.id ? null : a.id); setResolutionNote("") }} className="text-sm bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 flex-shrink-0 font-medium">Resolve</button>
+                  </div>
+                  {resolvingAlert === a.id && (
+                    <div className="mt-3 flex gap-2">
+                      <input value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="Enter resolution note - sent to installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)} />
+                      <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving ? "Sending..." : "Send & resolve"}</button>
+                    </div>
+                  )}
+                </div>
+              ))
+            })()}
+          </div>
+        )}
+
           {activeTab === 'alerts' && resolvedAlerts && resolvedAlerts.length > 0 && (
             <div className={card + " mt-4"}>
-              <div className={cardHeader}><span className="font-semibold text-gray-500">Resolved alerts</span></div>
-              {resolvedAlerts.map((a: any) => (
+              <button
+                onClick={() => setShowResolved(!showResolved)}
+                className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 text-left"
+              >
+                <span className="font-semibold text-gray-500">{showResolved ? 'v' : '>'} Resolved alerts ({resolvedAlerts.length})</span>
+                <span className="text-xs text-gray-400">{showResolved ? 'Hide' : 'Show'}</span>
+              </button>
+              {showResolved && resolvedAlerts.map((a: any) => (
                 <div key={a.id} className="px-6 py-4 border-b border-gray-50 last:border-0 opacity-70">
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
@@ -986,42 +1127,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             </div>
           )}
 
-        {activeTab === "performance" && (<ComplianceTab companyId={userData.company_id} teamMembers={teamMembers} />)}
-        {activeTab === "payroll" && <PayrollTab teamMembers={teamMembers} />}
-        {activeTab === "audit" && <AuditTab jobs={jobs} />}
-        {activeTab === "map" && <MapTab />}
-          {activeTab === "defects" && <DefectsTab />}
-        {activeTab === "settings" && <SettingsTab />}
-
-        {activeTab === "alerts" && (
-          <div className={card}>
-            <div className={cardHeader}><span className="font-semibold">Vantro alerts</span></div>
-            {liveAlerts.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No alerts - all clear</div>
-            : liveAlerts.map((a: any) => (
-              <div key={a.id} className={"px-6 py-5 border-b border-gray-50 last:border-0" + (a.alert_type === "blocker" ? " border-l-4 border-l-red-400" : a.alert_type === "issue" ? " border-l-4 border-l-amber-400" : "")}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">"BLOCKER"</span>}
-                      {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
-                      <span className={"text-xs font-semibold " + (a.alert_type === "blocker" ? "text-red-600" : "text-gray-700")}>{a.jobs?.name}</span>
-                      {a.users?.name && <span className="text-xs text-gray-400">logged by {a.users.name}</span>}
-                      <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                    </div>
-                    <div className="text-sm text-gray-700">{a.message}</div>
-                  </div>
-                  <button onClick={() => { setResolvingAlert(resolvingAlert === a.id ? null : a.id); setResolutionNote("") }} className="text-sm bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 flex-shrink-0 font-medium">Resolve</button>
-                </div>
-              {resolvingAlert === a.id && (
-                <div className="mt-3 flex gap-2">
-                  <input value={resolutionNote} onChange={e => setResolutionNote(e.target.value)} placeholder="Enter resolution note - sent to installer..." className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-teal-400" onKeyDown={e => e.key === "Enter" && resolveAlert(a.id)} />
-                  <button onClick={() => resolveAlert(a.id)} disabled={saving} className="bg-teal-400 hover:bg-teal-500 text-white rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving ? "Sending..." : "Send & resolve"}</button>
-                </div>
-              )}
-              </div>
-            ))}
-          </div>
-        )}
 
         </div>
       </div>
