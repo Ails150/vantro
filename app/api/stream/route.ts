@@ -36,9 +36,9 @@ export async function POST(request: Request) {
     const video = data.result
     return NextResponse.json({
       uid: video.uid,
-      playbackUrl: `https://customer-${CF_ACCOUNT_ID}.cloudflarestream.com/${video.uid}/manifest/video.m3u8`,
-      embedUrl: `https://customer-${CF_ACCOUNT_ID}.cloudflarestream.com/${video.uid}/iframe`,
-      thumbnailUrl: `https://customer-${CF_ACCOUNT_ID}.cloudflarestream.com/${video.uid}/thumbnails/thumbnail.jpg`,
+      playbackUrl: `https://customer-6416opuz33lyk78q.cloudflarestream.com/${video.uid}/manifest/video.m3u8`,
+      embedUrl: `https://customer-6416opuz33lyk78q.cloudflarestream.com/${video.uid}/iframe`,
+      thumbnailUrl: `https://customer-6416opuz33lyk78q.cloudflarestream.com/${video.uid}/thumbnails/thumbnail.jpg`,
     })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
