@@ -230,7 +230,30 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
       {!loading && summary.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold">Compliance scores</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold">Compliance scores</h3>
+              <div className="relative group">
+                <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div className="absolute left-0 top-6 z-50 hidden group-hover:block w-80 bg-gray-900 text-white text-xs rounded-xl p-4 shadow-xl">
+                  <div className="font-semibold mb-2 text-teal-300">How compliance is scored</div>
+                  <div className="mb-2 leading-relaxed">Each shift is counted clean unless it has an issue.</div>
+                  <div className="mb-2 font-semibold text-gray-300">Issues:</div>
+                  <ul className="space-y-1 mb-3 text-gray-300">
+                    <li>• <span className="text-amber-300">Early departure</span> — signed out before schedule end</li>
+                    <li>• <span className="text-red-300">No sign-out</span> — auto-closed by system</li>
+                  </ul>
+                  <div className="border-t border-gray-700 pt-2 mb-2">
+                    <div className="font-semibold text-gray-300 mb-1">Formula:</div>
+                    <div className="text-gray-400 font-mono text-[10px]">(clean shifts ÷ total shifts) × 100</div>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-teal-400"></span>85%+ good</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span>60-84% watch</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400"></span>&lt;60% action</span>
+                  </div>
+                </div>
+              </div>
+            </div>
             <span className="text-sm text-gray-500">{period === "today" ? "Today" : period === "this_week" ? "This week" : "Last week"}</span>
           </div>
           <div className="px-6 py-4 space-y-4">
