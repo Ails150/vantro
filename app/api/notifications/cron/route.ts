@@ -96,6 +96,24 @@ async function getProtectedUserIds(service: any, companyIds: string[], date: Dat
   return protectedIds
 }
 
+// Build the actual scheduled sign-out timestamp for a sign-in.
+// Combines the date the installer signed in (in UK time) with the
+// expected_sign_out_time (also UK local), then converts back to UTC.
+function buildScheduledSignOutAt(signedInAt: string, expectedSignOutTime: string, ukOffsetHours: number): Date {
+  const signedIn = new Date(signedInAt)
+  // Get the UK-local date of the sign-in
+  const ukSignInLocalMs = signedIn.getTime() + ukOffsetHours * 3600000
+  const ukDate = new Date(ukSignInLocalMs)
+  const yyyy = ukDate.getUTCFullYear()
+  const mm = String(ukDate.getUTCMonth() + 1).padStart(2, "0")
+  const dd = String(ukDate.getUTCDate()).padStart(2, "0")
+  const [h, m] = expectedSignOutTime.split(":").map(Number)
+  // Build UK-local timestamp at HH:MM on the sign-in date, then shift to UTC
+  const ukLocalMidnightUtc = Date.UTC(yyyy, ukDate.getUTCMonth(), ukDate.getUTCDate())
+  const ukLocalTargetMs = ukLocalMidnightUtc + h * 3600000 + m * 60000
+  return new Date(ukLocalTargetMs - ukOffsetHours * 3600000)
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization")
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -104,16 +122,26 @@ export async function GET(request: Request) {
 
   const service = await createServiceClient()
   const now = new Date()
+  const ukOffset = isBST(now) ? 1 : 0
+
+  // UK-local "today" boundaries (used for sign-in reminder logic)
+  const ukNowMs = now.getTime() + ukOffset * 3600000
+  const ukToday = new Date(ukNowMs)
+  ukToday.setUTCHours(0, 0, 0, 0)
+  const todayUtcMidnight = new Date(ukToday.getTime() - ukOffset * 3600000)
   const utcHour = now.getUTCHours()
   const utcMinute = now.getUTCMinutes()
-  const ukOffset = isBST(now) ? 1 : 0
   const ukHour = (utcHour + ukOffset) % 24
-  const currentMinutes = ukHour * 60 + utcMinute
+  const currentMinutesUkLocal = ukHour * 60 + utcMinute
 
-  const today = new Date()
-  today.setUTCHours(0, 0, 0, 0)
-
-  const results: any = { ukHour, currentMinutes, reminders_sent: 0, admin_alerts: 0, auto_closed: 0, time_off_skipped: 0 }
+  const results: any = {
+    ukHour,
+    currentMinutesUkLocal,
+    reminders_sent: 0,
+    admin_alerts: 0,
+    auto_closed: 0,
+    time_off_skipped: 0,
+  }
 
   // === SIGN-IN REMINDERS: check upcoming shifts ===
   const { data: activeJobs } = await service
@@ -125,12 +153,13 @@ export async function GET(request: Request) {
   // timeoff_guard_loop
   if (activeJobs && activeJobs.length > 0) {
     const companyIds = Array.from(new Set(activeJobs.map((j: any) => j.company_id)))
-    const protectedIds = await getProtectedUserIds(service, companyIds, today)
+    const protectedIds = await getProtectedUserIds(service, companyIds, todayUtcMidnight)
+
     for (const job of activeJobs) {
       const [h, m] = job.start_time.split(":").map(Number)
       const jobMinutes = h * 60 + m
-      if (jobMinutes > currentMinutes && jobMinutes <= currentMinutes + 30) {
-        const minutesUntil = jobMinutes - currentMinutes
+      if (jobMinutes > currentMinutesUkLocal && jobMinutes <= currentMinutesUkLocal + 30) {
+        const minutesUntil = jobMinutes - currentMinutesUkLocal
         const { data: assignments } = await service
           .from("job_assignments")
           .select("user_id, users(name, push_token)")
@@ -140,7 +169,7 @@ export async function GET(request: Request) {
           .from("signins")
           .select("user_id")
           .eq("job_id", job.id)
-          .gte("signed_in_at", today.toISOString())
+          .gte("signed_in_at", todayUtcMidnight.toISOString())
         const signedInIds = new Set((signins || []).map((s: any) => s.user_id))
         for (const assignment of assignments) {
           const user = assignment.users as any
@@ -161,6 +190,10 @@ export async function GET(request: Request) {
   }
 
   // === SIGN-OUT PROCESSING ===
+  // Process every active sign-in regardless of how old it is.
+  // Compute "minutes past expected sign-out" using the sign-in's OWN date,
+  // not "today's clock". This is the bug fix: previously a Friday sign-in
+  // checked Friday's expected_sign_out_time vs Monday's "now", which is meaningless.
   const { data: activeSignins } = await service
     .from("signins")
     .select("id, user_id, job_id, company_id, signed_in_at, expected_sign_out_time, reminder_sent_at, admin_reminder_sent_at, jobs(name, lat, lng, company_id), users(name, push_token)")
@@ -172,12 +205,19 @@ export async function GET(request: Request) {
       const job = signin.jobs as any
       if (!signin.expected_sign_out_time) continue
 
-      const [soh, som] = signin.expected_sign_out_time.split(":").map(Number)
-      const signOutMinutes = soh * 60 + som
-      const minutesPastSignOut = currentMinutes - signOutMinutes
+      // Build the actual scheduled sign-out timestamp from the sign-in's date
+      const scheduledSignOutAt = buildScheduledSignOutAt(
+        signin.signed_in_at,
+        signin.expected_sign_out_time,
+        ukOffset
+      )
+      const minutesPastSignOut = Math.floor(
+        (now.getTime() - scheduledSignOutAt.getTime()) / 60000
+      )
 
       // INSTALLER REMINDER: fire once within 0-15 min past sign-out time
       if (minutesPastSignOut >= 0 && minutesPastSignOut < 20 && !signin.reminder_sent_at && user?.push_token) {
+        const [soh, som] = signin.expected_sign_out_time.split(":").map(Number)
         const timeStr = `${soh.toString().padStart(2, "0")}:${som.toString().padStart(2, "0")}`
         await sendPushNotification(
           [user.push_token],
@@ -211,10 +251,8 @@ export async function GET(request: Request) {
 
       // AUTO-CLOSE: 2+ hours past sign-out
       if (minutesPastSignOut >= 120) {
-        // Find last breadcrumb where they were on site (within 150m of job)
-        let closeAt = new Date(`${new Date().toISOString().split("T")[0]}T${signin.expected_sign_out_time}Z`)
-        // Convert to UTC from UK time
-        closeAt = new Date(closeAt.getTime() - ukOffset * 3600000)
+        // Default: close at the scheduled sign-out timestamp (correct date)
+        let closeAt = scheduledSignOutAt
         let closeReason = "auto_scheduled"
 
         if (job?.lat && job?.lng) {
