@@ -63,11 +63,7 @@ export default function SettingsTab() {
         <div className="px-6 py-4 border-b border-gray-100">
           <h3 className="font-semibold">Site rules</h3>
           <p className="text-sm text-gray-500 mt-1">
-            Working hours, overrides and time off live in the{" "}
-            <a href="/admin/schedule" className="text-teal-600 underline">
-              Scheduler
-            </a>
-            .
+            Working hours, overrides and time off live in the Scheduler tab.
           </p>
         </div>
         <div className="px-6 py-5 space-y-5">

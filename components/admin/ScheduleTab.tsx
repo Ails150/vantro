@@ -1,8 +1,3 @@
-// app/admin/schedule/page.tsx
-//
-// Scheduler — top-level admin route.
-// Sticky tabs (last-viewed remembered in localStorage).
-
 "use client"
 
 import { useEffect, useState } from "react"
@@ -11,8 +6,8 @@ import DefaultsTab from "@/components/admin/schedule/DefaultsTab"
 import TeamTab from "@/components/admin/schedule/TeamTab"
 import TimeOffTab from "@/components/admin/schedule/TimeOffTab"
 
-type TabId = "overview" | "defaults" | "team" | "time_off"
-const TABS: { id: TabId; label: string }[] = [
+type SubTab = "overview" | "defaults" | "team" | "time_off"
+const SUB_TABS: { id: SubTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "defaults", label: "Defaults" },
   { id: "team", label: "Team" },
@@ -21,17 +16,16 @@ const TABS: { id: TabId; label: string }[] = [
 
 const STORAGE_KEY = "vantro.scheduler.activeTab"
 
-export default function SchedulePage() {
-  const [activeTab, setActiveTab] = useState<TabId>("overview")
+export default function ScheduleTab() {
+  const [activeSub, setActiveSub] = useState<SubTab>("overview")
   const [pendingDot, setPendingDot] = useState(false)
   const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
-    // Restore last-viewed tab
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored && TABS.find((t) => t.id === stored)) {
-        setActiveTab(stored as TabId)
+      if (stored && SUB_TABS.find((t) => t.id === stored)) {
+        setActiveSub(stored as SubTab)
       }
     } catch {}
     setHydrated(true)
@@ -40,11 +34,10 @@ export default function SchedulePage() {
   useEffect(() => {
     if (!hydrated) return
     try {
-      localStorage.setItem(STORAGE_KEY, activeTab)
+      localStorage.setItem(STORAGE_KEY, activeSub)
     } catch {}
-  }, [activeTab, hydrated])
+  }, [activeSub, hydrated])
 
-  // Detect pending count for the teal dot on the Time off tab
   useEffect(() => {
     let cancelled = false
     fetch("/api/admin/time-off?status=pending")
@@ -57,7 +50,7 @@ export default function SchedulePage() {
     return () => {
       cancelled = true
     }
-  }, [activeTab])
+  }, [activeSub])
 
   return (
     <div className="space-y-6">
@@ -69,13 +62,13 @@ export default function SchedulePage() {
       </div>
 
       <div className="flex gap-6 border-b border-gray-200">
-        {TABS.map((t) => {
-          const isActive = activeTab === t.id
+        {SUB_TABS.map((t) => {
+          const isActive = activeSub === t.id
           const showDot = t.id === "time_off" && pendingDot
           return (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => setActiveSub(t.id)}
               className={
                 "py-3 text-sm transition-colors flex items-center gap-2 -mb-px " +
                 (isActive
@@ -93,10 +86,10 @@ export default function SchedulePage() {
       </div>
 
       <div>
-        {activeTab === "overview" && <OverviewTab />}
-        {activeTab === "defaults" && <DefaultsTab />}
-        {activeTab === "team" && <TeamTab />}
-        {activeTab === "time_off" && <TimeOffTab />}
+        {activeSub === "overview" && <OverviewTab />}
+        {activeSub === "defaults" && <DefaultsTab />}
+        {activeSub === "team" && <TeamTab />}
+        {activeSub === "time_off" && <TimeOffTab />}
       </div>
     </div>
   )
