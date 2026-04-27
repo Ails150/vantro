@@ -40,6 +40,62 @@ function distanceMetres(lat1: number, lng1: number, lat2: number, lng2: number):
   return 2 * R * Math.asin(Math.sqrt(a))
 }
 
+// timeoff_guard_helper
+// Returns the set of user_ids who are on approved time off today or whose
+// company is observing a public holiday. Defensive: empty set on any error.
+async function getProtectedUserIds(service: any, companyIds: string[], date: Date): Promise<Set<string>> {
+  const protectedIds = new Set<string>()
+  if (!companyIds.length) return protectedIds
+  const dateStr = date.toISOString().slice(0, 10)
+  try {
+    const { data: timeOff } = await service
+      .from("time_off_entries")
+      .select("user_id")
+      .in("company_id", companyIds)
+      .eq("status", "approved")
+      .lte("start_date", dateStr)
+      .gte("end_date", dateStr)
+    for (const t of timeOff || []) protectedIds.add(t.user_id)
+
+    const { data: companies } = await service
+      .from("companies")
+      .select("id, country_code")
+      .in("id", companyIds)
+    const countryByCompany: Record<string, string> = {}
+    const countries = new Set<string>()
+    for (const c of companies || []) {
+      const cc = c.country_code || "GB"
+      countryByCompany[c.id] = cc
+      countries.add(cc)
+    }
+
+    if (countries.size > 0) {
+      const { data: holidays } = await service
+        .from("public_holidays")
+        .select("country_code")
+        .in("country_code", Array.from(countries))
+        .eq("holiday_date", dateStr)
+      const holidayCountries = new Set((holidays || []).map((h: any) => h.country_code))
+      if (holidayCountries.size > 0) {
+        const affectedCompanies = companyIds.filter(
+          (id) => holidayCountries.has(countryByCompany[id])
+        )
+        if (affectedCompanies.length > 0) {
+          const { data: users } = await service
+            .from("users")
+            .select("id")
+            .in("company_id", affectedCompanies)
+            .or("is_active.is.null,is_active.eq.true")
+          for (const u of users || []) protectedIds.add(u.id)
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[cron] getProtectedUserIds failed", err)
+  }
+  return protectedIds
+}
+
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization")
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -57,7 +113,7 @@ export async function GET(request: Request) {
   const today = new Date()
   today.setUTCHours(0, 0, 0, 0)
 
-  const results: any = { ukHour, currentMinutes, reminders_sent: 0, admin_alerts: 0, auto_closed: 0 }
+  const results: any = { ukHour, currentMinutes, reminders_sent: 0, admin_alerts: 0, auto_closed: 0, time_off_skipped: 0 }
 
   // === SIGN-IN REMINDERS: check upcoming shifts ===
   const { data: activeJobs } = await service
@@ -66,7 +122,10 @@ export async function GET(request: Request) {
     .eq("status", "active")
     .not("start_time", "is", null)
 
-  if (activeJobs) {
+  // timeoff_guard_loop
+  if (activeJobs && activeJobs.length > 0) {
+    const companyIds = Array.from(new Set(activeJobs.map((j: any) => j.company_id)))
+    const protectedIds = await getProtectedUserIds(service, companyIds, today)
     for (const job of activeJobs) {
       const [h, m] = job.start_time.split(":").map(Number)
       const jobMinutes = h * 60 + m
@@ -86,6 +145,10 @@ export async function GET(request: Request) {
         for (const assignment of assignments) {
           const user = assignment.users as any
           if (!user?.push_token || signedInIds.has(assignment.user_id)) continue
+          if (protectedIds.has(assignment.user_id)) {
+            results.time_off_skipped = (results.time_off_skipped || 0) + 1
+            continue
+          }
           await sendPushNotification(
             [user.push_token],
             "Shift reminder",

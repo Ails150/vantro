@@ -32,6 +32,43 @@ export async function POST(request: Request) {
   const { data: me } = await service.from('users').select('company_id').eq('id', installer.userId).single()
   if (!me?.company_id) return NextResponse.json({ error: 'No company' }, { status: 400 })
 
+  // timeoff_guard_location
+  // Skip GPS log if installer is on approved time off today.
+  // Also skip if their company is observing a public holiday today.
+  try {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const { data: tOff } = await service
+      .from('time_off_entries')
+      .select('id')
+      .eq('user_id', installer.userId)
+      .eq('status', 'approved')
+      .lte('start_date', todayStr)
+      .gte('end_date', todayStr)
+      .limit(1)
+    if (tOff && tOff.length > 0) {
+      return NextResponse.json({ success: true, skipped: 'time_off' })
+    }
+    const { data: cmp } = await service
+      .from('companies')
+      .select('country_code')
+      .eq('id', me.company_id)
+      .single()
+    if (cmp?.country_code) {
+      const { data: ph } = await service
+        .from('public_holidays')
+        .select('id')
+        .eq('country_code', cmp.country_code)
+        .eq('holiday_date', todayStr)
+        .limit(1)
+      if (ph && ph.length > 0) {
+        return NextResponse.json({ success: true, skipped: 'public_holiday' })
+      }
+    }
+  } catch (err) {
+    console.error('[location] timeoff guard check failed', err)
+    // fall through and log GPS as normal
+  }
+
   const job = signin.jobs as any
   let distanceFromSite = 0
   let withinRange = true

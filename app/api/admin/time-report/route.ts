@@ -21,6 +21,29 @@ export async function GET(request: Request) {
     .lte("signed_in_at", endDate + "T23:59:59Z")
     .order("signed_in_at", { ascending: false })
 
+  // timeoff_guard_report
+  // Fetch approved time off in the period so we can expose it on each installer's summary
+  function daysBetween(a: string, b: string, half: boolean): number {
+    if (half) return 0.5
+    const s = new Date(a + "T00:00:00Z").getTime()
+    const e = new Date(b + "T00:00:00Z").getTime()
+    return Math.round((e - s) / 86400000) + 1
+  }
+  const { data: timeOffEntries } = await service
+    .from("time_off_entries")
+    .select("user_id, type, start_date, end_date, is_half_day")
+    .eq("company_id", u.company_id)
+    .eq("status", "approved")
+    .lte("start_date", endDate)
+    .gte("end_date", startDate)
+  const timeOffByUser: Record<string, { total: number; by_type: Record<string, number> }> = {}
+  for (const e of timeOffEntries || []) {
+    const days = daysBetween(e.start_date, e.end_date, !!e.is_half_day)
+    if (!timeOffByUser[e.user_id]) timeOffByUser[e.user_id] = { total: 0, by_type: {} }
+    timeOffByUser[e.user_id].total += days
+    timeOffByUser[e.user_id].by_type[e.type] = (timeOffByUser[e.user_id].by_type[e.type] || 0) + days
+  }
+
   // Group by user for summary
   const byUser: Record<string, any> = {}
   for (const s of signins || []) {
@@ -53,11 +76,14 @@ export async function GET(request: Request) {
     const totalEntries = u.total_days
     const cleanEntries = totalEntries - u.flagged_count - u.early_departure_count
     const complianceScore = totalEntries > 0 ? Math.round((cleanEntries / totalEntries) * 100) : 100
+    const timeOff = timeOffByUser[u.user_id] || { total: 0, by_type: {} }
     return {
       ...u,
       early_departure_count: u.early_departure_count || 0,
       early_departure_minutes_total: u.early_departure_minutes_total || 0,
       compliance_score: complianceScore,
+      time_off_days: timeOff.total,
+      time_off_by_type: timeOff.by_type,
     }
   })
 
