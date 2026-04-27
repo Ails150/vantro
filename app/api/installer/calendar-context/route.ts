@@ -70,7 +70,7 @@ export async function GET(request: Request) {
 
   const { data: myEntries } = await service
     .from("time_off_entries")
-    .select("id, type, start_date, end_date, status, is_half_day, note, created_at")
+    .select("id, type, start_date, end_date, status, is_half_day, notes, created_at")
     .eq("user_id", installer.userId)
     .gte("end_date", queryStart)
     .lte("start_date", queryEnd)
@@ -123,7 +123,17 @@ export async function GET(request: Request) {
       remaining: entitlement - daysUsed,
     },
     weekly_schedule: weeklySchedule,
-    my_entries: myEntries || [],
+    // notes_field_fixed: rename DB column 'notes' to 'note' for mobile compat
+    my_entries: (myEntries || []).map((e) => ({
+      id: e.id,
+      type: e.type,
+      start_date: e.start_date,
+      end_date: e.end_date,
+      status: e.status,
+      is_half_day: e.is_half_day,
+      note: e.notes,
+      created_at: e.created_at,
+    })),
     team_entries: teamEntries,
     public_holidays: (holidays || []).map((h) => ({
       date: h.holiday_date,
