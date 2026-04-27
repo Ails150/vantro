@@ -51,7 +51,7 @@ export async function GET(request: Request) {
   let query = ctx.service
     .from("time_off_entries")
     .select(
-      "id, user_id, type, status, start_date, end_date, is_half_day, half_day_period, notes, created_at, approved_at, rejection_reason, users(name, initials)"
+      "id, user_id, type, status, start_date, end_date, is_half_day, half_day_period, notes, created_at, approved_at, rejection_reason, users!time_off_entries_user_id_fkey(name, initials)"
     )
     .eq("company_id", ctx.admin.company_id)
     .order("created_at", { ascending: false })
