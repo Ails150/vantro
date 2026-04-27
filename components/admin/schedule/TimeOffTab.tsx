@@ -17,7 +17,6 @@ type TimeOffEntry = {
   rejection_reason: string | null
   users: {
     name: string | null
-    full_name: string | null
     initials: string | null
   } | null
 }
@@ -122,7 +121,6 @@ export default function TimeOffTab() {
 
   return (
     <div className="space-y-3">
-      {/* Filter row */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1.5">
           <FilterChip
@@ -147,31 +145,23 @@ export default function TimeOffTab() {
             label="All time"
           />
         </div>
-        {/* Add manual button — TODO Phase 3.1 wires the modal */}
       </div>
 
-      {error && (
-        <div className="text-sm text-red-500 px-1">{error}</div>
-      )}
+      {error && <div className="text-sm text-red-500 px-1">{error}</div>}
 
       {loading ? (
         <div className="text-center py-12 text-gray-400">Loading time off...</div>
       ) : entries.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center text-gray-400 text-sm">
-          {filter === "pending"
-            ? "No pending requests."
-            : "No time off entries."}
+          {filter === "pending" ? "No pending requests." : "No time off entries."}
         </div>
       ) : (
         <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
           {entries.map((e) => {
             const u = e.users || ({} as any)
-            const name = u.name || u.full_name || "(unnamed)"
+            const name = u.name || "(unnamed)"
             const initials = u.initials || name.slice(0, 2).toUpperCase()
-            const typeColor = TYPE_COLOR[e.type] || {
-              bg: "bg-gray-100",
-              text: "text-gray-800",
-            }
+            const typeColor = TYPE_COLOR[e.type] || { bg: "bg-gray-100", text: "text-gray-800" }
             const days = daysCount(e.start_date, e.end_date, e.is_half_day)
             return (
               <div
@@ -181,9 +171,7 @@ export default function TimeOffTab() {
                 <div
                   className={
                     "w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium " +
-                    typeColor.bg +
-                    " " +
-                    typeColor.text
+                    typeColor.bg + " " + typeColor.text
                   }
                 >
                   {initials}
@@ -223,13 +211,9 @@ export default function TimeOffTab() {
                       </button>
                     </div>
                   ) : e.status === "approved" ? (
-                    <span className="text-[11px] text-teal-700 font-medium">
-                      Approved
-                    </span>
+                    <span className="text-[11px] text-teal-700 font-medium">Approved</span>
                   ) : (
-                    <span className="text-[11px] text-gray-500">
-                      Declined
-                    </span>
+                    <span className="text-[11px] text-gray-500">Declined</span>
                   )}
                 </div>
               </div>

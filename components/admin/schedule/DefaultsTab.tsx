@@ -39,11 +39,7 @@ const DEFAULT_SCHEDULE: WeeklySchedule = {
 }
 
 const TEMPLATES: { id: string; label: string; pattern: WeeklySchedule }[] = [
-  {
-    id: "monfri-8-5",
-    label: "Mon–Fri 8–5",
-    pattern: DEFAULT_SCHEDULE,
-  },
+  { id: "monfri-8-5", label: "Mon–Fri 8–5", pattern: DEFAULT_SCHEDULE },
   {
     id: "monsat-7-4",
     label: "Mon–Sat 7–4",
@@ -72,6 +68,25 @@ const TEMPLATES: { id: string; label: string; pattern: WeeklySchedule }[] = [
   },
 ]
 
+const COMMON_TIMEZONES = [
+  "Europe/London",
+  "Europe/Dublin",
+  "Europe/Belfast",
+  "Europe/Paris",
+  "Europe/Madrid",
+  "Europe/Berlin",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Toronto",
+  "Australia/Sydney",
+  "Australia/Melbourne",
+  "Australia/Perth",
+  "Pacific/Auckland",
+  "UTC",
+]
+
 function patternsEqual(a: WeeklySchedule, b: WeeklySchedule) {
   for (const k of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const) {
     const x = a[k]
@@ -87,6 +102,8 @@ function patternsEqual(a: WeeklySchedule, b: WeeklySchedule) {
 
 export default function DefaultsTab() {
   const [schedule, setSchedule] = useState<WeeklySchedule>(DEFAULT_SCHEDULE)
+  const [countryCode, setCountryCode] = useState("GB")
+  const [timezone, setTimezone] = useState("Europe/London")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -104,6 +121,8 @@ export default function DefaultsTab() {
         if (c.default_schedule) {
           setSchedule({ ...DEFAULT_SCHEDULE, ...c.default_schedule })
         }
+        if (c.country_code) setCountryCode(c.country_code)
+        if (c.timezone) setTimezone(c.timezone)
         if (teamData?.counts) {
           setOverrideCount(teamData.counts.custom)
           setTeamSize(teamData.counts.total)
@@ -120,8 +139,7 @@ export default function DefaultsTab() {
   function toggleDay(day: keyof WeeklySchedule) {
     setSchedule((prev) => {
       const current = prev[day]
-      if (current.enabled)
-        return { ...prev, [day]: { ...current, enabled: false } }
+      if (current.enabled) return { ...prev, [day]: { ...current, enabled: false } }
       return {
         ...prev,
         [day]: {
@@ -133,25 +151,30 @@ export default function DefaultsTab() {
     })
   }
 
-  function updateTime(
-    day: keyof WeeklySchedule,
-    field: "start" | "end",
-    value: string
-  ) {
-    setSchedule((prev) => ({
-      ...prev,
-      [day]: { ...prev[day], [field]: value },
-    }))
+  function updateTime(day: keyof WeeklySchedule, field: "start" | "end", value: string) {
+    setSchedule((prev) => ({ ...prev, [day]: { ...prev[day], [field]: value } }))
   }
 
   async function save() {
     setSaving(true)
     setSaved(false)
     setError(null)
+
+    const cleanCountry = (countryCode || "").trim().toUpperCase()
+    if (cleanCountry && !/^[A-Z]{2}$/.test(cleanCountry)) {
+      setSaving(false)
+      setError("Country must be a 2-letter ISO code (e.g. GB, IE, US, AU)")
+      return
+    }
+
     const res = await fetch("/api/admin/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ default_schedule: schedule }),
+      body: JSON.stringify({
+        default_schedule: schedule,
+        country_code: cleanCountry || "GB",
+        timezone: timezone || "Europe/London",
+      }),
     })
     setSaving(false)
     if (!res.ok) {
@@ -166,20 +189,54 @@ export default function DefaultsTab() {
   if (loading)
     return <div className="text-center py-12 text-gray-400">Loading defaults...</div>
 
-  // Total weekly hours
-  const totalMinutes = (Object.values(schedule) as DaySchedule[]).reduce(
-    (acc, d) => {
-      if (!d.enabled || !d.start || !d.end) return acc
-      const [sh, sm] = d.start.split(":").map(Number)
-      const [eh, em] = d.end.split(":").map(Number)
-      return acc + (eh * 60 + em - (sh * 60 + sm))
-    },
-    0
-  )
+  const totalMinutes = (Object.values(schedule) as DaySchedule[]).reduce((acc, d) => {
+    if (!d.enabled || !d.start || !d.end) return acc
+    const [sh, sm] = d.start.split(":").map(Number)
+    const [eh, em] = d.end.split(":").map(Number)
+    return acc + (eh * 60 + em - (sh * 60 + sm))
+  }, 0)
   const totalHours = Math.round((totalMinutes / 60) * 10) / 10
 
   return (
     <div className="space-y-3 max-w-2xl">
+      {/* Location card */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-5">
+        <div className="text-sm font-medium mb-1">Location</div>
+        <div className="text-xs text-gray-500 mb-4">
+          Drives public holidays, default holiday entitlement and time formatting.
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Country (ISO 2-letter)</label>
+            <input
+              type="text"
+              value={countryCode}
+              onChange={(e) => setCountryCode(e.target.value.toUpperCase().slice(0, 2))}
+              maxLength={2}
+              placeholder="GB"
+              className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-teal-400 uppercase"
+            />
+            <div className="text-[11px] text-gray-400 mt-1">
+              GB, IE, US, AU supported with public holidays. Other codes accepted but no holidays loaded.
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">Timezone</label>
+            <select
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+            >
+              {COMMON_TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Quick start */}
       <div className="bg-white border border-gray-200 rounded-2xl p-5">
         <div className="text-xs text-gray-500 mb-3">Quick start</div>
@@ -284,9 +341,7 @@ export default function DefaultsTab() {
                 <span className="text-sm text-gray-400 italic">Off</span>
               )}
               <span
-                className={
-                  "text-xs " + (isEdited ? "text-amber-700" : "text-gray-400")
-                }
+                className={"text-xs " + (isEdited ? "text-amber-700" : "text-gray-400")}
               >
                 {isEdited ? "Edited" : "Regular"}
               </span>
@@ -303,9 +358,7 @@ export default function DefaultsTab() {
             : ""}
         </div>
         <div className="flex items-center gap-3">
-          {saved && (
-            <span className="text-sm text-teal-600 font-medium">Saved</span>
-          )}
+          {saved && <span className="text-sm text-teal-600 font-medium">Saved</span>}
           {error && <span className="text-sm text-red-500">{error}</span>}
           <button
             onClick={save}

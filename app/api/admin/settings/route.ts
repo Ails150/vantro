@@ -3,6 +3,7 @@
 // Company-level settings.
 // Schedule lives in default_schedule jsonb (managed via Scheduler page).
 // Operational settings: geofence, grace period, background GPS, sick auto-approve.
+// Location settings: country_code, timezone.
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
@@ -84,7 +85,24 @@ export async function POST(request: Request) {
     updates.background_gps_enabled = body.background_gps_enabled
   if (body.sick_auto_approve !== undefined)
     updates.sick_auto_approve = body.sick_auto_approve
-  if (body.timezone !== undefined) updates.timezone = body.timezone
+
+  if (body.country_code !== undefined) {
+    const code = String(body.country_code).trim().toUpperCase()
+    if (code && !/^[A-Z]{2}$/.test(code)) {
+      return NextResponse.json(
+        { error: "country_code must be a 2-letter ISO code" },
+        { status: 400 }
+      )
+    }
+    updates.country_code = code || null
+  }
+  if (body.timezone !== undefined) {
+    const tz = String(body.timezone).trim()
+    if (tz && tz.length > 64) {
+      return NextResponse.json({ error: "Invalid timezone" }, { status: 400 })
+    }
+    updates.timezone = tz || null
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 })

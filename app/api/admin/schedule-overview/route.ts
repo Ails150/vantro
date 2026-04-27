@@ -14,10 +14,9 @@ function daysBetween(start: string, end: string, isHalfDay: boolean): number {
 }
 
 function startOfWeek(d: Date): Date {
-  // Monday-start week
   const out = new Date(d)
-  const day = out.getDay() // 0=Sun..6=Sat
-  const diff = (day === 0 ? -6 : 1 - day)
+  const day = out.getDay()
+  const diff = day === 0 ? -6 : 1 - day
   out.setDate(out.getDate() + diff)
   out.setHours(0, 0, 0, 0)
   return out
@@ -54,14 +53,14 @@ export async function GET() {
   const weekStartStr = weekStart.toISOString().slice(0, 10)
   const weekEndStr = weekEnd.toISOString().slice(0, 10)
 
-  // ── Total team count
+  // Team count — installers + foreman
   const { count: teamCount } = await service
     .from("users")
     .select("id", { count: "exact", head: true })
     .eq("company_id", admin.company_id)
-    .eq("is_active", true)
+    .in("role", ["installer", "foreman"])
+    .or("is_active.is.null,is_active.eq.true")
 
-  // ── Time off today (working today = team - off today - day off)
   const { data: offToday } = await service
     .from("time_off_entries")
     .select("id, type, user_id")
@@ -76,14 +75,12 @@ export async function GET() {
     offByType[e.type] = (offByType[e.type] || 0) + 1
   }
 
-  // ── Pending approvals
   const { count: pendingCount } = await service
     .from("time_off_entries")
     .select("id", { count: "exact", head: true })
     .eq("company_id", admin.company_id)
     .eq("status", "pending")
 
-  // ── Custom schedules — distinct user_ids in user_shifts active today
   const { data: shiftRows } = await service
     .from("user_shifts")
     .select("user_id")
@@ -95,9 +92,6 @@ export async function GET() {
   )
   const customScheduleCount = uniqueOverrideUsers.size
 
-  // ── Working today (rough: team total minus off-today minus day-off-by-default)
-  // Simple model: if today is in default_schedule with enabled:false, everyone is off
-  // unless they have a user_shift covering today (handled by uniqueOverrideUsers).
   const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
   const todayKey = dayKeys[today.getDay()]
   const defaultDay = (company?.default_schedule as any)?.[todayKey]
@@ -105,9 +99,8 @@ export async function GET() {
 
   const expectedWorkingToday = dayEnabledByDefault
     ? Math.max(0, (teamCount || 0) - onTimeOffToday)
-    : uniqueOverrideUsers.size // Only override users may be working today
+    : uniqueOverrideUsers.size
 
-  // ── Next public holiday
   const { data: nextHoliday } = await service
     .from("public_holidays")
     .select("name, holiday_date")
@@ -117,26 +110,23 @@ export async function GET() {
     .limit(1)
     .maybeSingle()
 
-  // ── This week — approved time off
   const { data: weekTimeOff } = await service
     .from("time_off_entries")
-    .select("id, type, start_date, end_date, is_half_day, users(name, full_name, initials)")
+    .select("id, type, start_date, end_date, is_half_day, users(name, initials)")
     .eq("company_id", admin.company_id)
     .eq("status", "approved")
     .lte("start_date", weekEndStr)
     .gte("end_date", weekStartStr)
     .order("start_date", { ascending: true })
 
-  // ── Pending approvals (latest 3 for the alert banner detail)
   const { data: pendingPreview } = await service
     .from("time_off_entries")
-    .select("id, type, start_date, end_date, created_at, users(name, full_name, initials)")
+    .select("id, type, start_date, end_date, created_at, users(name, initials)")
     .eq("company_id", admin.company_id)
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(3)
 
-  // ── Total entitlement and usage across team
   const { data: allowances } = await service
     .from("leave_allowances")
     .select("user_id, total_days, carried_over_days, leave_year_start, leave_year_end")
@@ -151,7 +141,6 @@ export async function GET() {
       totalEntitlement +=
         Number(a.total_days) + Number(a.carried_over_days || 0)
     }
-    // Calculate used from approved annual_leave entries within those windows
     const userIds = allowances.map((a: any) => a.user_id)
     const { data: approvedYearly } = await service
       .from("time_off_entries")
@@ -175,7 +164,6 @@ export async function GET() {
       }
     }
   } else {
-    // Fall back: country default × team size
     const { data: cfg } = await service
       .from("country_configs")
       .select("default_holiday_days")

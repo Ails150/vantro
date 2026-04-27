@@ -22,7 +22,7 @@ type OverviewData = {
     start_date: string
     end_date: string
     is_half_day: boolean
-    users: { name: string | null; full_name: string | null; initials: string | null }
+    users: { name: string | null; initials: string | null }
   }>
   pending_preview: Array<{
     id: string
@@ -30,7 +30,7 @@ type OverviewData = {
     start_date: string
     end_date: string
     created_at: string
-    users: { name: string | null; full_name: string | null; initials: string | null }
+    users: { name: string | null; initials: string | null }
   }>
   entitlement: { total_days: number; used_days: number }
 }
@@ -91,16 +91,13 @@ export default function OverviewTab() {
 
   return (
     <div className="space-y-3">
-      {/* KPI row */}
       <div className="grid grid-cols-4 gap-3">
         <Kpi
           label="Working today"
           value={`${data.kpis.working_today} / ${data.kpis.team_size}`}
           sub={
             data.kpis.team_size > 0
-              ? `${Math.round(
-                  (data.kpis.working_today / data.kpis.team_size) * 100
-                )}% of team`
+              ? `${Math.round((data.kpis.working_today / data.kpis.team_size) * 100)}% of team`
               : "—"
           }
         />
@@ -122,7 +119,6 @@ export default function OverviewTab() {
         />
       </div>
 
-      {/* Pending banner */}
       {data.kpis.pending_approval_count > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex items-center justify-between">
           <div>
@@ -149,7 +145,6 @@ export default function OverviewTab() {
         </div>
       )}
 
-      {/* This week */}
       <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <div>
@@ -166,7 +161,7 @@ export default function OverviewTab() {
         ) : (
           data.week_time_off.map((e) => {
             const u = e.users || ({} as any)
-            const name = u.name || u.full_name || "(unnamed)"
+            const name = u.name || "(unnamed)"
             const initials = u.initials || name.slice(0, 2).toUpperCase()
             return (
               <div
@@ -194,7 +189,6 @@ export default function OverviewTab() {
         )}
       </div>
 
-      {/* Holiday + entitlement */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white border border-gray-200 rounded-2xl px-5 py-4">
           <div className="text-[11px] text-gray-500 mb-1.5 uppercase tracking-wide">
@@ -224,9 +218,7 @@ export default function OverviewTab() {
           <div className="text-xs text-gray-500">
             {data.country_code} ·{" "}
             {data.entitlement.total_days > 0
-              ? `${Math.round(
-                  (data.entitlement.used_days / data.entitlement.total_days) * 100
-                )}% used`
+              ? `${Math.round((data.entitlement.used_days / data.entitlement.total_days) * 100)}% used`
               : "—"}
           </div>
         </div>
@@ -251,9 +243,7 @@ function Kpi({
       <div className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">
         {label}
       </div>
-      <div
-        className={"text-2xl font-medium mb-0.5 " + (warn ? "text-amber-600" : "")}
-      >
+      <div className={"text-2xl font-medium mb-0.5 " + (warn ? "text-amber-600" : "")}>
         {value}
       </div>
       <div className="text-[11px] text-gray-500">{sub}</div>

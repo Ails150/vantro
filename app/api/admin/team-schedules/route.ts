@@ -18,14 +18,12 @@ function daysBetween(start: string, end: string, isHalfDay: boolean): number {
 
 function summariseShifts(shifts: Array<{ day_of_week: number; start_time: string; end_time: string }>): string {
   if (!shifts.length) return "No shifts"
-  // Group consecutive days with same hours
   const byDay: Record<number, { start: string; end: string }> = {}
   for (const s of shifts)
     byDay[s.day_of_week] = {
       start: s.start_time.slice(0, 5),
       end: s.end_time.slice(0, 5),
     }
-  // Find Mon-Fri block as a special case
   const weekdays = [1, 2, 3, 4, 5]
   const allWeekdays = weekdays.every((d) => byDay[d])
   const allWeekdaysSame =
@@ -36,19 +34,13 @@ function summariseShifts(shifts: Array<{ day_of_week: number; start_time: string
     )
   const sat = byDay[6]
   const sun = byDay[0]
-
-  if (
-    allWeekdaysSame &&
-    !sat &&
-    !sun
-  ) {
+  if (allWeekdaysSame && !sat && !sun) {
     return `Mon–Fri ${byDay[1].start}–${byDay[1].end}`
   }
   if (allWeekdaysSame && sat && !sun) {
     if (sat.start === byDay[1].start && sat.end === byDay[1].end)
       return `Mon–Sat ${byDay[1].start}–${byDay[1].end}`
   }
-  // Generic: list each day
   const labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
   const parts: string[] = []
   for (let d = 0; d < 7; d++) {
@@ -76,7 +68,6 @@ export async function GET() {
 
   const today = new Date().toISOString().slice(0, 10)
 
-  // Company default
   const { data: company } = await service
     .from("companies")
     .select("default_schedule, country_code")
@@ -84,7 +75,6 @@ export async function GET() {
     .single()
   const defaultSchedule = (company?.default_schedule as any) || {}
 
-  // Default summary string for non-overriders
   const enabledDefaults: Record<string, { start: string; end: string }> = {}
   for (const k of DAY_KEYS) {
     const day = defaultSchedule[k]
@@ -102,46 +92,39 @@ export async function GET() {
     )
     const weekdayOrder = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
     const orderedDays = weekdayOrder.filter((d) => enabledDefaults[d])
-    if (
-      allSame &&
-      orderedDays.join(",") === "mon,tue,wed,thu,fri"
-    ) {
+    if (allSame && orderedDays.join(",") === "mon,tue,wed,thu,fri") {
       const f = enabledDefaults[orderedDays[0]]
       return `Mon–Fri ${f.start}–${f.end}`
     }
-    if (
-      allSame &&
-      orderedDays.join(",") === "mon,tue,wed,thu,fri,sat"
-    ) {
+    if (allSame && orderedDays.join(",") === "mon,tue,wed,thu,fri,sat") {
       const f = enabledDefaults[orderedDays[0]]
       return `Mon–Sat ${f.start}–${f.end}`
     }
-    // Generic
     const labels: Record<string, string> = {
-      mon: "Mon",
-      tue: "Tue",
-      wed: "Wed",
-      thu: "Thu",
-      fri: "Fri",
-      sat: "Sat",
-      sun: "Sun",
+      mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu",
+      fri: "Fri", sat: "Sat", sun: "Sun",
     }
     return orderedDays
       .map((d) => `${labels[d]} ${enabledDefaults[d].start}–${enabledDefaults[d].end}`)
       .join(", ")
   })()
 
-  // Users
+  // Users — only real columns (name, initials)
   const { data: users } = await service
     .from("users")
-    .select("id, name, full_name, initials, role, is_active")
+    .select("id, name, initials, role, is_active")
     .eq("company_id", admin.company_id)
-    .eq("is_active", true)
+    .or("is_active.is.null,is_active.eq.true")
     .order("name", { ascending: true })
 
   if (!users) return NextResponse.json({ users: [] })
 
-  const userIds = users.map((u: any) => u.id)
+  // Filter installers + foreman only (not admins)
+  const teamUsers = users.filter((u: any) =>
+    ["installer", "foreman"].includes(u.role)
+  )
+
+  const userIds = teamUsers.map((u: any) => u.id)
 
   // Active shifts for all users
   const { data: shifts } = await service
@@ -170,7 +153,6 @@ export async function GET() {
   const allowanceByUser: Record<string, any> = {}
   for (const a of allowances || []) allowanceByUser[a.user_id] = a
 
-  // Country fallback
   const { data: cfg } = await service
     .from("country_configs")
     .select("default_holiday_days")
@@ -178,7 +160,6 @@ export async function GET() {
     .single()
   const fallbackTotal = Number(cfg?.default_holiday_days || 0)
 
-  // Approved annual leave for entitlement usage
   const { data: approvedAL } = await service
     .from("time_off_entries")
     .select("user_id, start_date, end_date, is_half_day")
@@ -201,22 +182,20 @@ export async function GET() {
     }
   }
 
-  // Build response
-  const rows = users.map((u: any) => {
+  const rows = teamUsers.map((u: any) => {
     const userShifts = shiftsByUser[u.id] || []
     const hasOverride = userShifts.length > 0
-    const summary = hasOverride
-      ? summariseShifts(userShifts)
-      : defaultSummary
+    const summary = hasOverride ? summariseShifts(userShifts) : defaultSummary
     const allowance = allowanceByUser[u.id]
     const total = allowance
       ? Number(allowance.total_days) + Number(allowance.carried_over_days || 0)
       : fallbackTotal
     const used = Math.round((usedByUser[u.id] || 0) * 10) / 10
+    const name = u.name || "(unnamed)"
     return {
       id: u.id,
-      name: u.name || u.full_name || "(unnamed)",
-      initials: u.initials || (u.name || u.full_name || "?").slice(0, 2).toUpperCase(),
+      name,
+      initials: u.initials || name.slice(0, 2).toUpperCase(),
       role: u.role,
       schedule_summary: summary,
       schedule_source: hasOverride ? "custom" : "default",

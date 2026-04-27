@@ -44,14 +44,14 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: ctx.error }, { status: ctx.status })
 
   const url = new URL(request.url)
-  const status = url.searchParams.get("status") // pending | approved | rejected | all
+  const status = url.searchParams.get("status")
   const from = url.searchParams.get("from")
   const to = url.searchParams.get("to")
 
   let query = ctx.service
     .from("time_off_entries")
     .select(
-      "id, user_id, type, status, start_date, end_date, is_half_day, half_day_period, notes, created_at, approved_at, rejection_reason, users(name, full_name, initials)"
+      "id, user_id, type, status, start_date, end_date, is_half_day, half_day_period, notes, created_at, approved_at, rejection_reason, users(name, initials)"
     )
     .eq("company_id", ctx.admin.company_id)
     .order("created_at", { ascending: false })
@@ -113,7 +113,6 @@ export async function POST(request: Request) {
       { status: 400 }
     )
 
-  // Verify target user is in admin's company
   const { data: target } = await ctx.service
     .from("users")
     .select("id, company_id")
@@ -122,7 +121,7 @@ export async function POST(request: Request) {
   if (!target || target.company_id !== ctx.admin.company_id)
     return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  const finalStatus = status || "approved" // admin-created defaults to approved
+  const finalStatus = status || "approved"
 
   const insertRow: Record<string, any> = {
     user_id,
