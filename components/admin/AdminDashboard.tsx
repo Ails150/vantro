@@ -9,6 +9,7 @@ import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import ComplianceTab from "@/components/admin/ComplianceTab"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
+import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -388,6 +389,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "jobs", label: "Jobs" },
     { id: "checklists", label: "Checklists" },
     { id: "schedule", label: "Scheduler" }, // schedule_link_added
+    { id: "calendar", label: "Calendar" }, // calendar_sidebar_marker
     { id: "settings", label: "Settings" },
     { id: "alerts", label: "Alerts", badge: alerts.length },
   ]
@@ -1051,6 +1053,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "map" && <MapTab />}
           {activeTab === "defects" && <DefectsTab />}
         {activeTab === "schedule" && <ScheduleTab />}
+        {activeTab === "calendar" && <CalendarTab />}
         {activeTab === "settings" && <SettingsTab />}
 
         {activeTab === "alerts" && (
