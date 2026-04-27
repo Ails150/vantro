@@ -1,7 +1,8 @@
 // app/api/admin/settings/route.ts
 //
-// Company-level settings: default schedule, geofence, GPS, grace period.
-// Schedule is now stored as default_schedule jsonb (per-day enabled + hours).
+// Company-level settings.
+// Schedule lives in default_schedule jsonb (managed via Scheduler page).
+// Operational settings: geofence, grace period, background GPS, sick auto-approve.
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
@@ -15,6 +16,7 @@ const FIELDS = [
   "grace_period_minutes",
   "geofence_radius_metres",
   "background_gps_enabled",
+  "sick_auto_approve",
 ] as const
 
 export async function GET() {
@@ -61,9 +63,7 @@ export async function POST(request: Request) {
   const body = await request.json()
   const updates: Record<string, any> = {}
 
-  // Whitelist - prevents callers writing arbitrary columns
   if (body.default_schedule !== undefined) {
-    // Basic shape validation: must be object with day keys
     if (
       typeof body.default_schedule !== "object" ||
       body.default_schedule === null ||
@@ -82,6 +82,8 @@ export async function POST(request: Request) {
     updates.geofence_radius_metres = body.geofence_radius_metres
   if (body.background_gps_enabled !== undefined)
     updates.background_gps_enabled = body.background_gps_enabled
+  if (body.sick_auto_approve !== undefined)
+    updates.sick_auto_approve = body.sick_auto_approve
   if (body.timezone !== undefined) updates.timezone = body.timezone
 
   if (Object.keys(updates).length === 0) {

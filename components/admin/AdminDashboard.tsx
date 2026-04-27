@@ -191,9 +191,15 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return () => clearInterval(interval)
   }, [showAddJob])
 
-  function switchTab(tab: string) {
-    setActiveTab(tab)
-    try { localStorage.setItem("vantro_tab", tab) } catch {}
+  // switchTab_href_patched
+  function switchTab(tab: { id: string; href?: string } | string) {
+    if (typeof tab === "object" && tab.href) {
+      router.push(tab.href)
+      return
+    }
+    const id = typeof tab === "string" ? tab : tab.id
+    setActiveTab(id)
+    try { localStorage.setItem("vantro_tab", id) } catch {}
   }
 
   async function handleSignOut() { await supabase.auth.signOut(); router.push("/login") }
@@ -386,6 +392,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "team", label: "Team" },
     { id: "jobs", label: "Jobs" },
     { id: "checklists", label: "Checklists" },
+    { id: "schedule", label: "Scheduler", href: "/admin/schedule" }, // schedule_link_added
     { id: "settings", label: "Settings" },
     { id: "alerts", label: "Alerts", badge: alerts.length },
   ]
@@ -472,7 +479,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 {setupTabs.map(tab => (
                   <button
                     key={tab.id}
-                    onClick={() => switchTab(tab.id)}
+                    onClick={() => switchTab(tab)}
                     className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
                       activeTab === tab.id 
                         ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
@@ -493,7 +500,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 {operationsTabs.map(tab => (
                   <button
                     key={tab.id}
-                    onClick={() => switchTab(tab.id)}
+                    onClick={() => switchTab(tab)}
                     className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
                       activeTab === tab.id 
                         ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
