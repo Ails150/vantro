@@ -880,13 +880,19 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           <div className="space-y-5">
             {/* installer_limit_enforced_v1 banner */}
             {/* banner_data_source_fix_v1: read from company prop, not userData.companies */}
-            {/* banner_debug_temp - REMOVE AFTER TESTING */}
+            {/* banner_debug_v2 - REMOVE AFTER TESTING */}
             {(() => {
-              const limit = (company as any)?.installer_limit
+              const c = company as any
+              const limit = c?.installer_limit
               const active = teamMembers.filter((m: any) => ["installer","foreman"].includes(m.role) && m.is_active !== false).length
+              const companyKeys = c ? Object.keys(c).join(", ") : "(company is null/undefined)"
               return (
-                <div className="bg-purple-100 border border-purple-300 rounded-2xl p-4 text-sm text-purple-800 mb-2">
-                  DEBUG: company.installer_limit = <strong>{String(limit)}</strong> (type: {typeof limit}) — active count = <strong>{active}</strong> — would show banner = <strong>{String(!!(limit && active > limit))}</strong>
+                <div className="bg-purple-100 border border-purple-300 rounded-2xl p-4 text-xs text-purple-800 mb-2 break-all">
+                  <div>DEBUG company prop type: <strong>{typeof c}</strong></div>
+                  <div>company.installer_limit = <strong>{String(limit)}</strong> (type: {typeof limit})</div>
+                  <div>active count = <strong>{active}</strong></div>
+                  <div>company keys: <strong>{companyKeys}</strong></div>
+                  <div>company JSON (first 500 chars): <strong>{c ? JSON.stringify(c).slice(0, 500) : "null"}</strong></div>
                 </div>
               )
             })()}
