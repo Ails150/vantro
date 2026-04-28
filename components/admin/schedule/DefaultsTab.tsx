@@ -190,6 +190,15 @@ export default function DefaultsTab() {
         default_schedule: schedule,
         country_code: cleanCountry || "GB",
         timezone: timezone || "Europe/London",
+        // leave_year_save_v3
+        leave_year_start_month:
+          leaveYearMode === "country" ? null :
+          leaveYearMode === "calendar" ? 1 :
+          leaveYearMonth,
+        leave_year_start_day:
+          leaveYearMode === "country" ? null :
+          leaveYearMode === "calendar" ? 1 :
+          leaveYearDay,
       }),
     })
     setSaving(false)
@@ -249,6 +258,50 @@ export default function DefaultsTab() {
                 </option>
               ))}
             </select>
+          </div>
+          {/* leave_year_picker_ui_v3 */}
+          <div className="md:col-span-2">
+            <label className="block text-xs text-gray-500 mb-1">Leave year</label>
+            <select
+              value={leaveYearMode}
+              onChange={(e) => setLeaveYearMode(e.target.value as "country" | "calendar" | "custom")}
+              className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+            >
+              <option value="country">Use country default (recommended)</option>
+              <option value="calendar">Calendar year (1 January - 31 December)</option>
+              <option value="custom">Custom start date</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">
+              UK/IE default is 1 April. US default is 1 January. AU default is 1 July.
+            </p>
+            {leaveYearMode === "custom" && (
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start month</label>
+                  <select
+                    value={leaveYearMonth}
+                    onChange={(e) => setLeaveYearMonth(Number(e.target.value))}
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+                  >
+                    {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => (
+                      <option key={i} value={i + 1}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start day</label>
+                  <select
+                    value={leaveYearDay}
+                    onChange={(e) => setLeaveYearDay(Number(e.target.value))}
+                    className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+                  >
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
