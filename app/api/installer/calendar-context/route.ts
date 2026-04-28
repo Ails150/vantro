@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   // Resolve user + company in one go
   const { data: me } = await service
     .from("users")
-    .select("id, name, company_id, companies(country_code, default_schedule, timezone)")
+    .select("id, name, company_id, companies(country_code, default_schedule, timezone, leave_year_start_month, leave_year_start_day)")
     .eq("id", installer.userId)
     .single()
   if (!me?.company_id) return NextResponse.json({ error: "User not found" }, { status: 404 })
@@ -40,7 +40,10 @@ export async function GET(request: Request) {
     .maybeSingle()
 
   // Compute current leave year window
-  const leaveYear = computeLeaveYear(new Date(), countryCfg?.leave_year_start_month || 4, countryCfg?.leave_year_start_day || 1)
+  // leave_year_company_override: company setting takes priority over country default
+  const leaveYearMonth = company?.leave_year_start_month ?? countryCfg?.leave_year_start_month ?? 4
+  const leaveYearDay = company?.leave_year_start_day ?? countryCfg?.leave_year_start_day ?? 1
+  const leaveYear = computeLeaveYear(new Date(), leaveYearMonth, leaveYearDay)
 
   // Per-user shift override (if any)
   const { data: shifts } = await service

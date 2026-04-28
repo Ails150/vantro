@@ -16,6 +16,8 @@ const FIELDS = [
   "default_schedule",
   "grace_period_minutes",
   "geofence_radius_metres",
+    "leave_year_start_month",
+    "leave_year_start_day",
   "background_gps_enabled",
   "sick_auto_approve",
 ] as const
@@ -102,6 +104,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid timezone" }, { status: 400 })
     }
     updates.timezone = tz || null
+  }
+
+  // leave_year_settings_v1
+  if (body.leave_year_start_month !== undefined) {
+    const m = body.leave_year_start_month
+    if (m === null) {
+      updates.leave_year_start_month = null
+    } else {
+      const mNum = Number(m)
+      if (!Number.isInteger(mNum) || mNum < 1 || mNum > 12) {
+        return NextResponse.json(
+          { error: "leave_year_start_month must be an integer 1-12 or null" },
+          { status: 400 }
+        )
+      }
+      updates.leave_year_start_month = mNum
+    }
+  }
+  if (body.leave_year_start_day !== undefined) {
+    const d = body.leave_year_start_day
+    if (d === null) {
+      updates.leave_year_start_day = null
+    } else {
+      const dNum = Number(d)
+      if (!Number.isInteger(dNum) || dNum < 1 || dNum > 31) {
+        return NextResponse.json(
+          { error: "leave_year_start_day must be an integer 1-31 or null" },
+          { status: 400 }
+        )
+      }
+      updates.leave_year_start_day = dNum
+    }
   }
 
   if (Object.keys(updates).length === 0) {
