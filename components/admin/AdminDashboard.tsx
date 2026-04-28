@@ -280,22 +280,26 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   }
 
   // csv_import_v1
+  // csv_parser_fix_v1
   function parseCsvText(text: string): Array<{name:string; email:string; role:string}> {
-    const lines = text.replace(//g, "").split("
-").map(l => l.trim()).filter(l => l.length > 0)
+    const CR = String.fromCharCode(13)
+    const LF = String.fromCharCode(10)
+    const cleaned = text.split(CR).join("")
+    const lines = cleaned.split(LF).map((l) => l.trim()).filter((l) => l.length > 0)
     if (lines.length === 0) return []
-    // Detect header
     let startIdx = 0
     const first = lines[0].toLowerCase()
-    if (first.includes("name") && first.includes("email")) {
+    if (first.indexOf("name") !== -1 && first.indexOf("email") !== -1) {
       startIdx = 1
     }
     const rows: Array<{name:string; email:string; role:string}> = []
     for (let i = startIdx; i < lines.length; i++) {
-      const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""))
+      const cols = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""))
       if (cols.length < 2) continue
-      const [name, email, role] = cols
-      rows.push({ name: name || "", email: email || "", role: role || "installer" })
+      const name = cols[0] || ""
+      const email = cols[1] || ""
+      const role = cols[2] || "installer"
+      rows.push({ name, email, role })
     }
     return rows
   }
@@ -358,10 +362,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     setCsvImporting(false)
   }
   function downloadSampleCsv() {
-    const sample = "name,email,role
-Pete Walker,pete@example.com,installer
-Tom Burke,tom@example.com,foreman
-"
+    const NL = String.fromCharCode(10)
+    const sample =
+      "name,email,role" + NL +
+      "Pete Walker,pete@example.com,installer" + NL +
+      "Tom Burke,tom@example.com,foreman" + NL
     const blob = new Blob([sample], { type: "text/csv" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
