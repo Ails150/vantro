@@ -26,6 +26,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   })
   const [showAddJob, setShowAddJob] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
+  // csv_import_v1
+  const [showCsvImport, setShowCsvImport] = useState(false)
+  const [csvRows, setCsvRows] = useState<Array<{name:string; email:string; role:string}>>([])
+  const [csvError, setCsvError] = useState<string>("")
+  const [csvImporting, setCsvImporting] = useState(false)
+  const [csvResults, setCsvResults] = useState<any>(null)
   const [showAddTemplate, setShowAddTemplate] = useState(false)
   const [showAddItem, setShowAddItem] = useState(null)
   const [assigningJobId, setAssigningJobId] = useState(null)
@@ -271,6 +277,104 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     const res = await fetch("/api/jobs/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId }) })
     if (res.ok) { window.location.href = "/admin?tab=jobs" }
     else { const d = await res.json(); alert("Failed to delete: " + d.error) }
+  }
+
+  // csv_import_v1
+  function parseCsvText(text: string): Array<{name:string; email:string; role:string}> {
+    const lines = text.replace(//g, "").split("
+").map(l => l.trim()).filter(l => l.length > 0)
+    if (lines.length === 0) return []
+    // Detect header
+    let startIdx = 0
+    const first = lines[0].toLowerCase()
+    if (first.includes("name") && first.includes("email")) {
+      startIdx = 1
+    }
+    const rows: Array<{name:string; email:string; role:string}> = []
+    for (let i = startIdx; i < lines.length; i++) {
+      const cols = lines[i].split(",").map(c => c.trim().replace(/^"|"$/g, ""))
+      if (cols.length < 2) continue
+      const [name, email, role] = cols
+      rows.push({ name: name || "", email: email || "", role: role || "installer" })
+    }
+    return rows
+  }
+  async function handleCsvFile(file: File) {
+    setCsvError("")
+    setCsvResults(null)
+    if (!file.name.toLowerCase().endsWith(".csv") && file.type !== "text/csv") {
+      setCsvError("Please choose a .csv file")
+      return
+    }
+    try {
+      const text = await file.text()
+      const rows = parseCsvText(text)
+      if (rows.length === 0) {
+        setCsvError("No rows found in file")
+        return
+      }
+      if (rows.length > 200) {
+        setCsvError("Max 200 rows per import. Split your file.")
+        return
+      }
+      setCsvRows(rows)
+    } catch (err: any) {
+      setCsvError(err?.message || "Could not read file")
+    }
+  }
+  async function bulkImport() {
+    if (csvRows.length === 0) return
+    setCsvImporting(true)
+    setCsvResults(null)
+    try {
+      const res = await fetch("/api/admin/team/bulk-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: csvRows }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setCsvError(data.error || "Import failed")
+        setCsvResults(data.results ? data : null)
+        setCsvImporting(false)
+        return
+      }
+      setCsvResults(data)
+      // Send invites for created rows
+      const created = (data.results || []).filter((r: any) => r.status === "created")
+      for (const c of created) {
+        try {
+          await fetch("/api/invite", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: c.email, name: c.name, role: csvRows.find(r => r.email.toLowerCase() === c.email)?.role || "installer" }),
+          })
+        } catch {}
+      }
+      router.refresh()
+    } catch (err: any) {
+      setCsvError(err?.message || "Import failed")
+    }
+    setCsvImporting(false)
+  }
+  function downloadSampleCsv() {
+    const sample = "name,email,role
+Pete Walker,pete@example.com,installer
+Tom Burke,tom@example.com,foreman
+"
+    const blob = new Blob([sample], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = "vantro-team-template.csv"
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+  function resetCsvImport() {
+    setShowCsvImport(false)
+    setCsvRows([])
+    setCsvError("")
+    setCsvResults(null)
   }
 
   async function addMember() {
@@ -747,7 +851,102 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
         {activeTab === "team" && (
           <div className="space-y-5">
-            <div className="flex justify-end"><button onClick={() => { setShowAddMember(true); setFormError("") }} className={btn}>+ Add member</button></div>
+            {/* csv_import_v1 */}
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setShowCsvImport(true)} className={btnGhost}>Import CSV</button>
+              <button onClick={() => { setShowAddMember(true); setFormError("") }} className={btn}>+ Add member</button>
+            </div>
+            {showCsvImport && (
+              <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold">Import team from CSV</h3>
+                    <p className="text-sm text-gray-500">Upload a CSV with columns: name, email, role. Existing emails are skipped.</p>
+                  </div>
+                  <button onClick={downloadSampleCsv} className="text-sm text-teal-600 hover:underline">Download template</button>
+                </div>
+                {!csvResults && csvRows.length === 0 && (
+                  <div>
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvFile(f) }}
+                      className="block w-full text-sm border border-gray-200 rounded-md p-3"
+                    />
+                    {csvError && <p className="text-sm text-red-600 mt-2">{csvError}</p>}
+                  </div>
+                )}
+                {!csvResults && csvRows.length > 0 && (
+                  <div>
+                    <p className="text-sm text-gray-600 mb-2">{csvRows.length} row(s) ready to import:</p>
+                    <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs text-gray-500">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Name</th>
+                            <th className="px-3 py-2 text-left">Email</th>
+                            <th className="px-3 py-2 text-left">Role</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {csvRows.map((r, i) => (
+                            <tr key={i} className="border-t border-gray-100">
+                              <td className="px-3 py-2">{r.name}</td>
+                              <td className="px-3 py-2">{r.email}</td>
+                              <td className="px-3 py-2">{r.role}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {csvError && <p className="text-sm text-red-600 mt-2">{csvError}</p>}
+                    <div className="flex gap-3 mt-4">
+                      <button onClick={bulkImport} disabled={csvImporting} className={btn}>
+                        {csvImporting ? "Importing..." : `Import ${csvRows.length} member(s)`}
+                      </button>
+                      <button onClick={() => setCsvRows([])} className={btnGhost}>Choose different file</button>
+                      <button onClick={resetCsvImport} className={btnGhost}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {csvResults && (
+                  <div>
+                    <div className="flex gap-4 mb-3 text-sm">
+                      <span className="text-teal-600">Created: {csvResults.summary?.created || 0}</span>
+                      <span className="text-gray-500">Skipped: {csvResults.summary?.skipped || 0}</span>
+                      <span className="text-red-600">Errors: {csvResults.summary?.errored || 0}</span>
+                    </div>
+                    <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-50 text-xs text-gray-500">
+                          <tr>
+                            <th className="px-3 py-2 text-left">Row</th>
+                            <th className="px-3 py-2 text-left">Name</th>
+                            <th className="px-3 py-2 text-left">Email</th>
+                            <th className="px-3 py-2 text-left">Status</th>
+                            <th className="px-3 py-2 text-left">Detail</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(csvResults.results || []).map((r: any, i: number) => (
+                            <tr key={i} className="border-t border-gray-100">
+                              <td className="px-3 py-2">{r.row}</td>
+                              <td className="px-3 py-2">{r.name}</td>
+                              <td className="px-3 py-2">{r.email}</td>
+                              <td className={"px-3 py-2 " + (r.status === "created" ? "text-teal-600" : r.status === "skipped" ? "text-gray-500" : "text-red-600")}>{r.status}</td>
+                              <td className="px-3 py-2 text-gray-500">{r.message || ""}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="flex gap-3 mt-4">
+                      <button onClick={resetCsvImport} className={btn}>Done</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {showAddMember && (
               <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
                 <h3 className="font-semibold">New team member</h3>
