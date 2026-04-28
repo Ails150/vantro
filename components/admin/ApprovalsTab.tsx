@@ -94,17 +94,25 @@ export default function ApprovalsTab({ pendingQA, onRefresh }: Props) {
                         <div className="flex-1">
                           <div className="font-medium text-sm">{sub.checklist_items?.label}</div>
                           <div className={"text-xs text-gray-500 mt-0.5 capitalize"}>{sub.checklist_items?.item_type?.replace("_", " ")}</div>
-                          {sub.notes && <div className="text-sm text-gray-600 mt-1">{sub.notes}</div>}{sub.photo_url && <img src={sub.photo_url} alt="QA photo" className="mt-2 rounded-lg w-full max-h-48 object-cover"/>}
+                          {sub.notes && <div className="text-sm text-gray-600 mt-1">{sub.notes}</div>}
                         </div>
                         <span className={"text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 " + (sub.state === "pass" || sub.state === "submitted" ? "bg-teal-50 text-teal-600" : sub.state === "fail" ? "bg-red-50 text-red-500" : "bg-gray-100 text-gray-500")}>
                           {sub.state === "submitted" ? "Done" : sub.state}
                         </span>
                       </div>
-                      {qa.photoUrls?.[sub.id] && (
+                      {/* qa_photo_fix_v1: use onClick + window.open instead of <a> wrapper to prevent expand-state reset */}
+                      {(qa.photoUrls?.[sub.id] || sub.photo_url) && (
                         <div className="mt-3">
-                          <a href={qa.photoUrls[sub.id]} target="_blank" rel="noreferrer">
-                            <img src={qa.photoUrls[sub.id]} alt="QA photo" className="w-full max-h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"/>
-                          </a>
+                          <img
+                            src={qa.photoUrls?.[sub.id] || sub.photo_url}
+                            alt="QA photo"
+                            className="w-full max-h-48 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              window.open(qa.photoUrls?.[sub.id] || sub.photo_url, "_blank", "noopener,noreferrer");
+                            }}
+                          />
                           <p className="text-xs text-gray-400 mt-1">Click to view full size</p>
                         </div>
                       )}
