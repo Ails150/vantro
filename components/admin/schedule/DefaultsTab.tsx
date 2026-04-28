@@ -104,6 +104,10 @@ export default function DefaultsTab() {
   const [schedule, setSchedule] = useState<WeeklySchedule>(DEFAULT_SCHEDULE)
   const [countryCode, setCountryCode] = useState("GB")
   const [timezone, setTimezone] = useState("Europe/London")
+  // leave_year_picker_v1
+  const [leaveYearMode, setLeaveYearMode] = useState<"country" | "calendar" | "custom">("country")
+  const [leaveYearMonth, setLeaveYearMonth] = useState<number>(1)
+  const [leaveYearDay, setLeaveYearDay] = useState<number>(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -123,6 +127,18 @@ export default function DefaultsTab() {
         }
         if (c.country_code) setCountryCode(c.country_code)
         if (c.timezone) setTimezone(c.timezone)
+        // leave_year_picker_v1
+        if (c.leave_year_start_month != null && c.leave_year_start_day != null) {
+          if (c.leave_year_start_month === 1 && c.leave_year_start_day === 1) {
+            setLeaveYearMode("calendar")
+          } else {
+            setLeaveYearMode("custom")
+          }
+          setLeaveYearMonth(c.leave_year_start_month)
+          setLeaveYearDay(c.leave_year_start_day)
+        } else {
+          setLeaveYearMode("country")
+        }
         if (teamData?.counts) {
           setOverrideCount(teamData.counts.custom)
           setTeamSize(teamData.counts.total)
