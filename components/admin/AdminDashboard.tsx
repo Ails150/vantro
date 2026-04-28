@@ -382,6 +382,21 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     setCsvResults(null)
   }
 
+  // billing_polish_v1
+  async function handleOpenBillingPortal() {
+    try {
+      const res = await fetch("/api/billing/portal", { method: "POST" })
+      const data = await res.json()
+      if (data?.url) {
+        window.open(data.url, "_blank", "noopener,noreferrer")
+        return
+      }
+      alert(data?.error || "Could not open billing portal. Please try again or contact support.")
+    } catch (err) {
+      alert("Could not open billing portal. Please try again or contact support.")
+    }
+  }
+
   async function addMember() {
     if (!memberName.trim() || !memberEmail.trim()) { setFormError("Enter name and email"); return }
     setSaving(true); setFormError("")
@@ -902,8 +917,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               if (limit && active > limit) {
                 const over = active - limit
                 return (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-                    <strong>You're {over} over your plan limit of {limit} installers.</strong> Existing users will keep working. To add more, upgrade your plan or remove a user.
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800 flex items-start justify-between gap-4">
+                    <div>
+                      <strong>You're {over} over your plan limit of {limit} installers.</strong> Existing users will keep working. To add more, upgrade your plan or remove a user.
+                    </div>
+                    <button
+                      onClick={handleOpenBillingPortal}
+                      className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+                    >
+                      Upgrade plan â†'
+                    </button>
                   </div>
                 )
               }

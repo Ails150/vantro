@@ -17,6 +17,30 @@ export async function POST(request: Request) {
 
   const service = await createServiceClient()
 
+  // audit_log_v1: idempotency + audit log via billing_events table.
+  // Unique constraint on stripe_event_id prevents double-processing on Stripe retries.
+  // If this insert fails because event was already logged, return 200 immediately.
+  try {
+    const obj: any = event.data.object
+    const companyId =
+      obj?.metadata?.company_id ||
+      (obj?.customer ? (await service.from('companies').select('id').eq('stripe_customer_id', obj.customer).maybeSingle()).data?.id : null) ||
+      null
+    const { error: auditError } = await service.from('billing_events').insert({
+      stripe_event_id: event.id,
+      event_type: event.type,
+      company_id: companyId,
+      data: event.data.object as any,
+    })
+    if (auditError && auditError.code === '23505') {
+      // Duplicate key violation = event already processed. Stripe is retrying. Return 200.
+      return NextResponse.json({ received: true, duplicate: true })
+    }
+  } catch (err) {
+    // If billing_events table doesn't exist yet, log and continue (don't break webhook).
+    console.error('billing_events audit log error:', err)
+  }
+
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session
     const companyId = session.metadata?.company_id

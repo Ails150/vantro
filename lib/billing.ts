@@ -4,19 +4,19 @@
 export const TIERS = {
   starter: {
     name: 'Starter',
-    price: 199,
+    price: 299, // price_polish_v1
     installerLimit: 40,
     priceId: process.env.STRIPE_PRICE_STARTER!,
   },
   growth: {
     name: 'Growth',
-    price: 299,
+    price: 399,
     installerLimit: 70,
     priceId: process.env.STRIPE_PRICE_GROWTH!,
   },
   scale: {
     name: 'Scale',
-    price: 449,
+    price: 499,
     installerLimit: 100,
     priceId: process.env.STRIPE_PRICE_SCALE!,
   },
