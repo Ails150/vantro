@@ -385,6 +385,28 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   async function addMember() {
     if (!memberName.trim() || !memberEmail.trim()) { setFormError("Enter name and email"); return }
     setSaving(true); setFormError("")
+    // installer_limit_enforced_v1
+    try {
+      const { data: companyRow } = await supabase
+        .from("companies")
+        .select("installer_limit")
+        .eq("id", userData.company_id)
+        .single()
+      const limit = companyRow?.installer_limit
+      if (limit) {
+        const { count: activeCount } = await supabase
+          .from("users")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", userData.company_id)
+          .in("role", ["installer", "foreman"])
+          .eq("is_active", true)
+        if (activeCount !== null && activeCount >= limit) {
+          setFormError(`You've reached your plan limit of ${limit} installers. Upgrade your plan to add more, or remove an existing user first.`)
+          setSaving(false)
+          return
+        }
+      }
+    } catch {}
     const initials = memberName.trim().split(" ").map((n: any) => n[0]).join("").toUpperCase().slice(0, 2)
     const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: memberRole, is_active: true })
     if (error) { setFormError(error.message); setSaving(false); return }
@@ -856,6 +878,21 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
         {activeTab === "team" && (
           <div className="space-y-5">
+            {/* installer_limit_enforced_v1 banner */}
+            {/* banner_data_source_fix_v1: read from company prop, not userData.companies */}
+            {(() => {
+              const limit = (company as any)?.installer_limit
+              const active = teamMembers.filter((m: any) => ["installer","foreman"].includes(m.role) && m.is_active !== false).length
+              if (limit && active > limit) {
+                const over = active - limit
+                return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
+                    <strong>You're {over} over your plan limit of {limit} installers.</strong> Existing users will keep working. To add more, upgrade your plan or remove a user.
+                  </div>
+                )
+              }
+              return null
+            })()}
             {/* csv_import_v1 */}
             <div className="flex justify-end gap-2">
               <button onClick={() => setShowCsvImport(true)} className={btnGhost}>Import CSV</button>
