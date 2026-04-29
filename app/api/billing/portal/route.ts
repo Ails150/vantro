@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 
@@ -50,7 +50,7 @@ export async function POST() {
   try {
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customerId!,
-      return_url: `${appUrl}/admin?tab=settings`,
+      return_url: `${appUrl}/admin/settings`,
     })
     return NextResponse.json({ url: portalSession.url })
   } catch (err: any) {
