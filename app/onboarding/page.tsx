@@ -1,12 +1,12 @@
-'use client'
+﻿'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 type Step = 'team' | 'done'
 
-export default function OnboardingPage() {
+function OnboardingInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>('team')
@@ -30,12 +30,12 @@ export default function OnboardingPage() {
         .maybeSingle()
 
       if (!data?.company_id) {
-        // No company yet — webhook hasn't fired. Bounce to success page to wait.
+        // No company yet â€” webhook hasn't fired. Bounce to success page to wait.
         router.push('/signup/success')
         return
       }
 
-      // Check if they've already added installers — if so, send to dashboard
+      // Check if they've already added installers â€” if so, send to dashboard
       const { count } = await supabase
         .from('users')
         .select('id', { count: 'exact', head: true })
@@ -145,7 +145,7 @@ export default function OnboardingPage() {
                 disabled={loading}
                 className="block mt-3 text-sm text-[#4d6478] hover:text-[#8fa3b8] disabled:opacity-40"
               >
-                Skip for now → I'll add my team later
+                Skip for now â†’ I'll add my team later
               </button>
 
               {error && <p className="text-red-400 text-sm bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3 mt-4">{error}</p>}
@@ -155,7 +155,7 @@ export default function OnboardingPage() {
                 disabled={loading}
                 className="mt-6 w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-40 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors"
               >
-                {loading ? 'Saving…' : 'Continue'}
+                {loading ? 'Savingâ€¦' : 'Continue'}
               </button>
             </div>
           )}
@@ -177,3 +177,13 @@ export default function OnboardingPage() {
     </div>
   )
 }
+
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0f1923] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#00d4a0] border-t-transparent rounded-full animate-spin"/></div>}>
+      <OnboardingInner />
+    </Suspense>
+  )
+}
+

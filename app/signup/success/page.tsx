@@ -1,10 +1,10 @@
-'use client'
+﻿'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-export default function SignupSuccessPage() {
+function SuccessInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('session_id')
@@ -14,7 +14,7 @@ export default function SignupSuccessPage() {
   useEffect(() => {
     let cancelled = false
     const supabase = createClient()
-    const MAX_ATTEMPTS = 30 // 30 attempts × 1s = 30 seconds max wait
+    const MAX_ATTEMPTS = 30 // 30 attempts Ã— 1s = 30 seconds max wait
 
     async function poll() {
       let i = 0
@@ -25,13 +25,13 @@ export default function SignupSuccessPage() {
           // Check if user is signed in (the webhook should also have provisioned them)
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) {
-            // Not signed in yet — try to sign them in via the session
-            // Webhook may still be processing — wait
+            // Not signed in yet â€” try to sign them in via the session
+            // Webhook may still be processing â€” wait
             await new Promise(r => setTimeout(r, 1000))
             continue
           }
 
-          // User exists — check for company
+          // User exists â€” check for company
           const { data } = await supabase
             .from('users')
             .select('company_id')
@@ -40,7 +40,7 @@ export default function SignupSuccessPage() {
 
           if (data?.company_id) {
             setStatus('ready')
-            // Onboarding now skips company step — go straight to team
+            // Onboarding now skips company step â€” go straight to team
             setTimeout(() => router.push('/onboarding?step=team'), 800)
             return
           }
@@ -80,7 +80,7 @@ export default function SignupSuccessPage() {
           {status === 'waiting' && (
             <>
               <div className="w-12 h-12 mx-auto mb-5 border-2 border-[#00d4a0] border-t-transparent rounded-full animate-spin"/>
-              <h1 className="text-xl font-semibold text-white mb-2">Setting up your account…</h1>
+              <h1 className="text-xl font-semibold text-white mb-2">Setting up your accountâ€¦</h1>
               <p className="text-[#4d6478] text-sm">Payment confirmed. Provisioning your dashboard.</p>
               {attempts > 10 && (
                 <p className="text-[#4d6478] text-xs mt-4">
@@ -98,7 +98,7 @@ export default function SignupSuccessPage() {
                 </svg>
               </div>
               <h1 className="text-xl font-semibold text-white mb-2">All set!</h1>
-              <p className="text-[#4d6478] text-sm">Taking you to set up your team…</p>
+              <p className="text-[#4d6478] text-sm">Taking you to set up your teamâ€¦</p>
             </>
           )}
 
@@ -135,3 +135,13 @@ export default function SignupSuccessPage() {
     </div>
   )
 }
+
+
+export default function SignupSuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0f1923] flex items-center justify-center"><div className="w-8 h-8 border-2 border-[#00d4a0] border-t-transparent rounded-full animate-spin"/></div>}>
+      <SuccessInner />
+    </Suspense>
+  )
+}
+
