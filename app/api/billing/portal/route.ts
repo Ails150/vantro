@@ -1,12 +1,9 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
-// POST /api/billing/portal
-// Generates a Stripe Customer Portal session for the logged-in admin's company.
-// Returns { url } to redirect to.
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -31,7 +28,6 @@ export async function POST() {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.getvantro.com'
 
-  // If no Stripe customer yet (still on trial, never paid), create one
   let customerId = company.stripe_customer_id
   if (!customerId) {
     const customer = await stripe.customers.create({
