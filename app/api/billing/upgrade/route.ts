@@ -55,8 +55,9 @@ export async function POST(request: Request) {
     installer_limit: newTier.installerLimit,
   }).eq('id', company.id)
 
-  const session = await stripe.checkout.sessions.create({
-    customer: company.stripe_customer_id || undefined,
+  // checkout_email_fix_v1: Stripe needs customer or customer_email when creating
+  // a Checkout session. If no stripe_customer_id yet, fall back to the auth user email.
+  const checkoutPayload: any = {
     mode: 'subscription',
     payment_method_types: ['card'],
     line_items: [{ price: newTier.priceId, quantity: 1 }],
@@ -66,7 +67,23 @@ export async function POST(request: Request) {
     success_url: `${appUrl}/admin?billing=upgraded`,
     cancel_url: `${appUrl}/admin?billing=cancelled`,
     metadata: { company_id: company.id }
-  })
+  }
+  if (company.stripe_customer_id) {
+    checkoutPayload.customer = company.stripe_customer_id
+  } else if (user.email) {
+    checkoutPayload.customer_email = user.email
+  } else {
+    return NextResponse.json({ error: 'Cannot create checkout: no customer email available' }, { status: 400 })
+  }
 
-  return NextResponse.json({ url: session.url })
+  try {
+    const session = await stripe.checkout.sessions.create(checkoutPayload)
+    return NextResponse.json({ url: session.url })
+  } catch (err: any) {
+    console.error('Stripe Checkout creation failed:', err?.message || err)
+    return NextResponse.json(
+      { error: 'Could not create checkout session', detail: err?.message || String(err) },
+      { status: 500 }
+    )
+  }
 }
