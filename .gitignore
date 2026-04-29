@@ -57,3 +57,8 @@ aggressive_*.py
 clean_dashboard.tsx
 load_test.js
 *_backup.tsx
+
+*.bak
+*-patch.ps1
+*-paste.ps1
+apply-*.ps1
