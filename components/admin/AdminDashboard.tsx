@@ -13,14 +13,15 @@ import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import PaywallOverlay from '@/components/billing/PaywallOverlay' // paywall_wired_v2
 
 interface Props {
   user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
   pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
-  checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string
+  checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string; trialExpiredAndUnpaid?: boolean
 }
 
-export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab }: Props) {
+export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid }: Props) {
   const [activeTab, setActiveTab] = useState(() => {
     try { return localStorage.getItem("vantro_tab") || defaultTab } catch { return defaultTab }
   })
@@ -573,6 +574,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
+        <PaywallOverlay show={!!trialExpiredAndUnpaid} companyName={company?.name} currentPlan={company?.current_plan} />
       <div className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-teal-400 flex items-center justify-center flex-shrink-0">
