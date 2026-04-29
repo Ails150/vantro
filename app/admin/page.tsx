@@ -23,13 +23,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const companyId = userData.company_id
   const { data: company } = await supabase.from('companies').select('*').eq('id', companyId).single()
   // Trial/subscription check
+  // paywall_overlay_v1
+  let trialExpiredAndUnpaid = false
   if (company) {
     const now = new Date()
     const trialEnds = company.trial_ends_at ? new Date(company.trial_ends_at) : null
     const status = company.subscription_status
     const trialExpired = trialEnds && now > trialEnds
     const notActive = !status || status === 'trial' || status === 'cancelled' || status === 'past_due'
-    if (trialExpired && notActive) redirect('/billing')
+    trialExpiredAndUnpaid = !!(trialExpired && notActive)
   }
 
   const { data: jobs } = await supabase.from('jobs').select('*, job_checklists(template_id)').eq('company_id', companyId).order('created_at', { ascending: false })
@@ -48,6 +50,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       user={user}
       userData={userData}
       company={company}
+      trialExpiredAndUnpaid={trialExpiredAndUnpaid}
       jobs={jobs || []}
       signins={signins || []}
       alerts={alerts || []} resolvedAlerts={resolvedAlerts || []}

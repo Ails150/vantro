@@ -7,6 +7,10 @@
     {
       "path": "/api/cleanup",
       "schedule": "0 3 * * 0"
+    },
+    {
+      "path": "/api/cron/trial-conversion",
+      "schedule": "30 23 * * *"
     }
   ],
   "headers": [
@@ -41,4 +45,3 @@
     }
   ]
 }
-
