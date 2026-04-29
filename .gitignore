@@ -62,3 +62,11 @@ load_test.js
 *-patch.ps1
 *-paste.ps1
 apply-*.ps1
+
+# Backup and patch artifacts
+*.bak
+*.bak-*
+*-internal.ps1
+vantro-*.ps1
+apply-*.ps1
+
