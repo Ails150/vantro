@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 
@@ -29,7 +29,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'No active subscription' }, { status: 400 })
   }
 
-  // Determine action — cancel or undo cancel
   let action: 'cancel' | 'undo' = 'cancel'
   try {
     const body = await request.json()
@@ -37,10 +36,9 @@ export async function POST(request: Request) {
   } catch {}
 
   try {
-    const sub = await stripe.subscriptions.update(company.stripe_subscription_id, {
+    const sub: any = await stripe.subscriptions.update(company.stripe_subscription_id, {
       cancel_at_period_end: action === 'cancel',
     })
-
     return NextResponse.json({
       success: true,
       cancel_at_period_end: sub.cancel_at_period_end,
