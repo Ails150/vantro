@@ -31,7 +31,10 @@ export async function POST(request: Request) {
       .select()
       .single()
 
-    if (compError) return NextResponse.json({ error: compError.message }, { status: 400 })
+    if (compError) {
+      console.error('[onboarding/company] insert failed:', compError)
+      return NextResponse.json({ error: 'Could not create company', detail: compError.message }, { status: 400 })
+    }
 
     const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Admin'
     const initials = fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
@@ -45,7 +48,10 @@ export async function POST(request: Request) {
       auth_user_id: user.id
     })
 
-    if (userError) return NextResponse.json({ error: userError.message }, { status: 400 })
+    if (userError) {
+      console.error('[onboarding/company] user insert failed:', userError)
+      return NextResponse.json({ error: 'Could not create admin user', detail: userError.message }, { status: 400 })
+    }
     return NextResponse.json({ success: true, companyId: company.id })
   }
 
@@ -55,11 +61,18 @@ export async function POST(request: Request) {
     if (!userData) {
       const companyName = user.user_metadata?.company_name || 'My Company'
       const slug = companyName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20) + '_' + Math.random().toString(36).slice(2, 6)
-      const { data: company } = await service.from('companies').insert({ name: companyName, slug }).select().single()
-      if (!company) return NextResponse.json({ error: 'Could not create company' }, { status: 400 })
+      const { data: company, error: compError } = await service.from('companies').insert({ name: companyName, slug }).select().single()
+      if (compError || !company) {
+        console.error('[onboarding/installers] company insert failed:', compError)
+        return NextResponse.json({ error: 'Could not create company', detail: compError?.message || 'no company returned' }, { status: 400 })
+      }
       const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Admin'
       const initials = fullName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
-      await service.from('users').insert({ company_id: company.id, email: user.email, name: fullName, initials, role: 'admin', auth_user_id: user.id })
+      const { error: adminErr } = await service.from('users').insert({ company_id: company.id, email: user.email, name: fullName, initials, role: 'admin', auth_user_id: user.id })
+      if (adminErr) {
+        console.error('[onboarding/installers] admin insert failed:', adminErr)
+        return NextResponse.json({ error: 'Could not create admin user', detail: adminErr.message }, { status: 400 })
+      }
       const { data: newUser } = await service.from('users').select('company_id').eq('auth_user_id', user.id).single()
       userData = newUser
     }
@@ -78,7 +91,10 @@ export async function POST(request: Request) {
     }))
 
     const { error } = await service.from('users').insert(insertData)
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (error) {
+      console.error('[onboarding/installers] installers insert failed:', error)
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
     return NextResponse.json({ success: true })
   }
 
@@ -90,12 +106,16 @@ export async function POST(request: Request) {
     if (jobs && jobs.length > 0) {
       const valid = jobs.filter((j: any) => j.name && j.address)
       if (valid.length > 0) {
-        await service.from('jobs').insert(valid.map((job: any) => ({
+        const { error: jobsErr } = await service.from('jobs').insert(valid.map((job: any) => ({
           company_id: userData.company_id,
           name: job.name,
           address: job.address,
           status: 'active',
         })))
+        if (jobsErr) {
+          console.error('[onboarding/jobs] insert failed:', jobsErr)
+          return NextResponse.json({ error: jobsErr.message }, { status: 400 })
+        }
       }
     }
     return NextResponse.json({ success: true })
