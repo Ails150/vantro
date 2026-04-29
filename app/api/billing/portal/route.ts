@@ -4,6 +4,11 @@ import Stripe from 'stripe'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
 
+const isValidStripeCustomerId = (id: string | null | undefined): boolean => {
+  if (!id) return false
+  return /^cus_[A-Za-z0-9]{14,}$/.test(id) && !id.includes('TBD')
+}
+
 export async function POST() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -29,7 +34,7 @@ export async function POST() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.getvantro.com'
 
   let customerId = company.stripe_customer_id
-  if (!customerId) {
+  if (!isValidStripeCustomerId(customerId)) {
     const customer = await stripe.customers.create({
       email: user.email,
       name: company.name,
@@ -44,8 +49,8 @@ export async function POST() {
 
   try {
     const portalSession = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${appUrl}/admin?tab=team`,
+      customer: customerId!,
+      return_url: `${appUrl}/admin?tab=settings`,
     })
     return NextResponse.json({ url: portalSession.url })
   } catch (err: any) {
