@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // Payroll CSV export with row locking.
-//   GET  /api/payroll/export?from=ISO&to=ISO&preview=true   → preview totals (no lock)
-//   POST /api/payroll/export  body: { from, to }            → finalise + return CSV (locks rows)
+//   GET  /api/payroll/export?from=ISO&to=ISO&preview=true   â†’ preview totals (no lock)
+//   POST /api/payroll/export  body: { from, to }            â†’ finalise + return CSV (locks rows)
 //
 // On finalise:
 //   - Each signin in the range gets payroll_exported_at = now() and payroll_export_id = <new id>
@@ -61,7 +61,7 @@ function calculateHours(signin: any): number {
   return 0
 }
 
-// ─── GET: preview totals (no lock) ──────────────────────────────
+// â”€â”€â”€ GET: preview totals (no lock) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -121,7 +121,7 @@ export async function GET(request: Request) {
   })
 }
 
-// ─── POST: finalise + return CSV ──────────────────────────────
+// â”€â”€â”€ POST: finalise + return CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -150,7 +150,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No new signins in this range to export" }, { status: 400 })
   }
 
-  const totalHours = signins.reduce((acc, s) => acc + calculateHours(s), 0)
+  const totalHours = signins.reduce((acc: number, s: any) => acc + calculateHours(s), 0)
 
   // Create payroll_exports audit row
   const { data: exportRow, error: exportErr } = await service
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not create export record", detail: exportErr?.message }, { status: 500 })
   }
 
-  // LOCK signins — set payroll_exported_at and payroll_export_id
+  // LOCK signins â€” set payroll_exported_at and payroll_export_id
   const signinIds = signins.map((s: any) => s.id)
   const { error: lockErr } = await service
     .from("signins")
@@ -230,3 +230,4 @@ export async function POST(request: Request) {
     },
   })
 }
+
