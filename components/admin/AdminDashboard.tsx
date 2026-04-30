@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation"
 import PaywallOverlay from '@/components/billing/PaywallOverlay' // paywall_wired_v2
 import SitesTab from "./SitesTab"
 import TradesTab from "./TradesTab"
+import TradeMultiSelect from "./TradeMultiSelect"
 import CsvImportModal from "./CsvImportModal"
 import PayrollExportModal from "./PayrollExportModal"
 import SettingsMenu from "./SettingsMenu"
@@ -117,6 +118,28 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [itemPhoto, setItemPhoto] = useState(false)
   const [itemVideo, setItemVideo] = useState(false)
   const [itemFailNote, setItemFailNote] = useState(false)
+  // ---- multi-trade v1 state (added by patch_trades_1_foundation) ----
+  // trades_foundation_patched
+  const [multiTradeEnabled, setMultiTradeEnabled] = useState(false)
+  const [companyTrades, setCompanyTrades] = useState<Array<{ trade_key: string; label: string; enabled: boolean }>>([])
+  const [jobRequiredTrades, setJobRequiredTrades] = useState<string[]>([])
+  const [editJobRequiredTrades, setEditJobRequiredTrades] = useState<string[]>([])
+  const [memberTrades, setMemberTrades] = useState<string[]>([])
+  const [itemTrade, setItemTrade] = useState<string>("")
+
+  // Fetch multi-trade state once on mount
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/trades", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return
+        setMultiTradeEnabled(!!data.multi_trade_enabled)
+        setCompanyTrades(Array.isArray(data.trades) ? data.trades : [])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
   const [saving, setSaving] = useState(false)
   const [resolvingAlert, setResolvingAlert] = useState<string|null>(null)
   const [alertFilter, setAlertFilter] = useState<'all'|'blocker'|'issue'|'24h'>('all')
