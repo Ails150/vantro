@@ -485,7 +485,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       }
     } catch {}
     const initials = memberName.trim().split(" ").map((n: any) => n[0]).join("").toUpperCase().slice(0, 2)
-    const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: memberRole, is_active: true })
+    const { error } = await supabase.from("users").insert({ company_id: userData.company_id, name: memberName.trim(), email: memberEmail.trim(), initials, role: memberRole, is_active: true, trades: multiTradeEnabled ? memberTrades : null })
     if (error) { setFormError(error.message); setSaving(false); return }
     try {
       const res = await fetch("/api/invite", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: memberEmail.trim(), name: memberName.trim(), role: memberRole }) })
@@ -501,7 +501,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         return
       }
     } catch(e) { setFormError("Something went wrong. Please try again."); setSaving(false); return }
-    setMemberName(""); setMemberEmail(""); setMemberRole("installer"); setShowAddMember(false); setSaving(false)
+    setMemberName(""); setMemberEmail(""); setMemberRole("installer"); setShowAddMember(false); setSaving(false); setMemberTrades([])
     router.refresh()
   }
 
@@ -1160,6 +1160,18 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <option value="foreman">Foreman - PIN app + alert emails</option>
                   </select>
                 </div>
+                {/* trades_team_patched */}
+                {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
+                  <div>
+                    <TradeMultiSelect
+                      trades={companyTrades.filter(t => t.enabled)}
+                      selected={memberTrades}
+                      onChange={setMemberTrades}
+                      label="Trades this person is qualified for"
+                      helperText="They will see a warning if assigned to a job that needs trades they don't have."
+                    />
+                  </div>
+                )}
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
                   <button onClick={addMember} disabled={saving} className={btn}>{saving ? "Saving..." : "Save and send invite"}</button>
