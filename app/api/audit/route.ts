@@ -19,13 +19,6 @@ function staticMapUrl(lat: number | null | undefined, lng: number | null | undef
   )
 }
 
-/**
- * Convert a stored value into a signed URL.
- * Accepts either:
- *  - a storage path (e.g. "company-id/job-id/item/123.jpg")
- *  - a public/legacy URL containing "/vantro-media/" — we extract the path after that
- * Returns null on failure.
- */
 async function signOne(service: any, value: string | null | undefined): Promise<string | null> {
   if (!value) return null
   let path = value
@@ -67,7 +60,6 @@ export async function GET(request: Request) {
 
   const service = await createServiceClient()
 
-  // Resolve company_id via auth_user_id lookup
   const { data: appUser, error: userErr } = await service
     .from("users")
     .select("id, company_id, role")
@@ -85,7 +77,7 @@ export async function GET(request: Request) {
   const to = searchParams.get("to")
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
 
-  // 3. Job (with required_trades) — must belong to caller's company
+  // 3. Job
   const { data: job, error: jobErr } = await service
     .from("jobs")
     .select("id, name, address, lat, lng, company_id, required_trades")
@@ -106,97 +98,110 @@ export async function GET(request: Request) {
 
   let companyTrades: AnyRow[] = []
   if (multi_trade_enabled) {
-    const { data: trades } = await service
+    const { data: trades, error: tradesErr } = await service
       .from("company_trades")
       .select("id, name, slug")
       .eq("company_id", companyId)
       .order("name", { ascending: true })
+    if (tradesErr) console.error("[audit] companyTrades error:", tradesErr.message)
     companyTrades = trades || []
   }
 
-  // 5. Sign-ins (with user trades + map URLs in/out)
+  // 5. Sign-ins — column names corrected to match schema
   let signinsQuery = service
     .from("signins")
     .select(
-      "id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_metres, sign_out_distance_metres, users(id, name, trades)"
+      "id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_from_site_metres, sign_out_distance_metres, within_range, sign_out_within_range, hours_worked, flagged, flag_reason, departed_early, early_departure_minutes, auto_closed, auto_closed_reason, users(id, name, trades)"
     )
     .eq("job_id", jobId)
     .order("signed_in_at", { ascending: true })
   if (from) signinsQuery = signinsQuery.gte("signed_in_at", from)
   if (to) signinsQuery = signinsQuery.lte("signed_in_at", to + "T23:59:59Z")
-  const { data: signinsRaw } = await signinsQuery
+  const { data: signinsRaw, error: signinsErr } = await signinsQuery
+  if (signinsErr) console.error("[audit] signins error:", signinsErr.message)
 
   const signins = (signinsRaw || []).map((s: AnyRow) => ({
     ...s,
+    // legacy alias for AuditTab compatibility
+    distance_metres: s.distance_from_site_metres,
     map_in_url: staticMapUrl(s.lat, s.lng),
     map_out_url: staticMapUrl(s.sign_out_lat, s.sign_out_lng),
   }))
 
-  // 6. QA submissions (+ checklist_item.trade, signed photos, video summary)
+  // 6. QA submissions — corrected: state (not result), notes (not note), no photo_urls array
   let qaQuery = service
     .from("qa_submissions")
     .select(
-      "id, submitted_at, result, note, photo_url, photo_urls, video_url, video_ai_summary, users(id, name), checklist_items(id, label, trade)"
+      "id, submitted_at, created_at, state, value, notes, rejection_note, photo_url, video_url, video_ai_summary, video_ai_summary_at, users(id, name), checklist_items(id, label, trade)"
     )
     .eq("job_id", jobId)
     .order("submitted_at", { ascending: true })
   if (from) qaQuery = qaQuery.gte("submitted_at", from)
   if (to) qaQuery = qaQuery.lte("submitted_at", to + "T23:59:59Z")
-  const { data: qaRaw } = await qaQuery
+  const { data: qaRaw, error: qaErr } = await qaQuery
+  if (qaErr) console.error("[audit] qa error:", qaErr.message)
 
   const qa: AnyRow[] = []
   for (const q of qaRaw || []) {
     qa.push({
       ...q,
+      // legacy aliases for AuditTab compatibility
+      result: q.state,
+      note: q.notes,
       photo_url: await signOne(service, q.photo_url),
-      photo_urls: await signMany(service, q.photo_urls),
+      photo_urls: q.photo_url ? [await signOne(service, q.photo_url)].filter(Boolean) : [],
       video_url: await signOne(service, q.video_url),
     })
   }
 
-  // 7. Diary entries (+ signed photos, video summary)
+  // 7. Diary — corrected: entry_text (not note), no severity column (use ai_alert_type as severity proxy)
   let diaryQuery = service
     .from("diary_entries")
     .select(
-      "id, created_at, severity, note, ai_summary, photo_urls, video_url, video_ai_summary, users(id, name)"
+      "id, created_at, entry_text, ai_alert_type, ai_summary, photo_urls, video_url, video_ai_summary, video_ai_summary_at, replied_at, replied_by, reply, users(id, name)"
     )
     .eq("job_id", jobId)
     .order("created_at", { ascending: true })
   if (from) diaryQuery = diaryQuery.gte("created_at", from)
   if (to) diaryQuery = diaryQuery.lte("created_at", to + "T23:59:59Z")
-  const { data: diaryRaw } = await diaryQuery
+  const { data: diaryRaw, error: diaryErr } = await diaryQuery
+  if (diaryErr) console.error("[audit] diary error:", diaryErr.message)
 
   const diary: AnyRow[] = []
   for (const d of diaryRaw || []) {
     diary.push({
       ...d,
+      // legacy aliases for AuditTab compatibility
+      note: d.entry_text,
+      severity: d.ai_alert_type,
       photo_urls: await signMany(service, d.photo_urls),
       video_url: await signOne(service, d.video_url),
     })
   }
 
-  // 8. Defects (NEW — was missing entirely)
+  // 8. Defects — corrected: description (not note), no photo_urls array, no users() join (defects table has user_id but check if FK exists)
   let defectsQuery = service
     .from("defects")
     .select(
-      "id, created_at, status, severity, note, photo_url, photo_urls, users(id, name)"
+      "id, created_at, status, severity, description, photo_url, resolution_note, resolved_at, resolved_by, user_id, users(id, name)"
     )
     .eq("job_id", jobId)
     .order("created_at", { ascending: true })
   if (from) defectsQuery = defectsQuery.gte("created_at", from)
   if (to) defectsQuery = defectsQuery.lte("created_at", to + "T23:59:59Z")
-  const { data: defectsRaw } = await defectsQuery
+  const { data: defectsRaw, error: defectsErr } = await defectsQuery
+  if (defectsErr) console.error("[audit] defects error:", defectsErr.message)
 
   const defects: AnyRow[] = []
   for (const d of defectsRaw || []) {
     defects.push({
       ...d,
+      note: d.description,
       photo_url: await signOne(service, d.photo_url),
-      photo_urls: await signMany(service, d.photo_urls),
+      photo_urls: d.photo_url ? [await signOne(service, d.photo_url)].filter(Boolean) : [],
     })
   }
 
-  // 9. Response
   return NextResponse.json({
     job,
     period: { from, to },
