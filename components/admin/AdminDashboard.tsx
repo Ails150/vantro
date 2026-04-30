@@ -308,11 +308,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
     if (!jobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
-    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime }).select("id").single()
+    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime, required_trades: multiTradeEnabled ? jobRequiredTrades : null }).select("id").single()
     if (error) { setFormError(error.message); setSaving(false); return }
     if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
     if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
-    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00")
+    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00"); setJobRequiredTrades([])
     router.refresh()
   }
 
@@ -321,7 +321,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!editJobPlaceSelected && !editJobLat) { setFormError("Select an address from the dropdown - do not just type it"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, required_trades: multiTradeEnabled ? editJobRequiredTrades : null }).eq("id", jobId)
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
@@ -330,7 +330,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (editJobTemplateIds.length > 0) {
       await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid })))
     }
-    setEditingJobId(null); setSaving(false)
+    setEditingJobId(null); setSaving(false); setEditJobRequiredTrades([])
     window.location.reload()
   }
 
@@ -888,6 +888,18 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     </div>
                   )}
                 </div>
+                {/* trades_jobs_patched: add-job */}
+                {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
+                  <div className="pt-2">
+                    <TradeMultiSelect
+                      trades={companyTrades.filter(t => t.enabled)}
+                      selected={jobRequiredTrades}
+                      onChange={setJobRequiredTrades}
+                      label="Trades required for this job"
+                      helperText="Installers without these trades will see a warning when working on this job."
+                    />
+                  </div>
+                )}
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
                   <button onClick={addJob} disabled={saving} className={btn}>{saving ? "Saving..." : "Save job"}</button>
@@ -923,7 +935,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobPlaceSelected(true); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobPlaceSelected(true); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -950,6 +962,17 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             <label className="block text-sm font-medium text-gray-600 mb-1">Sign-out time</label>
                             <input type="time" value={editJobSignOutTime} onChange={e => setEditJobSignOutTime(e.target.value)} className={inp}/>
                           </div>
+                          {/* trades_jobs_patched: edit-job */}
+                          {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
+                            <div>
+                              <TradeMultiSelect
+                                trades={companyTrades.filter(t => t.enabled)}
+                                selected={editJobRequiredTrades}
+                                onChange={setEditJobRequiredTrades}
+                                label="Trades required"
+                              />
+                            </div>
+                          )}
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Checklists</label>
                             <div className="space-y-2 mt-1">
