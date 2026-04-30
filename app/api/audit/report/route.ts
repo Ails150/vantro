@@ -58,6 +58,27 @@ function escapeHtml(s: any): string {
 }
 
 /**
+ * Render an inline HTML5 video player + "Open full size" link.
+ * Used in diary cards and QA cards as evidence playback.
+ * Returns empty string if no URL provided.
+ */
+function renderVideoBlock(videoUrl: string | null | undefined, label: string = "Video evidence"): string {
+  if (!videoUrl) return ""
+  const safe = escapeHtml(videoUrl)
+  return `
+    <div class="video-block">
+      <video class="video-player" controls preload="metadata" playsinline>
+        <source src="${safe}">
+        Your browser does not support inline video playback.
+      </video>
+      <div class="video-caption">
+        <span class="video-label">${escapeHtml(label)}</span>
+        <a href="${safe}" target="_blank" rel="noopener" class="video-link">Open full size &rarr;</a>
+      </div>
+    </div>`
+}
+
+/**
  * Aggressively hide test/dev diary entries from the audit report.
  * Returns true if entry should be SHOWN, false to hide.
  *
@@ -397,6 +418,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
         ${q.notes ? `<div class="card-body">${escapeHtml(q.notes)}</div>` : ""}
         ${q.rejection_note ? `<div class="card-body bad-note">Rejection: ${escapeHtml(q.rejection_note)}</div>` : ""}
         ${q.photo_url ? `<img class="evidence" src="${escapeHtml(q.photo_url)}" alt="QA photo">` : ""}
+        ${renderVideoBlock(q.video_url, "QA video")}
         ${q.video_ai_summary ? `<div class="ai-box"><div class="ai-label">AI video summary</div>${escapeHtml(q.video_ai_summary)}</div>` : ""}
       </div>`
   }).join("") || `<p class="empty">No quality checks recorded in this period.</p>`
@@ -420,6 +442,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
         </div>
         ${d.entry_text ? `<div class="card-body">${escapeHtml(d.entry_text)}</div>` : ""}
         ${d.ai_summary ? `<div class="ai-box"><div class="ai-label">AI summary</div>${escapeHtml(d.ai_summary)}</div>` : ""}
+        ${renderVideoBlock(d.video_url, "Site video")}
         ${d.video_ai_summary ? `<div class="ai-box"><div class="ai-label">AI video summary</div>${escapeHtml(d.video_ai_summary)}</div>` : ""}
         ${photos ? `<div class="thumbs">${photos}</div>` : ""}
         ${d.reply ? `<div class="reply"><strong>Reply:</strong> ${escapeHtml(d.reply)}</div>` : ""}
@@ -546,6 +569,19 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
   .reply { margin-top: 8px; padding: 8px 12px; background: var(--soft); border-radius: 6px;
     font-size: 13px; color: var(--ink-2); }
   .empty { color: var(--muted); font-style: italic; padding: 16px 0; }
+  .video-block { margin: 8px 0; }
+  .video-player { width: 100%; max-width: 600px; max-height: 360px; border-radius: 6px;
+    background: #000; border: 1px solid var(--line); display: block; }
+  .video-caption { display: flex; justify-content: space-between; align-items: center;
+    margin-top: 4px; font-size: 11px; color: var(--muted); max-width: 600px; }
+  .video-label { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  .video-link { color: var(--teal); text-decoration: none; font-weight: 600; }
+  .video-link:hover { text-decoration: underline; }
+  @media print {
+    .video-block { page-break-inside: avoid; }
+    .video-player { display: none; }
+    .video-caption::before { content: "[Video available — see digital report] "; color: var(--muted); }
+  }
   .day-group { margin: 24px 0; }
   .day-group:first-child { margin-top: 8px; }
   .day-header { display: flex; align-items: baseline; justify-content: space-between;
