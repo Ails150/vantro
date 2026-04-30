@@ -26,6 +26,22 @@ export async function POST(request: Request) {
     const { entryText, workStatus, jobId, lat, lng, photoUrls, videoUrl } = await request.json()
     if (!entryText?.trim() && (!photoUrls || photoUrls.length === 0) && !videoUrl) return NextResponse.json({ error: "Entry requires text, photo, or video" }, { status: 400 })
 
+    // Guard: reject entries that claim to be video uploads but have no video URL.
+    // This catches buggy clients that insert a row before the Cloudflare upload finishes.
+    // Avoids "Video entry" rows with video_url = NULL polluting the audit pack.
+    const trimmedText = (entryText || "").trim().toLowerCase()
+    const claimsVideo =
+      trimmedText === "video entry" ||
+      trimmedText.startsWith("\ud83c\udfa5") ||  // 🎥 emoji
+      trimmedText.includes("video entry")
+    if (claimsVideo && !videoUrl) {
+      console.error("[diary] Rejected: claims video but videoUrl missing", { entryText, jobId })
+      return NextResponse.json(
+        { error: "Video upload did not complete. Please try again from the app." },
+        { status: 400 }
+      )
+    }
+
     const installer = verifyInstallerToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const payload = { userId: installer.userId, companyId: installer.companyId }
