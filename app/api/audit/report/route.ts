@@ -751,21 +751,48 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
 // ---------------- Route ----------------
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
   const service = await createServiceClient()
-  const { data: appUser } = await service.from("users").select("id, company_id").eq("auth_user_id", user.id).single()
-  if (!appUser) return NextResponse.json({ error: "User not found" }, { status: 403 })
-
   const { searchParams } = new URL(request.url)
-  const jobId = searchParams.get("jobId")
-  const from = searchParams.get("from")
-  const to = searchParams.get("to")
+  const shareToken = searchParams.get("shareToken")
+
+  let companyId: string
+  let jobId = searchParams.get("jobId")
+  let from = searchParams.get("from")
+  let to = searchParams.get("to")
+
+  if (shareToken) {
+    // Public share access — resolve token to job + company + date range
+    const { data: share, error: shareErr } = await service
+      .from("audit_shares")
+      .select("id, job_id, company_id, date_from, date_to, expires_at, revoked")
+      .eq("token", shareToken)
+      .maybeSingle()
+    if (shareErr || !share) {
+      return new NextResponse("This audit link is invalid.", { status: 404, headers: { "Content-Type": "text/plain" } })
+    }
+    if (share.revoked) {
+      return new NextResponse("This audit link has been revoked.", { status: 410, headers: { "Content-Type": "text/plain" } })
+    }
+    if (share.expires_at && new Date(share.expires_at) < new Date()) {
+      return new NextResponse("This audit link has expired.", { status: 410, headers: { "Content-Type": "text/plain" } })
+    }
+    companyId = share.company_id
+    jobId = share.job_id
+    if (share.date_from) from = String(share.date_from).slice(0, 10)
+    if (share.date_to) to = String(share.date_to).slice(0, 10)
+  } else {
+    // Admin access — auth user, look up company
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const { data: appUser } = await service.from("users").select("id, company_id").eq("auth_user_id", user.id).single()
+    if (!appUser) return NextResponse.json({ error: "User not found" }, { status: 403 })
+    companyId = appUser.company_id
+  }
+
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
 
-  const data = await fetchAuditData(service, appUser.company_id, jobId, from, to)
+  const data = await fetchAuditData(service, companyId, jobId, from, to)
   if (!data) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
   const aiEnabled = !!data.company?.ai_audit_enabled
