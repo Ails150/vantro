@@ -57,6 +57,75 @@ function escapeHtml(s: any): string {
     .replace(/'/g, "&#39;")
 }
 
+/**
+ * Aggressively hide test/dev diary entries from the audit report.
+ * Returns true if entry should be SHOWN, false to hide.
+ *
+ * Always KEEP if:
+ *  - ai_alert_type is "blocker" or "issue" (signal entries)
+ *  - has a non-empty reply (someone engaged)
+ *
+ * Otherwise HIDE if:
+ *  - empty text + no photos + no video
+ *  - text under 10 chars + no photos + no video
+ *  - text matches known test patterns (test, tt, q1-q9, random, etc.)
+ */
+function isRealDiaryEntry(d: any): boolean {
+  // Always keep alert-tagged or replied entries — they have real value
+  if (d.ai_alert_type === "blocker" || d.ai_alert_type === "issue") return true
+  if (d.reply && String(d.reply).trim().length > 0) return true
+
+  const text = (d.entry_text || "").trim()
+  const hasPhotos = Array.isArray(d.photo_urls) && d.photo_urls.length > 0
+  const hasVideo = !!d.video_url
+
+  // No content at all -> hide
+  if (!text && !hasPhotos && !hasVideo) return false
+
+  // Test pattern matchers (case-insensitive, exact match after trim)
+  const testPatterns = [
+    /^test\d*$/i,
+    /^tt+$/i,
+    /^q\d+$/i,
+    /^btay$/i,
+    /^random$/i,
+    /^laptop$/i,
+    /^bigg+$/i,
+    /^tasd+$/i,
+    /^photo entry$/i,
+    /^video entry$/i,
+    /^test\s+\w{1,5}$/i,        // "test new", "test cars policy" etc.
+    /^test\s*\d+$/i,
+    /^\d+$/i,                     // pure numbers
+    /^[a-z]{1,3}$/i,               // 1-3 letter junk like "gh", "io"
+  ]
+  if (testPatterns.some((p) => p.test(text))) return false
+
+  // Short text + no media -> almost certainly test
+  if (text.length < 10 && !hasPhotos && !hasVideo) return false
+
+  return true
+}
+
+/**
+ * Group diary entries by calendar day (UK timezone).
+ * Returns array of { date, label, entries[] } sorted oldest first.
+ */
+function groupDiaryByDay(entries: any[]): Array<{ date: string; label: string; entries: any[] }> {
+  const groups: Record<string, { date: string; label: string; entries: any[] }> = {}
+  for (const d of entries) {
+    if (!d.created_at) continue
+    const dt = new Date(d.created_at)
+    const dateKey = dt.toISOString().slice(0, 10) // YYYY-MM-DD
+    const label = dt.toLocaleDateString("en-GB", {
+      weekday: "long", day: "2-digit", month: "long", year: "numeric"
+    })
+    if (!groups[dateKey]) groups[dateKey] = { date: dateKey, label, entries: [] }
+    groups[dateKey].entries.push(d)
+  }
+  return Object.values(groups).sort((a, b) => a.date.localeCompare(b.date))
+}
+
 function fmtDateTime(s: string | null | undefined): string {
   if (!s) return "—"
   try {
@@ -281,7 +350,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
     if (s.users?.name) installerSet.add(s.users.name)
     totalHours += Number(s.hours_worked) || 0
   }
-  const photoCount = diary.reduce((n: number, d: any) => n + (d.photo_urls?.length || 0), 0)
+  const photoCount = diary.filter(isRealDiaryEntry).reduce((n: number, d: any) => n + (d.photo_urls?.length || 0), 0)
     + qa.filter((q: any) => q.photo_url).length + defects.filter((d: any) => d.photo_url).length
   const qaPass = qa.filter((q: any) => q.state === "approved" || q.value === "pass").length
   const qaFail = qa.filter((q: any) => q.state === "rejected" || q.value === "fail").length
@@ -332,15 +401,20 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
       </div>`
   }).join("") || `<p class="empty">No quality checks recorded in this period.</p>`
 
-  const diaryCards = diary.map((d: any) => {
+  const diaryFiltered = diary.filter(isRealDiaryEntry)
+  const diaryGroups = groupDiaryByDay(diaryFiltered)
+  const renderDiaryCard = (d: any) => {
     const alertChip = d.ai_alert_type === "blocker" ? `<span class="chip chip-bad">Blocker</span>`
       : d.ai_alert_type === "issue" ? `<span class="chip chip-warn">Issue</span>` : ""
     const photos = (d.photo_urls || []).map((p: string) => `<img class="thumb" src="${escapeHtml(p)}" alt="">`).join("")
+    const time = d.created_at
+      ? new Date(d.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      : ""
     return `
       <div class="card ${d.ai_alert_type === "blocker" ? "card-bad" : d.ai_alert_type === "issue" ? "card-warn" : ""}">
         <div class="card-head">
           <div>
-            <div class="muted">${escapeHtml(d.users?.name || "Unknown")} · ${fmtDateTime(d.created_at)}</div>
+            <div class="card-meta"><strong>${escapeHtml(d.users?.name || "Unknown")}</strong> · ${escapeHtml(time)}</div>
           </div>
           ${alertChip}
         </div>
@@ -348,9 +422,20 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
         ${d.ai_summary ? `<div class="ai-box"><div class="ai-label">AI summary</div>${escapeHtml(d.ai_summary)}</div>` : ""}
         ${d.video_ai_summary ? `<div class="ai-box"><div class="ai-label">AI video summary</div>${escapeHtml(d.video_ai_summary)}</div>` : ""}
         ${photos ? `<div class="thumbs">${photos}</div>` : ""}
-        ${d.reply ? `<div class="reply">Reply: ${escapeHtml(d.reply)}</div>` : ""}
+        ${d.reply ? `<div class="reply"><strong>Reply:</strong> ${escapeHtml(d.reply)}</div>` : ""}
       </div>`
-  }).join("") || `<p class="empty">No diary entries in this period.</p>`
+  }
+  const diaryCards = diaryGroups.length === 0
+    ? `<p class="empty">No diary entries in this period.</p>`
+    : diaryGroups.map((g) => `
+        <div class="day-group">
+          <div class="day-header">
+            <span class="day-label">${escapeHtml(g.label)}</span>
+            <span class="day-count">${g.entries.length} entr${g.entries.length === 1 ? "y" : "ies"}</span>
+          </div>
+          ${g.entries.map(renderDiaryCard).join("")}
+        </div>`).join("")
+  const diaryShownCount = diaryFiltered.length
 
   const defectCards = defects.map((d: any) => {
     const sevClass = d.severity === "critical" ? "bad" : d.severity === "major" ? "warn" : "neutral"
@@ -461,6 +546,17 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
   .reply { margin-top: 8px; padding: 8px 12px; background: var(--soft); border-radius: 6px;
     font-size: 13px; color: var(--ink-2); }
   .empty { color: var(--muted); font-style: italic; padding: 16px 0; }
+  .day-group { margin: 24px 0; }
+  .day-group:first-child { margin-top: 8px; }
+  .day-header { display: flex; align-items: baseline; justify-content: space-between;
+    margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .day-label { font-weight: 700; color: var(--ink); font-size: 13px;
+    text-transform: uppercase; letter-spacing: 0.05em; }
+  .day-count { color: var(--muted); font-size: 12px; }
+  .card-meta { color: var(--muted); font-size: 12px; }
+  .card { padding: 12px 16px; margin: 8px 0; }
+  .card-head { margin-bottom: 6px; }
+  .kpi-grid { grid-template-columns: repeat(3, 1fr) !important; }
   .footer { margin-top: 64px; padding-top: 16px; border-top: 1px solid var(--line);
     color: var(--muted); font-size: 11px; display: flex; justify-content: space-between; }
   .toolbar { position: sticky; top: 0; background: white; border-bottom: 1px solid var(--line);
@@ -515,13 +611,10 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-num">${signins.length}</div><div class="kpi-label">Sign-ins</div></div>
     <div class="kpi"><div class="kpi-num">${totalHours.toFixed(1)}h</div><div class="kpi-label">Total hours</div></div>
-    <div class="kpi"><div class="kpi-num">${installerSet.size}</div><div class="kpi-label">Installers</div></div>
     <div class="kpi"><div class="kpi-num ${qa.length === 0 ? "" : compliance >= 80 ? "ok" : compliance >= 50 ? "warn" : "bad"}">${qa.length === 0 ? "—" : compliance + "%"}</div><div class="kpi-label">QA compliance</div></div>
     <div class="kpi"><div class="kpi-num ${openDefects > 0 ? "bad" : "ok"}">${openDefects}</div><div class="kpi-label">Open defects</div></div>
     <div class="kpi"><div class="kpi-num ${blockers > 0 ? "bad" : ""}">${blockers}</div><div class="kpi-label">Blockers</div></div>
-    <div class="kpi"><div class="kpi-num">${aiFlags}</div><div class="kpi-label">AI flags</div></div>
-    <div class="kpi"><div class="kpi-num">${photoCount}</div><div class="kpi-label">Photo evidence</div></div>
-    <div class="kpi"><div class="kpi-num">${diary.length}</div><div class="kpi-label">Diary entries</div></div>
+    <div class="kpi"><div class="kpi-num">${diaryShownCount}</div><div class="kpi-label">Diary entries</div></div>
   </div>
 
   <div class="footer">
