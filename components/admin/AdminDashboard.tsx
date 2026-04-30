@@ -547,9 +547,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   async function addItem(templateId: string) {
     if (!itemLabel.trim()) { setFormError("Enter item label"); return }
     setSaving(true); setFormError("")
-    const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_item", templateId, label: itemLabel.trim(), item_type: itemType, is_mandatory: itemMandatory, requires_photo: itemPhoto, requires_video: itemVideo, fail_note_required: itemFailNote }) })
+    const res = await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "add_item", templateId, label: itemLabel.trim(), item_type: itemType, is_mandatory: itemMandatory, requires_photo: itemPhoto, requires_video: itemVideo, fail_note_required: itemFailNote, trade: multiTradeEnabled ? (itemTrade || null) : null }) })
     if (!res.ok) { const d = await res.json(); setFormError(d.error); setSaving(false); return }
-    setItemLabel(""); setItemType("tick"); setItemMandatory(false); setItemPhoto(false); setItemVideo(false); setItemFailNote(false); setShowAddItem(null); setSaving(false)
+    setItemLabel(""); setItemType("tick"); setItemMandatory(false); setItemPhoto(false); setItemVideo(false); setItemFailNote(false); setShowAddItem(null); setSaving(false); setItemTrade("")
     router.refresh()
   }
 
@@ -1283,6 +1283,19 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         {itemTypeOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                       </select>
                     </div>
+                    {/* trades_checklist_patched */}
+                    {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1">Trade (optional)</label>
+                        <select value={itemTrade} onChange={e => setItemTrade(e.target.value)} className={inp}>
+                          <option value="">All trades</option>
+                          {companyTrades.filter(t => t.enabled).map(t => (
+                            <option key={t.trade_key} value={t.trade_key}>{t.label}</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">Leave as "All trades" to show this item to every installer.</p>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-4">
                       {[
                         { key: "mandatory", label: "Mandatory", state: itemMandatory, set: setItemMandatory },
@@ -1311,6 +1324,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <div className="font-medium text-sm">{item.label}</div>
                       <div className="flex gap-2 mt-1 flex-wrap">
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{itemTypeOptions.find(o => o.value === item.item_type)?.label || item.item_type}</span>
+                        {item.trade && <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-medium">{companyTrades.find(t => t.trade_key === item.trade)?.label || item.trade}</span>}
                         {item.is_mandatory && <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full">Mandatory</span>}
                         {item.requires_photo && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Photo</span>}
                         {item.requires_video && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">Video</span>}

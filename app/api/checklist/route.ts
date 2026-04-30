@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   }
 
   if (action === 'add_item') {
-    const { templateId, label, item_type, is_mandatory, requires_photo, requires_video, fail_note_required, sort_order } = body
+    const { templateId, label, item_type, is_mandatory, requires_photo, requires_video, fail_note_required, sort_order, trade } = body
     const { data, error } = await service.from('checklist_items').insert({
       template_id: templateId,
       company_id: userData.company_id,
@@ -39,7 +39,8 @@ export async function POST(request: Request) {
       requires_photo: requires_photo || false,
       requires_video: requires_video || false,
       fail_note_required: fail_note_required || false,
-      sort_order: sort_order || 0
+      sort_order: sort_order || 0,
+      trade: trade || null
     }).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ item: data })
