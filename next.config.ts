@@ -1,3 +1,4 @@
+import { withSentryConfig } from "@sentry/nextjs"
 import type { NextConfig } from "next";
 
 const CSP = [
@@ -27,4 +28,12 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+const __sentry_original_config = nextConfig;
+
+
+export default withSentryConfig(__sentry_original_config, {
+  silent: true,
+  org: undefined,
+  project: undefined,
+  // Source maps disabled — set SENTRY_AUTH_TOKEN env to enable
+})
