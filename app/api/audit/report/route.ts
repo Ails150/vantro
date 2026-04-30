@@ -65,11 +65,45 @@ function escapeHtml(s: any): string {
 function renderVideoBlock(videoUrl: string | null | undefined, label: string = "Video evidence"): string {
   if (!videoUrl) return ""
   const safe = escapeHtml(videoUrl)
+
+  // Cloudflare Stream URLs end in /iframe and are HTML pages, not video files.
+  // They must be rendered with <iframe>, not <video>.
+  // Examples:
+  //   https://customer-XXX.cloudflarestream.com/UID/iframe
+  //   https://iframe.videodelivery.net/UID
+  //   https://watch.cloudflarestream.com/UID
+  const isCloudflareStream =
+    videoUrl.includes("cloudflarestream.com") ||
+    videoUrl.includes("videodelivery.net") ||
+    videoUrl.endsWith("/iframe")
+
+  // Build "Open full size" link — for Stream URLs, derive the watch page
+  let openUrl = videoUrl
+  if (isCloudflareStream && videoUrl.endsWith("/iframe")) {
+    // Replace /iframe suffix with /watch for a public view page
+    openUrl = videoUrl.replace(/\/iframe$/, "/watch")
+  }
+  const safeOpenUrl = escapeHtml(openUrl)
+
+  if (isCloudflareStream) {
+    return `
+    <div class="video-block">
+      <div class="video-frame-wrap">
+        <iframe class="video-frame" src="${safe}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowfullscreen></iframe>
+      </div>
+      <div class="video-caption">
+        <span class="video-label">${escapeHtml(label)}</span>
+        <a href="${safeOpenUrl}" target="_blank" rel="noopener" class="video-link">Open in new tab &rarr;</a>
+      </div>
+    </div>`
+  }
+
+  // Direct video file (R2, Supabase, etc) — use <video> tag
   return `
     <div class="video-block">
       <video class="video-player" controls preload="metadata" playsinline>
         <source src="${safe}">
-        Your browser does not support inline video playback.
+        Your browser does not support inline video playback. <a href="${safe}" target="_blank">Download video</a>
       </video>
       <div class="video-caption">
         <span class="video-label">${escapeHtml(label)}</span>
@@ -569,9 +603,12 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
   .reply { margin-top: 8px; padding: 8px 12px; background: var(--soft); border-radius: 6px;
     font-size: 13px; color: var(--ink-2); }
   .empty { color: var(--muted); font-style: italic; padding: 16px 0; }
-  .video-block { margin: 8px 0; }
+  .video-block { margin: 8px 0; max-width: 600px; }
   .video-player { width: 100%; max-width: 600px; max-height: 360px; border-radius: 6px;
     background: #000; border: 1px solid var(--line); display: block; }
+  .video-frame-wrap { position: relative; padding-top: 56.25%; max-width: 600px;
+    background: #000; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+  .video-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .video-caption { display: flex; justify-content: space-between; align-items: center;
     margin-top: 4px; font-size: 11px; color: var(--muted); max-width: 600px; }
   .video-label { text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
@@ -579,7 +616,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
   .video-link:hover { text-decoration: underline; }
   @media print {
     .video-block { page-break-inside: avoid; }
-    .video-player { display: none; }
+    .video-player, .video-frame-wrap { display: none; }
     .video-caption::before { content: "[Video available — see digital report] "; color: var(--muted); }
   }
   .day-group { margin: 24px 0; }
