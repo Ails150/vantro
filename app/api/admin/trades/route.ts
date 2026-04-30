@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { createClient as createServiceClient } from "@supabase/supabase-js"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
 
@@ -22,32 +21,25 @@ const STANDARD_UK_TRADES = [
   { key: "cleaning", label: "Cleaning", sort: 15 },
 ]
 
-async function getAdminContext() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: "Unauthorized", status: 401 } as const
-
-  const service = createServiceClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
-  const { data: admin } = await service
+async function getAdmin(authUserId: string) {
+  const service = await createServiceClient()
+  const { data } = await service
     .from("users")
-    .select("id, role, company_id")
-    .eq("id", user.id)
+    .select("id, company_id, role")
+    .eq("auth_user_id", authUserId)
     .single()
-
-  if (!admin || admin.role !== "admin") {
-    return { error: "Forbidden", status: 403 } as const
-  }
-  return { service, admin } as const
+  return { service, admin: data }
 }
 
 export async function GET() {
-  const ctx = await getAdminContext()
-  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
-  const { service, admin } = ctx
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const { service, admin } = await getAdmin(user.id)
+  if (!admin || admin.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
 
   const { data: company } = await service
     .from("companies")
@@ -69,11 +61,16 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const ctx = await getAdminContext()
-  if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status })
-  const { service, admin } = ctx
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const body = await request.json()
+  const { service, admin } = await getAdmin(user.id)
+  if (!admin || admin.role !== "admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
+  const body = await request.json().catch(() => ({}))
   const { multi_trade_enabled, trades } = body
 
   if (typeof multi_trade_enabled === "boolean") {
