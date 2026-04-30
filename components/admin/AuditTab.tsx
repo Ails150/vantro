@@ -218,7 +218,7 @@ ${report.qa.map((q: any) => `<tr><td>${new Date(q.created_at).toLocaleString("en
                 )}
               </div>
               <div className="flex gap-2 flex-wrap">
-                <button onClick={exportHTML} className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold">
+                <button onClick={() => { if (!preview?.job?.id) return; const params = new URLSearchParams({ jobId: preview.job.id }); if (from) params.append('from', from); if (to) params.append('to', to); window.open('/api/audit/report?' + params.toString(), '_blank'); }} className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold">
                   Download report
                 </button>
                 <button onClick={createShareLink} disabled={creatingLink} className="px-4 py-2 bg-white border border-teal-300 text-teal-700 hover:bg-teal-50 rounded-lg text-sm font-semibold disabled:opacity-50">
