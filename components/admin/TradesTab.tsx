@@ -8,44 +8,30 @@ import { useEffect, useState } from "react"
  *
  * Multi-trade v1 (opt-in, harmless to single-trade companies).
  *
- * - Toggle: companies.multi_trade_enabled
- * - 15 standard UK trades pre-seeded in company_trades table
- * - Enable/disable each trade per company
+ * Schema (company_trades):
+ *   company_id  uuid
+ *   trade_key   text   (PK part — e.g. 'glazing', 'm_and_e')
+ *   label       text   (display name — e.g. 'Glazing', 'M&E')
+ *   enabled     boolean
+ *   sort_order  integer
  *
  * API: /api/admin/trades  (GET + PATCH)
- *   GET  → { multi_trade_enabled: boolean, trades: Array<{ id, name, enabled }> }
+ *   GET  → { multi_trade_enabled: boolean, trades: Trade[] }
  *   PATCH body shape (either or both):
- *     { multi_trade_enabled?: boolean, trades?: Array<{ id, enabled }> }
+ *     { multi_trade_enabled?: boolean, trades?: Array<{ trade_key, enabled }> }
  */
 
 type Trade = {
-  id: string
-  name: string
+  trade_key: string
+  label: string
   enabled: boolean
+  sort_order?: number
 }
 
 type TradesPayload = {
   multi_trade_enabled: boolean
   trades: Trade[]
 }
-
-const STANDARD_TRADES = [
-  "Glazing",
-  "Carpentry",
-  "Electrical",
-  "Plumbing",
-  "Roofing",
-  "Plastering",
-  "Bricklaying",
-  "Painting",
-  "Tiling",
-  "Joinery",
-  "Drylining",
-  "M&E",
-  "Groundworks",
-  "Landscaping",
-  "Cleaning",
-]
 
 export default function TradesTab() {
   const [loading, setLoading] = useState(true)
@@ -66,12 +52,11 @@ export default function TradesTab() {
         const data: TradesPayload = await res.json()
         if (cancelled) return
         setEnabled(!!data.multi_trade_enabled)
-        // Sort to match the standard UK ordering above; unknown extras at the end
-        const order = new Map(STANDARD_TRADES.map((n, i) => [n, i]))
         const sorted = [...(data.trades || [])].sort((a, b) => {
-          const ai = order.has(a.name) ? (order.get(a.name) as number) : 999
-          const bi = order.has(b.name) ? (order.get(b.name) as number) : 999
-          return ai - bi
+          const ai = a.sort_order ?? 999
+          const bi = b.sort_order ?? 999
+          if (ai !== bi) return ai - bi
+          return (a.label || "").localeCompare(b.label || "")
         })
         setTrades(sorted)
       } catch (e: any) {
@@ -91,7 +76,7 @@ export default function TradesTab() {
     window.setTimeout(() => setSavedFlash(null), 1800)
   }
 
-  async function patchTrades(body: Partial<{ multi_trade_enabled: boolean; trades: Array<{ id: string; enabled: boolean }> }>) {
+  async function patchTrades(body: Partial<{ multi_trade_enabled: boolean; trades: Array<{ trade_key: string; enabled: boolean }> }>) {
     setSaving(true)
     setError(null)
     try {
@@ -119,16 +104,15 @@ export default function TradesTab() {
       await patchTrades({ multi_trade_enabled: next })
       flash(next ? "Multi-trade enabled" : "Multi-trade disabled")
     } catch {
-      // rollback on error
       setEnabled(prev)
     }
   }
 
-  async function toggleTrade(id: string, next: boolean) {
+  async function toggleTrade(trade_key: string, next: boolean) {
     const prev = trades
-    setTrades((t) => t.map((x) => (x.id === id ? { ...x, enabled: next } : x)))
+    setTrades((t) => t.map((x) => (x.trade_key === trade_key ? { ...x, enabled: next } : x)))
     try {
-      await patchTrades({ trades: [{ id, enabled: next }] })
+      await patchTrades({ trades: [{ trade_key, enabled: next }] })
       flash("Saved")
     } catch {
       setTrades(prev)
@@ -237,10 +221,10 @@ export default function TradesTab() {
               const on = t.enabled
               return (
                 <button
-                  key={t.id}
+                  key={t.trade_key}
                   type="button"
                   disabled={!enabled || saving}
-                  onClick={() => toggleTrade(t.id, !on)}
+                  onClick={() => toggleTrade(t.trade_key, !on)}
                   className={
                     "flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-colors disabled:cursor-not-allowed " +
                     (on
@@ -248,7 +232,7 @@ export default function TradesTab() {
                       : "bg-white border-gray-200 text-gray-700 hover:bg-gray-50")
                   }
                 >
-                  <span className="text-sm font-medium">{t.name}</span>
+                  <span className="text-sm font-medium">{t.label}</span>
                   <span
                     className={
                       "ml-3 h-5 w-5 rounded-full flex items-center justify-center text-[11px] font-bold " +
