@@ -19,14 +19,41 @@ function staticMapUrl(lat: number | null | undefined, lng: number | null | undef
   )
 }
 
+/**
+ * Convert a stored value into a usable URL for the audit pack.
+ *  - Cloudflare R2 URLs (pub-*.r2.dev) -> passed through unchanged (already public)
+ *  - Full Supabase public URLs containing "/vantro-media/" -> path extracted, signed
+ *  - Bare paths -> signed
+ *  - Anything else -> returned unchanged
+ * Returns null only when input is null/empty.
+ */
 async function signOne(service: any, value: string | null | undefined): Promise<string | null> {
   if (!value) return null
-  let path = value
+
+  // R2 (Cloudflare) URLs are already public, no signing needed
+  if (value.includes(".r2.dev/") || value.includes(".r2.cloudflarestorage.com/")) {
+    return value
+  }
+
+  // Only sign if it looks like a Supabase path or vantro-media URL
   const marker = "/vantro-media/"
-  const idx = value.indexOf(marker)
-  if (idx >= 0) path = value.substring(idx + marker.length)
-  if (path.startsWith("/")) path = path.substring(1)
-  if (!path) return null
+  let path: string | null = null
+  if (value.startsWith("http")) {
+    const idx = value.indexOf(marker)
+    if (idx >= 0) {
+      path = value.substring(idx + marker.length)
+    } else {
+      // Unknown remote URL — return as-is
+      return value
+    }
+  } else {
+    // Treat as bare storage path
+    path = value
+  }
+
+  if (path?.startsWith("/")) path = path.substring(1)
+  if (!path) return value
+
   try {
     const { data, error } = await service.storage
       .from("vantro-media")
@@ -51,7 +78,6 @@ async function signMany(service: any, values: any): Promise<string[]> {
 // ---------- Route ----------
 
 export async function GET(request: Request) {
-  // 1. Auth — admin user
   const supabase = await createClient()
   const {
     data: { user },
@@ -70,14 +96,12 @@ export async function GET(request: Request) {
   }
   const companyId = appUser.company_id
 
-  // 2. Params
   const { searchParams } = new URL(request.url)
   const jobId = searchParams.get("jobId")
   const from = searchParams.get("from")
   const to = searchParams.get("to")
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
 
-  // 3. Job
   const { data: job, error: jobErr } = await service
     .from("jobs")
     .select("id, name, address, lat, lng, company_id, required_trades")
@@ -86,7 +110,6 @@ export async function GET(request: Request) {
     .single()
   if (jobErr || !job) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
-  // 4. Company flags + trades catalogue
   const { data: company } = await service
     .from("companies")
     .select("id, name, multi_trade_enabled, ai_audit_enabled, ai_audit_trial_ends_at")
@@ -107,11 +130,11 @@ export async function GET(request: Request) {
     companyTrades = trades || []
   }
 
-  // 5. Sign-ins — column names corrected to match schema
+  // Sign-ins — single users FK (user_id), no ambiguity
   let signinsQuery = service
     .from("signins")
     .select(
-      "id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_from_site_metres, sign_out_distance_metres, within_range, sign_out_within_range, hours_worked, flagged, flag_reason, departed_early, early_departure_minutes, auto_closed, auto_closed_reason, users(id, name, trades)"
+      "id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_from_site_metres, sign_out_distance_metres, within_range, sign_out_within_range, hours_worked, flagged, flag_reason, departed_early, early_departure_minutes, auto_closed, auto_closed_reason, users!user_id(id, name, trades)"
     )
     .eq("job_id", jobId)
     .order("signed_in_at", { ascending: true })
@@ -122,43 +145,56 @@ export async function GET(request: Request) {
 
   const signins = (signinsRaw || []).map((s: AnyRow) => ({
     ...s,
-    // legacy alias for AuditTab compatibility
     distance_metres: s.distance_from_site_metres,
     map_in_url: staticMapUrl(s.lat, s.lng),
     map_out_url: staticMapUrl(s.sign_out_lat, s.sign_out_lng),
   }))
 
-  // 6. QA submissions — corrected: state (not result), notes (not note), no photo_urls array
+  // QA submissions — explicit user_id FK hint (table also has reviewed_by FK)
+  // checklist_items join dropped: we expose checklist_item_id and let frontend resolve
   let qaQuery = service
     .from("qa_submissions")
     .select(
-      "id, submitted_at, created_at, state, value, notes, rejection_note, photo_url, video_url, video_ai_summary, video_ai_summary_at, users(id, name), checklist_items(id, label, trade)"
+      "id, submitted_at, created_at, state, value, notes, rejection_note, photo_url, video_url, video_ai_summary, video_ai_summary_at, checklist_item_id, template_id, users!user_id(id, name)"
     )
     .eq("job_id", jobId)
-    .order("submitted_at", { ascending: true })
-  if (from) qaQuery = qaQuery.gte("submitted_at", from)
-  if (to) qaQuery = qaQuery.lte("submitted_at", to + "T23:59:59Z")
+    .order("created_at", { ascending: true })
+  if (from) qaQuery = qaQuery.gte("created_at", from)
+  if (to) qaQuery = qaQuery.lte("created_at", to + "T23:59:59Z")
   const { data: qaRaw, error: qaErr } = await qaQuery
   if (qaErr) console.error("[audit] qa error:", qaErr.message)
 
+  // Resolve checklist item labels in one batch (avoids broken join)
+  const itemIds = Array.from(new Set((qaRaw || []).map((q: AnyRow) => q.checklist_item_id).filter(Boolean)))
+  const itemMap: Record<string, AnyRow> = {}
+  if (itemIds.length > 0) {
+    const { data: items, error: itemsErr } = await service
+      .from("checklist_items")
+      .select("id, label, trade")
+      .in("id", itemIds)
+    if (itemsErr) console.error("[audit] checklist_items error:", itemsErr.message)
+    for (const it of items || []) itemMap[it.id] = it
+  }
+
   const qa: AnyRow[] = []
   for (const q of qaRaw || []) {
+    const item = q.checklist_item_id ? itemMap[q.checklist_item_id] : null
     qa.push({
       ...q,
-      // legacy aliases for AuditTab compatibility
       result: q.state,
       note: q.notes,
       photo_url: await signOne(service, q.photo_url),
       photo_urls: q.photo_url ? [await signOne(service, q.photo_url)].filter(Boolean) : [],
       video_url: await signOne(service, q.video_url),
+      checklist_items: item || null,
     })
   }
 
-  // 7. Diary — corrected: entry_text (not note), no severity column (use ai_alert_type as severity proxy)
+  // Diary — explicit user_id FK hint (table also has replied_by FK)
   let diaryQuery = service
     .from("diary_entries")
     .select(
-      "id, created_at, entry_text, ai_alert_type, ai_summary, photo_urls, video_url, video_ai_summary, video_ai_summary_at, replied_at, replied_by, reply, users(id, name)"
+      "id, created_at, entry_text, ai_alert_type, ai_summary, photo_urls, video_url, video_ai_summary, video_ai_summary_at, replied_at, reply, users!user_id(id, name)"
     )
     .eq("job_id", jobId)
     .order("created_at", { ascending: true })
@@ -171,7 +207,6 @@ export async function GET(request: Request) {
   for (const d of diaryRaw || []) {
     diary.push({
       ...d,
-      // legacy aliases for AuditTab compatibility
       note: d.entry_text,
       severity: d.ai_alert_type,
       photo_urls: await signMany(service, d.photo_urls),
@@ -179,11 +214,12 @@ export async function GET(request: Request) {
     })
   }
 
-  // 8. Defects — corrected: description (not note), no photo_urls array, no users() join (defects table has user_id but check if FK exists)
+  // Defects — single user_id FK, plus resolved_by which is also a users FK
+  // To be safe, hint anyway
   let defectsQuery = service
     .from("defects")
     .select(
-      "id, created_at, status, severity, description, photo_url, resolution_note, resolved_at, resolved_by, user_id, users(id, name)"
+      "id, created_at, status, severity, description, photo_url, resolution_note, resolved_at, resolved_by, user_id, users!user_id(id, name)"
     )
     .eq("job_id", jobId)
     .order("created_at", { ascending: true })
