@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import PaywallOverlay from '@/components/billing/PaywallOverlay' // paywall_wired_v2
 import SitesTab from "./SitesTab"
+import TradesTab from "./TradesTab"
 import CsvImportModal from "./CsvImportModal"
 import PayrollExportModal from "./PayrollExportModal"
 import SettingsMenu from "./SettingsMenu"
@@ -571,6 +572,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const setupTabs = [
     { id: "team", label: "Team" },
     { id: "sites", label: "Sites" },
+    { id: "trades", label: "Trades" },
     { id: "jobs", label: "Jobs" },
     { id: "checklists", label: "Checklists" },
     { id: "schedule", label: "Scheduler" }, // schedule_link_added
@@ -1409,6 +1411,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           </div>
         )}
         {activeTab === "sites" && <SitesTab />}
+        {activeTab === "trades" && <TradesTab />}
         {activeTab === "audit" && <AuditTab jobs={jobs} />}
         {activeTab === "map" && <MapTab />}
           {activeTab === "defects" && <DefectsTab />}
