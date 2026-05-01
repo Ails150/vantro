@@ -316,11 +316,14 @@ export async function runNotificationEngine(
             return dist <= 150
           })
           if (lastOnSite) {
+            // Industry standard: pay for actual time on site.
+            // Use last on-site GPS point regardless of whether it is before
+            // or after the scheduled finish - this protects installer pay
+            // (no lost overtime) and prevents overpayment if they left early.
+            // Always flagged so admin reviews and approves payroll.
             const lastOnSiteTime = new Date(lastOnSite.logged_at)
-            if (lastOnSiteTime < closeAt) {
-              closeAt = lastOnSiteTime
-              closeReason = "auto_last_onsite"
-            }
+            closeAt = lastOnSiteTime
+            closeReason = "auto_last_onsite"
           }
         }
 
@@ -343,7 +346,7 @@ export async function runNotificationEngine(
             auto_closed: true,
             auto_closed_reason: closeReason,
             flagged: true,
-            flag_reason: `No sign-out received. Closed at ${closeReason === "auto_last_onsite" ? "the last GPS point on-site" : "the scheduled sign-out time"}. Please review hours.`,
+            flag_reason: `No sign-out received. Closed at ${closeReason === "auto_last_onsite" ? "the last GPS point on-site (actual time worked)" : "the scheduled sign-out time (no GPS data available)"}. Please review hours.`,
           }).eq("id", signin.id)
 
           if (user?.push_token) {
