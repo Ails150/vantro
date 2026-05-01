@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const installer = verifyInstallerToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const service = createServiceClient()
+    const service = await createServiceClient()
 
     const since = new Date()
     since.setDate(since.getDate() - 14)
