@@ -13,6 +13,6 @@ export async function GET() {
     .eq("company_id", userData.company_id)
     .eq("is_read", false)
     .order("created_at", { ascending: false })
-    .limit(20)
+    .limit(500)
   return NextResponse.json({ alerts: alerts || [] })
 }
