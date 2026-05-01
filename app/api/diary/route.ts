@@ -26,13 +26,10 @@ export async function POST(request: Request) {
     const { entryText, workStatus, jobId, lat, lng, photoUrls, videoUrl } = await request.json()
     if (!entryText?.trim() && (!photoUrls || photoUrls.length === 0) && !videoUrl) return NextResponse.json({ error: "Entry requires text, photo, or video" }, { status: 400 })
 
-    // Guard: reject entries that claim to be video uploads but have no video URL.
-    // This catches buggy clients that insert a row before the Cloudflare upload finishes.
-    // Avoids "Video entry" rows with video_url = NULL polluting the audit pack.
     const trimmedText = (entryText || "").trim().toLowerCase()
     const claimsVideo =
       trimmedText === "video entry" ||
-      trimmedText.startsWith("\ud83c\udfa5") ||  // 🎥 emoji
+      trimmedText.startsWith("\ud83c\udfa5") ||
       trimmedText.includes("video entry")
     if (claimsVideo && !videoUrl) {
       console.error("[diary] Rejected: claims video but videoUrl missing", { entryText, jobId })
@@ -46,8 +43,8 @@ export async function POST(request: Request) {
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const payload = { userId: installer.userId, companyId: installer.companyId }
 
-        const service = createServiceClient()
-    
+    const service = createServiceClient()
+
     const { data: diary, error: diaryError } = await service
       .from("diary_entries")
       .insert({
@@ -83,7 +80,6 @@ Respond with the summary sentence only, no JSON, no preamble.`
       ? completion.content[0].text.trim().replace(/^["']|["']$/g, "")
       : entryText.slice(0, 80)
 
-    // Installer-driven classification. AI only writes the summary.
     const statusToAlert: Record<string, string> = {
       carrying_on: "normal",
       paused: "issue",
@@ -103,19 +99,25 @@ Respond with the summary sentence only, no JSON, no preamble.`
       .eq("id", diary.id)
 
     if (aiAlertType === "blocker" || aiAlertType === "issue") {
-      await service
+      const { error: alertError } = await service
         .from("alerts")
         .insert({
           company_id: payload.companyId,
           job_id: jobId,
           user_id: payload.userId,
-          type: aiAlertType,
+          alert_type: aiAlertType,
           message: aiSummary || entryText.slice(0, 100),
           diary_entry_id: diary.id,
           status: "open",
           urgency,
+          is_read: false,
           created_at: new Date().toISOString()
         })
+      if (alertError) {
+        console.error("[diary] Alert insert failed:", alertError)
+      } else {
+        console.log("[diary] Alert created:", aiAlertType, "for diary", diary.id)
+      }
     }
 
     return NextResponse.json({ success: true })
