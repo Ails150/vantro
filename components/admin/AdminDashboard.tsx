@@ -1058,7 +1058,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       onClick={handleOpenBillingPortal}
                       className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                     >
-                      Upgrade plan ?
+                      Upgrade plan →
                     </button>
                   </div>
                 )
