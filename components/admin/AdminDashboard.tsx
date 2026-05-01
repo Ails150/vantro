@@ -662,14 +662,28 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 px-4 md:px-8 py-4 md:py-6">
-        {[
-          { label: "On Site Now", value: signins.length, color: "text-teal-500" },
-          { label: "Active Jobs", value: jobs.filter((j: any) => j.status === "active").length, color: "text-gray-900" },
-          { label: "Awaiting Approval", value: pendingQA.length, color: "text-amber-500" },
-          { label: "Unread Alerts", value: alerts.length, color: "text-red-500" },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-gray-200 rounded-2xl p-4 md:p-6 shadow-sm">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4 px-4 md:px-8 py-4 md:py-6">
+        {(() => {
+          const now = Date.now()
+          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+          const sevenDaysAgo = now - 7 * 86400000
+          const todayCount = liveAlerts.filter((a: any) => new Date(a.created_at).getTime() >= todayStart.getTime()).length
+          const blockerOpenCount = liveAlerts.filter((a: any) => a.alert_type === "blocker").length
+          const olderCount = liveAlerts.filter((a: any) => new Date(a.created_at).getTime() < sevenDaysAgo).length
+          return [
+            { label: "On Site Now", value: signins.length, color: "text-teal-500" },
+            { label: "Active Jobs", value: jobs.filter((j: any) => j.status === "active").length, color: "text-gray-900" },
+            { label: "Awaiting Approval", value: pendingQA.length, color: "text-amber-500" },
+            { label: "Today's Alerts", value: todayCount, color: todayCount > 0 ? "text-red-500" : "text-gray-400", onClick: () => { setActiveTab("alerts"); setAlertFilter("24h" as any) } },
+            { label: "Open Blockers", value: blockerOpenCount, color: blockerOpenCount > 0 ? "text-red-600" : "text-gray-400", onClick: () => { setActiveTab("alerts"); setAlertFilter("blocker" as any) } },
+            { label: "Older than 7d", value: olderCount, color: olderCount > 0 ? "text-amber-600" : "text-gray-400", onClick: () => { setActiveTab("alerts") } },
+          ]
+        })().map((s: any) => (
+          <div
+            key={s.label}
+            onClick={s.onClick}
+            className={"bg-white border border-gray-200 rounded-2xl p-4 md:p-6 shadow-sm " + (s.onClick ? "cursor-pointer hover:border-gray-300 transition-colors" : "")}
+          >
             <div className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">{s.label}</div>
             <div className={"text-3xl md:text-4xl font-bold " + s.color}>{s.value}</div>
           </div>
