@@ -13,7 +13,7 @@
 
 import { combineDateAndLocalTime, nowInTimezone, type LocalNow } from "./timezone"
 
-type Service = any // SupabaseClient â€” typed as any to avoid SDK version coupling
+type Service = any // SupabaseClient - typed as any to avoid SDK version coupling
 
 export type EngineResult = {
   dryRun: boolean
@@ -154,8 +154,8 @@ export async function runNotificationEngine(
     // Build protected-user set once per company
     const protectedIds = await getProtectedUserIds(service, company.id, local.dateStr)
 
-    // â”€â”€ SIGN-IN REMINDERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Window: minutesUntil > 15 && <= 30 â†’ exactly one reminder per shift,
+    // - SIGN-IN REMINDERS -
+    // Window: minutesUntil > 15 && <= 30 - exactly one reminder per shift,
     // assuming cron runs every 15 min. No duplicates.
     const { data: jobs } = await service
       .from("jobs")
@@ -229,7 +229,7 @@ export async function runNotificationEngine(
       }
     }
 
-    // â”€â”€ SIGN-OUT REMINDERS + AUTO-CLOSE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // - SIGN-OUT REMINDERS + AUTO-CLOSE -
     const { data: activeSignins } = await service
       .from("signins")
       .select("id, user_id, job_id, company_id, signed_in_at, expected_sign_out_time, reminder_sent_at, admin_reminder_sent_at, jobs(name, lat, lng), users(name, push_token)")
