@@ -172,6 +172,33 @@ Return ONLY valid JSON, no preamble, no markdown:
         console.error("[diary] Alert insert failed:", alertError)
       } else {
         console.log("[diary] Alert created:", finalSeverity, "for diary", diary.id)
+        // Push admin/foreman for new blocker or issue alerts
+        try {
+          const { data: jobInfo } = await service.from("jobs").select("name").eq("id", jobId).single()
+          const { data: installerInfo } = await service.from("users").select("name").eq("id", payload.userId).single()
+          const { data: admins } = await service.from("users")
+            .select("push_token")
+            .eq("company_id", payload.companyId)
+            .in("role", ["admin", "foreman"])
+          const adminTokens = (admins || []).map((a: any) => a.push_token).filter(Boolean)
+          if (adminTokens.length > 0) {
+            await fetch("https://exp.host/--/api/v2/push/send", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", "Accept": "application/json" },
+              body: JSON.stringify(adminTokens.map((t: string) => ({
+                to: t,
+                sound: "default",
+                title: finalSeverity === "blocker" ? "BLOCKER reported" : "Site issue reported",
+                body: (installerInfo?.name || "Installer") + " at " + (jobInfo?.name || "site") + ": " + (aiSummary || "").slice(0, 100),
+                data: { type: "diary_alert", diaryId: diary.id, jobId, severity: finalSeverity },
+                channelId: "vantro",
+              }))),
+            }).catch(() => {})
+            console.log("[diary] Pushed", adminTokens.length, "admin/foreman tokens for", finalSeverity)
+          }
+        } catch (pushErr) {
+          console.error("[diary] push to admins failed (non-fatal):", pushErr)
+        }
       }
     }
 
@@ -192,21 +219,42 @@ export async function GET(request: Request) {
     const jobId = searchParams.get("jobId")
     if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
 
+    // Pagination: ?since=ISO_DATE limits to entries created on/after that time
+    // ?limit=N caps results (default 50, max 200)
+    const since = searchParams.get("since")
+    const limitParam = parseInt(searchParams.get("limit") || "50", 10)
+    const limit = Math.min(Math.max(limitParam, 1), 200)
+
     const service = createServiceClient()
 
-    const { data: entries, error } = await service
+    let query = service
       .from("diary_entries")
       .select("*")
       .eq("company_id", installer.companyId)
       .eq("job_id", jobId)
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false })
+      .limit(limit)
+
+    if (since) {
+      query = query.gte("created_at", since)
+    }
+
+    const { data: entries, error } = await query
 
     if (error) {
       console.error("Diary GET error:", error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ entries: entries || [] })
+    // Return ascending for client display (oldest first within window)
+    const sorted = (entries || []).slice().reverse()
+
+    return NextResponse.json({
+      entries: sorted,
+      hasMore: (entries?.length || 0) === limit,
+      limit,
+      since: since || null,
+    })
   } catch (e: any) {
     console.error("Diary GET exception:", e)
     return NextResponse.json({ error: e?.message || "Server error" }, { status: 500 })

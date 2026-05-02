@@ -61,6 +61,49 @@ export async function POST(request: Request) {
       photo_url: photoUrl || null, photo_path: photoPath || null
     }).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+    // For critical/major defects: create alert + push admin/foreman
+    const sev = severity || 'minor'
+    if (sev === 'critical' || sev === 'major') {
+      try {
+        const { data: job } = await service.from('jobs').select('name').eq('id', jobId).single()
+        const { data: installer } = await service.from('users').select('name').eq('id', userId).single()
+        const alertMessage = (sev === 'critical' ? 'CRITICAL defect' : 'Major defect') + ' at ' + (job?.name || 'site') + ': ' + description.slice(0, 200)
+
+        await service.from('alerts').insert({
+          company_id: companyId,
+          user_id: userId,
+          job_id: jobId,
+          alert_type: sev === 'critical' ? 'blocker' : 'issue',
+          message: alertMessage,
+          is_read: false,
+          status: 'open',
+        })
+
+        const { data: admins } = await service.from('users')
+          .select('push_token')
+          .eq('company_id', companyId)
+          .in('role', ['admin', 'foreman'])
+        const adminTokens = (admins || []).map((a: any) => a.push_token).filter(Boolean)
+        if (adminTokens.length > 0) {
+          await fetch('https://exp.host/--/api/v2/push/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(adminTokens.map((t: string) => ({
+              to: t,
+              sound: 'default',
+              title: sev === 'critical' ? 'CRITICAL defect logged' : 'Major defect logged',
+              body: (installer?.name || 'Installer') + ' at ' + (job?.name || 'site') + ': ' + description.slice(0, 100),
+              data: { type: 'defect_alert', defectId: data.id, jobId },
+              channelId: 'vantro',
+            }))),
+          }).catch(() => {})
+        }
+      } catch (alertErr) {
+        console.error('[defects] alert/push failed (non-fatal)', alertErr)
+      }
+    }
+
     return NextResponse.json({ defect: data })
   }
 
