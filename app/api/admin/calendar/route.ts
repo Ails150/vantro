@@ -20,11 +20,17 @@ export async function GET(request: Request) {
   const service = await createServiceClient()
   const { data: admin } = await service
     .from("users")
-    .select("id, company_id, role, companies(country_code)")
+    .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
   if (!admin || !["admin", "foreman"].includes(admin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+  const { data: company } = await service
+    .from("companies")
+    .select("country_code")
+    .eq("id", admin.company_id)
+    .single()
 
   const url = new URL(request.url)
   const start = url.searchParams.get("start") // YYYY-MM-DD
@@ -36,7 +42,6 @@ export async function GET(request: Request) {
       { status: 400 }
     )
 
-  const company = admin.companies as any
   const countryCode = company?.country_code || "GB"
 
   // 1. All active installers + foreman in this company

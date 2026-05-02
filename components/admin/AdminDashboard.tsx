@@ -29,9 +29,13 @@ interface Props {
 }
 
 export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid }: Props) {
-  const [activeTab, setActiveTab] = useState(() => {
-    try { return localStorage.getItem("vantro_tab") || defaultTab } catch { return defaultTab }
-  })
+  const [activeTab, setActiveTab] = useState(defaultTab)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("vantro_tab")
+      if (stored) setActiveTab(stored)
+    } catch {}
+  }, [])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [setupExpanded, setSetupExpanded] = useState(true)
   const [operationsExpanded, setOperationsExpanded] = useState(true)

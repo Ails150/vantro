@@ -60,26 +60,41 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function CalendarTab() {
   // Anchor "current week" on a Monday
-  const [weekStart, setWeekStart] = useState<Date>(getMondayOf(new Date()))
+  const [weekStart, setWeekStart] = useState<Date | null>(null)
+  const [viewMode, setViewMode] = useState<"week" | "month">("week")
+  useEffect(() => { setWeekStart(getMondayOf(new Date())) }, [])
+  const numWeeks = viewMode === "month" ? 4 : 1
+  const numDays = numWeeks * 7
   const [data, setData] = useState<CalendarData | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Compute week's 7 dates
   const weekDates = useMemo(() => {
+    if (!weekStart) return []
     const dates: Date[] = []
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < numDays; i++) {
       const d = new Date(weekStart)
       d.setDate(d.getDate() + i)
       dates.push(d)
     }
     return dates
-  }, [weekStart])
+  }, [weekStart, numDays])
+
+  // Group dates into weeks (always 7 per row, even if numDays > 7)
+  const weekRows = useMemo(() => {
+    const rows: Date[][] = []
+    for (let i = 0; i < weekDates.length; i += 7) {
+      rows.push(weekDates.slice(i, i + 7))
+    }
+    return rows
+  }, [weekDates])
 
   const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
-  const startStr = fmtDate(weekDates[0])
-  const endStr = fmtDate(weekDates[6])
+  const startStr = weekDates.length > 0 ? fmtDate(weekDates[0]) : ""
+  const endStr = weekDates.length > 0 ? fmtDate(weekDates[weekDates.length - 1]) : ""
 
   const load = useCallback(async () => {
+    if (!startStr || !endStr) return
     setLoading(true)
     try {
       const res = await fetch(
@@ -98,13 +113,15 @@ export default function CalendarTab() {
   }, [load])
 
   const goPrev = () => {
+    if (!weekStart) return
     const d = new Date(weekStart)
-    d.setDate(d.getDate() - 7)
+    d.setDate(d.getDate() - numDays)
     setWeekStart(d)
   }
   const goNext = () => {
+    if (!weekStart) return
     const d = new Date(weekStart)
-    d.setDate(d.getDate() + 7)
+    d.setDate(d.getDate() + numDays)
     setWeekStart(d)
   }
   const goToday = () => setWeekStart(getMondayOf(new Date()))
@@ -112,10 +129,10 @@ export default function CalendarTab() {
   // Build a lookup: which visits cover each (installer_id, date)?
   const cellMap = useMemo(() => {
     const map: Record<string, { visits: Visit[]; timeOff: TimeOff | null; isPublicHoliday: PublicHoliday | null }> = {}
-    if (!data) return map
+    if (!data || !data.installers) return map
 
     const holidayByDate: Record<string, PublicHoliday> = {}
-    for (const h of data.public_holidays) holidayByDate[h.date] = h
+    for (const h of (data.public_holidays || [])) holidayByDate[h.date] = h
 
     // Index assignments by user → set of visit_ids
     const assignmentsByUser: Record<string, Set<string>> = {}
@@ -169,8 +186,9 @@ export default function CalendarTab() {
 
   // Format helpers
   const weekLabel = useMemo(() => {
+    if (weekDates.length === 0) return ""
     const start = weekDates[0]
-    const end = weekDates[6]
+    const end = weekDates[weekDates.length - 1]
     const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
     if (sameMonth) {
       return `${start.getDate()} – ${end.getDate()} ${start.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`
@@ -212,6 +230,20 @@ export default function CalendarTab() {
           >
             →
           </button>
+          <div className="ml-3 flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode("week")}
+              className={"px-3 py-1 rounded-md text-xs font-medium transition-colors " + (viewMode === "week" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setViewMode("month")}
+              className={"px-3 py-1 rounded-md text-xs font-medium transition-colors " + (viewMode === "month" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700")}
+            >
+              4 weeks
+            </button>
+          </div>
         </div>
         <div className="text-base font-medium text-gray-900">{weekLabel}</div>
         <div className="text-sm text-gray-500">
@@ -234,7 +266,7 @@ export default function CalendarTab() {
                 {weekDates.map((d, i) => {
                   const dateStr = fmtDate(d)
                   const isToday = dateStr === todayStr
-                  const ph = data?.public_holidays.find((h) => h.date === dateStr)
+                  const ph = (data?.public_holidays || []).find((h) => h.date === dateStr)
                   const dayName = d.toLocaleDateString("en-GB", { weekday: "short" })
                   const dayNum = d.getDate()
                   const isWeekend = i >= 5

@@ -1,5 +1,6 @@
-﻿import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google"
+import Script from "next/script";
 import "./globals.css";
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,6 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister();});})}` }}/>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
         <meta name="mobile-web-app-capable" content="yes"/>
         <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -41,7 +41,12 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content="Vantro"/>
         <meta name="theme-color" content="#00d4a0"/>
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        {children}
+        <Script id="sw-unregister" strategy="afterInteractive">
+          {`if('serviceWorker' in navigator){navigator.serviceWorker.getRegistrations().then(function(regs){regs.forEach(function(r){r.unregister();});})}`}
+        </Script>
+      </body>
     </html>
   );
 }
