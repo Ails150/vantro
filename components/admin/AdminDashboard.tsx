@@ -163,6 +163,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [lightboxUrl, setLightboxUrl] = useState<string|null>(null)
   const [diaryReply, setDiaryReply] = useState("")
   const [replySending, setReplySending] = useState(false)
+  const [localReplies, setLocalReplies] = useState<Record<string, string>>({})
   const [invitingJobId, setInvitingJobId] = useState<string|null>(null)
   const [inviteName, setInviteName] = useState("")
   const [inviteEmail, setInviteEmail] = useState("")
@@ -513,14 +514,26 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   async function replyToDiary(entryId: string, userId: string) {
     if (!diaryReply.trim()) { alert("Please enter a reply"); return }
     setReplySending(true)
-    await fetch("/api/diary/reply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entryId, userId, message: diaryReply })
-    })
-    setReplyingDiary(null)
-    setDiaryReply("")
-    setReplySending(false)
+    try {
+      const res = await fetch("/api/diary/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entryId, userId, message: diaryReply })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        alert("Could not send reply: " + (err.error || "Unknown error"))
+        setReplySending(false)
+        return
+      }
+      setLocalReplies(prev => ({ ...prev, [entryId]: diaryReply.trim() }))
+      setReplyingDiary(null)
+      setDiaryReply("")
+    } catch (e: any) {
+      alert("Network error sending reply: " + (e?.message || ""))
+    } finally {
+      setReplySending(false)
+    }
   }
 
   async function markAlertRead(id: string) { await supabase.from("alerts").update({ is_read: true }).eq("id", id); router.refresh() }
@@ -1925,17 +1938,17 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             <iframe src={d.video_url} className="w-full max-w-sm aspect-video rounded-lg border border-gray-200" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen />
                           </div>
                         )}
-                        {d.reply && (
+                        {(d.reply || localReplies[d.id]) && (
                           <div className="mt-3 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs bg-teal-500 text-white px-2 py-0.5 rounded-full font-semibold">Replied</span>
                               {d.replied_at && <span className="text-xs text-teal-700">{new Date(d.replied_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
                             </div>
-                            <p className="text-sm text-teal-900">{d.reply}</p>
+                            <p className="text-sm text-teal-900">{d.reply || localReplies[d.id]}</p>
                           </div>
                         )}
                       </div>
-                      {!d.reply && (
+                      {!(d.reply || localReplies[d.id]) && (
                         <button onClick={() => { setReplyingDiary(replyingDiary === d.id ? null : d.id); setDiaryReply("") }} className="text-xs border border-gray-200 text-gray-500 hover:border-teal-300 hover:text-teal-600 rounded-lg px-3 py-1.5 flex-shrink-0">Reply</button>
                       )}
                     </div>
