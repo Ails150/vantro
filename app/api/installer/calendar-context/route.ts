@@ -115,6 +115,41 @@ export async function GET(request: Request) {
     .lte("holiday_date", endDate)
     .order("holiday_date", { ascending: true })
 
+  // My job assignments in window: list of visit_assignments joined to visits + jobs
+  const { data: myAssignments } = await service
+    .from("visit_assignments")
+    .select("id, role, visits:job_visits(id, start_at, end_at, status, jobs(id, name, address))")
+    .eq("user_id", installer.userId)
+
+  // Filter & map to per-day chips for window
+  const myJobs: Array<{ assignment_id: string; visit_id: string; date: string; job_id: string; job_name: string; job_address: string | null; role: string | null; status: string | null }> = []
+  for (const a of myAssignments || []) {
+    const v: any = (a as any).visits
+    if (!v || !v.jobs) continue
+    const startDay = v.start_at.slice(0, 10)
+    const endDay = v.end_at ? v.end_at.slice(0, 10) : startDay
+    // Expand visit range and intersect with [startDate, endDate]
+    const s = startDay < startDate ? startDate : startDay
+    const e = endDay > endDate ? endDate : endDay
+    if (s > e) continue
+    const cur = new Date(s + "T00:00:00Z")
+    const last = new Date(e + "T00:00:00Z")
+    while (cur <= last) {
+      myJobs.push({
+        assignment_id: (a as any).id,
+        visit_id: v.id,
+        date: cur.toISOString().slice(0, 10),
+        job_id: v.jobs.id,
+        job_name: v.jobs.name,
+        job_address: v.jobs.address || null,
+        role: (a as any).role || null,
+        status: v.status || null,
+      })
+      cur.setUTCDate(cur.getUTCDate() + 1)
+    }
+  }
+  myJobs.sort((a, b) => a.date.localeCompare(b.date))
+
   return NextResponse.json({
     user_id: me.id,
     user_name: me.name,
@@ -126,6 +161,7 @@ export async function GET(request: Request) {
       remaining: entitlement - daysUsed,
     },
     weekly_schedule: weeklySchedule,
+    my_jobs: myJobs,
     // notes_field_fixed: rename DB column 'notes' to 'note' for mobile compat
     my_entries: (myEntries || []).map((e) => ({
       id: e.id,
