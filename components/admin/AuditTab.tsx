@@ -5,6 +5,7 @@ import UpgradeAIAuditPack from "./UpgradeAIAuditPack"
 
 interface Props {
   jobs: any[]
+  aiAuditEnabled?: boolean
 }
 
 export default function AuditTab({ jobs, aiAuditEnabled }: Props) {
