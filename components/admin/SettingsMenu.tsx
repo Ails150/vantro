@@ -105,7 +105,7 @@ export default function SettingsMenu({ user, userData, company, onSiteRulesClick
         </div>
       )}
 
-      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} user={user} userData={userData} />
+      <AccountModal open={showAccount} onClose={() => setShowAccount(false)} user={user} userData={userData} company={company} />
       <CompanyModal open={showCompany} onClose={() => setShowCompany(false)} company={company} />
     </div>
   )
