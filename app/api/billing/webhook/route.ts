@@ -2,7 +2,11 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured")
+  return new Stripe(key)
+}
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -22,7 +26,7 @@ export async function POST(request: Request) {
   const sig = request.headers.get('stripe-signature')!
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
+    event = getStripe().webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
   } catch (err: any) {
     return NextResponse.json({ error: 'Webhook signature error' }, { status: 400 })
   }

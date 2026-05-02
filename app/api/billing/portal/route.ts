@@ -2,7 +2,11 @@ import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured")
+  return new Stripe(key)
+}
 
 const isValidStripeCustomerId = (id: string | null | undefined): boolean => {
   if (!id) return false
@@ -35,7 +39,7 @@ export async function POST() {
 
   let customerId = company.stripe_customer_id
   if (!isValidStripeCustomerId(customerId)) {
-    const customer = await stripe.customers.create({
+    const customer = await getStripe().customers.create({
       email: user.email,
       name: company.name,
       metadata: { company_id: company.id },
@@ -48,7 +52,7 @@ export async function POST() {
   }
 
   try {
-    const portalSession = await stripe.billingPortal.sessions.create({
+    const portalSession = await getStripe().billingPortal.sessions.create({
       customer: customerId!,
       return_url: `${appUrl}/admin/settings`,
     })

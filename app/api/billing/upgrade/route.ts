@@ -3,7 +3,11 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { TIERS, type TierKey } from '@/lib/billing'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured")
+  return new Stripe(key)
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -33,10 +37,10 @@ export async function POST(request: Request) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.getvantro.com'
 
   if (company.stripe_subscription_id && company.subscription_status === 'active') {
-    const subscription = await stripe.subscriptions.retrieve(company.stripe_subscription_id)
+    const subscription = await getStripe().subscriptions.retrieve(company.stripe_subscription_id)
     const subscriptionItemId = subscription.items.data[0].id
 
-    await stripe.subscriptions.update(company.stripe_subscription_id, {
+    await getStripe().subscriptions.update(company.stripe_subscription_id, {
       items: [{ id: subscriptionItemId, price: newTier.priceId }],
       proration_behavior: 'always_invoice',
       metadata: { plan: newPlan, installer_limit: String(newTier.installerLimit) }
@@ -77,7 +81,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const session = await stripe.checkout.sessions.create(checkoutPayload)
+    const session = await getStripe().checkout.sessions.create(checkoutPayload)
     return NextResponse.json({ url: session.url })
   } catch (err: any) {
     console.error('Stripe Checkout creation failed:', err?.message || err)

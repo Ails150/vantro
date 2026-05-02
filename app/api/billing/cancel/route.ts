@@ -2,7 +2,11 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured")
+  return new Stripe(key)
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -36,7 +40,7 @@ export async function POST(request: Request) {
   } catch {}
 
   try {
-    const sub: any = await stripe.subscriptions.update(company.stripe_subscription_id, {
+    const sub: any = await getStripe().subscriptions.update(company.stripe_subscription_id, {
       cancel_at_period_end: action === 'cancel',
     })
     return NextResponse.json({

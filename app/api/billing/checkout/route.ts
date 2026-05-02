@@ -3,7 +3,11 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { TIERS, type TierKey } from '@/lib/billing'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not configured")
+  return new Stripe(key)
+}
 
 const isValidStripeCustomerId = (id: string | null | undefined): boolean => {
   if (!id) return false
@@ -89,7 +93,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const session = await stripe.checkout.sessions.create(checkoutPayload)
+    const session = await getStripe().checkout.sessions.create(checkoutPayload)
     return NextResponse.json({ url: session.url })
   } catch (err: any) {
     console.error('Stripe Checkout creation failed:', err?.message || err)
