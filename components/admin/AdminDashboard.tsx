@@ -10,7 +10,7 @@ import ComplianceTab from "@/components/admin/ComplianceTab"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import PaywallOverlay from '@/components/billing/PaywallOverlay' // paywall_wired_v2
@@ -20,6 +20,7 @@ import TradeMultiSelect from "./TradeMultiSelect"
 import CsvImportModal from "./CsvImportModal"
 import PayrollExportModal from "./PayrollExportModal"
 import SettingsMenu from "./SettingsMenu"
+import { analyzeAllJobs, jobsNeedingAttention, summarizeJobStaffing } from "@/lib/staffing"
 
 interface Props {
   user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
@@ -208,6 +209,40 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   }, [])
   const [formError, setFormError] = useState("")
   const router = useRouter()
+
+  // staffing analysis - memoized so it only recomputes when jobs/team/assignments change
+  const staffingResults = useMemo(() => analyzeAllJobs(
+    jobs.map((j: any) => ({
+      id: j.id,
+      name: j.name,
+      required_trades: Array.isArray(j.required_trades) ? j.required_trades : [],
+    })),
+    teamMembers.map((m: any) => ({
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      is_active: m.is_active,
+      trades: Array.isArray(m.trades) ? m.trades : [],
+    })),
+    jobAssignments.map((a: any) => ({
+      job_id: a.job_id,
+      user_id: a.user_id,
+    }))
+  ), [jobs, teamMembers, jobAssignments])
+
+  // alerts: operational issues only (exclude "unspecified" - those are setup tasks, not ops)
+  const staffingAlerts = useMemo(
+    () => jobsNeedingAttention(staffingResults).filter((r: any) => r.status !== "unspecified"),
+    [staffingResults]
+  )
+
+  // lookup map for per-row badges
+  const staffingByJobId = useMemo(() => {
+    const m: Record<string, any> = {}
+    for (const r of staffingResults) m[r.jobId] = r
+    return m
+  }, [staffingResults])
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -827,6 +862,32 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
         {activeTab === "jobs" && (
           <div className="space-y-5">
+            {staffingAlerts.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+                <div className="flex items-start justify-between gap-4 mb-3">
+                  <div>
+                    <h3 className="font-semibold text-amber-900">Staffing alerts</h3>
+                    <p className="text-sm text-amber-800 mt-0.5">{staffingAlerts.length} {staffingAlerts.length === 1 ? "job needs" : "jobs need"} attention</p>
+                  </div>
+                </div>
+                <ul className="space-y-2">
+                  {staffingAlerts.slice(0, 5).map((r: any) => (
+                    <li key={r.jobId} className="flex items-center justify-between gap-3 bg-white border border-amber-100 rounded-xl px-4 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm truncate">{r.jobName}</div>
+                        <div className="text-xs text-amber-700 mt-0.5">{summarizeJobStaffing(r)}</div>
+                      </div>
+                      <span className={"text-xs px-2 py-1 rounded-full font-semibold flex-shrink-0 " + (r.status === "missing" ? "bg-red-100 text-red-700" : r.status === "partial" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600")}>
+                        {r.status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                {staffingAlerts.length > 5 && (
+                  <div className="text-xs text-amber-700 mt-2">+ {staffingAlerts.length - 5} more</div>
+                )}
+              </div>
+            )}
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowJobsImport(true)} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-teal-300">Import CSV</button>
               <button onClick={() => { setShowAddJob(true); setFormError("") }} className={btn}>+ Add job</button>
@@ -857,7 +918,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                   {jobAddress && (
                     <div className={"absolute right-3 top-3 text-xs font-semibold " + (jobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                      {jobPlaceSelected ? "? GPS verified" : "? Select from dropdown"}
+                      {jobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
                     </div>
                   )}
                 </div>
@@ -955,6 +1016,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {isAssigning ? "Done" : "Assign"}
                       </button>
+                      {(() => { const sr = staffingByJobId[j.id]; if (!sr || sr.status === "covered") return null; const cls = sr.status === "missing" ? "bg-red-50 text-red-700" : sr.status === "partial" ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-500"; return <span className={"text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 " + cls} title={summarizeJobStaffing(sr)}>{sr.status === "missing" ? "Understaffed" : sr.status === "partial" ? "Partial" : "Trades not set"}</span> })()}
                       <span className={"text-sm px-3 py-1 rounded-full font-medium flex-shrink-0 " + (j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500")}>{j.status}</span>
                     </div>
                     {editingJobId === j.id && (
