@@ -123,6 +123,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   // trades_foundation_patched
   const [multiTradeEnabled, setMultiTradeEnabled] = useState(false)
   const [companyTrades, setCompanyTrades] = useState<Array<{ trade_key: string; label: string; enabled: boolean }>>([])
+  // Team tab filters
+  const [teamSearch, setTeamSearch] = useState("")
+  const [teamRoleFilter, setTeamRoleFilter] = useState<string>("all")
+  const [teamTradeFilter, setTeamTradeFilter] = useState<string>("all")
+  const [teamStatusFilter, setTeamStatusFilter] = useState<"all" | "active" | "inactive">("all")
+  const [openMenuMemberId, setOpenMenuMemberId] = useState<string | null>(null)
   const [jobRequiredTrades, setJobRequiredTrades] = useState<string[]>([])
   const [editJobRequiredTrades, setEditJobRequiredTrades] = useState<string[]>([])
   const [memberTrades, setMemberTrades] = useState<string[]>([])
@@ -242,6 +248,45 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     for (const r of staffingResults) m[r.jobId] = r
     return m
   }, [staffingResults])
+
+  // Filtered/searched team members for the Team tab
+  const filteredTeamMembers = useMemo(() => {
+    const q = teamSearch.trim().toLowerCase()
+    return teamMembers.filter((m: any) => {
+      // Search: name + email
+      if (q) {
+        const name = (m.name || "").toLowerCase()
+        const email = (m.email || "").toLowerCase()
+        if (!name.includes(q) && !email.includes(q)) return false
+      }
+      // Role
+      if (teamRoleFilter !== "all" && m.role !== teamRoleFilter) return false
+      // Status
+      if (teamStatusFilter === "active" && m.is_active === false) return false
+      if (teamStatusFilter === "inactive" && m.is_active !== false) return false
+      // Trade
+      if (teamTradeFilter !== "all") {
+        const trades = Array.isArray(m.trades) ? m.trades : []
+        if (!trades.includes(teamTradeFilter)) return false
+      }
+      return true
+    })
+  }, [teamMembers, teamSearch, teamRoleFilter, teamTradeFilter, teamStatusFilter])
+
+  // Counts per role/trade/status for the filter chips
+  const teamCounts = useMemo(() => {
+    const byRole: Record<string, number> = { all: teamMembers.length, installer: 0, foreman: 0, admin: 0 }
+    const byTrade: Record<string, number> = {}
+    let active = 0, inactive = 0
+    for (const m of teamMembers) {
+      if (m.role && byRole[m.role] !== undefined) byRole[m.role]++
+      if (m.is_active === false) inactive++
+      else active++
+      const trades = Array.isArray(m.trades) ? m.trades : []
+      for (const t of trades) byTrade[t] = (byTrade[t] || 0) + 1
+    }
+    return { byRole, byTrade, active, inactive }
+  }, [teamMembers])
 
   // ============================================================
   // Overview triage view: derived data
@@ -1458,47 +1503,199 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 </div>
               </div>
             )}
-            <div className={card}>
-              <div className={cardHeader}><span className="font-semibold">Team members</span></div>
-              {teamMembers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No team members yet</div>
-              : teamMembers.map((m: any) => (
-                <div key={m.id} className="border-b border-gray-50 last:border-0">
-                  <div className="flex items-center gap-4 px-6 py-5">
-                    <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0 " + (m.is_active === false ? "bg-gray-100 text-gray-400" : "bg-gray-100 text-gray-900")}>{m.initials}</div>
-                    <div className="flex-1">
-                      <div className={"font-semibold " + (m.is_active === false ? "text-gray-400" : "")}>{m.name}</div>
-                      <div className={"text-sm mt-0.5 " + sub}>{m.email || "No email"}</div>
-                      {m.is_active === false && <span className="text-xs text-amber-500">Suspended</span>}
-                      {!m.pin_hash && m.role === "installer" && <span className="text-xs text-red-400 ml-2">PIN not set</span>}
-                    </div>
-                    <span className={"text-sm px-3 py-1 rounded-full capitalize font-medium flex-shrink-0 " + (roleColors[m.role] || "bg-gray-100 text-gray-600")}>{m.role}</span>
-                    {(m.role === "installer" || m.role === "foreman") && (
-                      <div className="flex gap-2">
-                        <button onClick={() => resendInvite(m.email, m.name)} className="text-xs border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-lg px-3 py-1.5 transition-colors">Resend invite</button>
-                        <button onClick={() => resetPin(m.id)} className="text-xs border border-gray-200 text-gray-600 hover:border-amber-300 hover:text-amber-600 rounded-lg px-3 py-1.5 transition-colors">Reset PIN</button>
-                          <button onClick={() => editingScheduleId === m.id ? setEditingScheduleId(null) : openSchedule(m)} className={"text-xs border rounded-lg px-3 py-1.5 transition-colors " + (editingScheduleId === m.id ? "border-teal-400 text-teal-600 bg-teal-50" : "border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600")}>Schedule</button>
-                        <button onClick={() => toggleActive(m.id, m.is_active !== false)} className={"text-xs border rounded-lg px-3 py-1.5 transition-colors " + (m.is_active === false ? "border-teal-200 text-teal-600 hover:bg-teal-50" : "border-gray-200 text-gray-600 hover:border-amber-300 hover:text-amber-600")}>{m.is_active === false ? "Reactivate" : "Suspend"}</button>
-                        <button onClick={() => removeMember(m.id, m.auth_user_id)} className="text-xs border border-red-200 text-red-500 hover:bg-red-50 rounded-lg px-3 py-1.5 transition-colors">Remove</button>
-                      </div>
-                    )}
-                  </div>
-                    {editingScheduleId === m.id && (
-                      <MemberSchedule
-                        member={m}
-                        onSave={async (schedule) => {
-                          await fetch("/api/admin/team/schedule", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ userId: m.id, weekly_schedule: schedule })
-                          })
-                          setEditingScheduleId(null)
-                          router.refresh()
-                        }}
-                        onCancel={() => setEditingScheduleId(null)}
-                      />
-                    )}
+            {/* Team filters */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="text"
+                  value={teamSearch}
+                  onChange={e => setTeamSearch(e.target.value)}
+                  placeholder="Search by name or email..."
+                  className="flex-1 min-w-[200px] max-w-md border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+                />
+                {teamSearch && (
+                  <button onClick={() => setTeamSearch("")} className="text-xs text-gray-500 hover:text-gray-700">Clear</button>
+                )}
+              </div>
+
+              {/* Role chips */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-500 mr-1">Role:</span>
+                {(["all", "installer", "foreman", "admin"] as const).map(r => {
+                  const count = teamCounts.byRole[r] || 0
+                  const active = teamRoleFilter === r
+                  return (
+                    <button
+                      key={r}
+                      onClick={() => setTeamRoleFilter(r)}
+                      className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+                    >
+                      {r === "all" ? "All" : r.charAt(0).toUpperCase() + r.slice(1)} {count}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Status chips */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-gray-500 mr-1">Status:</span>
+                {(["all", "active", "inactive"] as const).map(s => {
+                  const count = s === "all" ? teamMembers.length : s === "active" ? teamCounts.active : teamCounts.inactive
+                  const active = teamStatusFilter === s
+                  return (
+                    <button
+                      key={s}
+                      onClick={() => setTeamStatusFilter(s)}
+                      className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+                    >
+                      {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)} {count}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Trade chips - only show when multi-trade enabled and trades exist */}
+              {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-gray-500 mr-1">Trade:</span>
+                  <button
+                    onClick={() => setTeamTradeFilter("all")}
+                    className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (teamTradeFilter === "all" ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+                  >
+                    All {teamMembers.length}
+                  </button>
+                  {companyTrades.filter(t => t.enabled).map(t => {
+                    const count = teamCounts.byTrade[t.trade_key] || 0
+                    const active = teamTradeFilter === t.trade_key
+                    return (
+                      <button
+                        key={t.trade_key}
+                        onClick={() => setTeamTradeFilter(t.trade_key)}
+                        className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+                      >
+                        {t.label} {count}
+                      </button>
+                    )
+                  })}
                 </div>
-              ))}
+              )}
+            </div>
+
+            <div className={card}>
+              <div className={cardHeader}>
+                <span className="font-semibold">Team members</span>
+                <span className="text-xs text-gray-500 ml-2">{filteredTeamMembers.length} of {teamMembers.length}</span>
+              </div>
+              {filteredTeamMembers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>{teamMembers.length === 0 ? "No team members yet" : "No matches"}</div>
+              : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+                    {filteredTeamMembers.map((m: any) => {
+                      const isActive = m.is_active !== false
+                      const isInstFm = m.role === "installer" || m.role === "foreman"
+                      const memberTrades = Array.isArray(m.trades) ? m.trades : []
+                      const tradeLabels = memberTrades.map((tk: string) => {
+                        const t = companyTrades.find((ct: any) => ct.trade_key === tk)
+                        return t ? t.label : tk
+                      })
+                      const menuOpen = openMenuMemberId === m.id
+                      const roleBadgeCls = roleColors[m.role] || "bg-gray-100 text-gray-600"
+                      return (
+                        <div
+                          key={m.id}
+                          className={"relative border rounded-2xl p-4 transition-colors flex flex-col min-h-[180px] " + (!isActive ? "bg-gray-50 border-gray-200 opacity-75" : (!m.pin_hash && m.role === "installer") ? "bg-red-50 border-red-200 hover:border-red-300" : "bg-white border-gray-200 hover:border-teal-300")}
+                        >
+                          <div className="flex items-start gap-3 mb-3">
+                            <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0 " + (isActive ? "bg-gray-100 text-gray-900" : "bg-gray-100 text-gray-400")}>
+                              {m.initials}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className={"font-semibold text-sm truncate " + (isActive ? "" : "text-gray-400")} title={m.name}>{m.name}</div>
+                              <div className="text-xs text-gray-500 truncate" title={m.email}>{m.email || "No email"}</div>
+                            </div>
+                            <span className={"text-[10px] px-2 py-0.5 rounded-full capitalize font-medium flex-shrink-0 " + roleBadgeCls}>{m.role}</span>
+                          </div>
+
+                          {(!isActive || (!m.pin_hash && m.role === "installer")) && (
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {!isActive && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">Suspended</span>}
+                              {!m.pin_hash && m.role === "installer" && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-medium">PIN not set</span>}
+                            </div>
+                          )}
+
+                          {multiTradeEnabled && (m.role === "installer" || m.role === "foreman") && (
+                            <div className="flex flex-wrap gap-1 mb-3">
+                              {tradeLabels.length > 0 ? (
+                                tradeLabels.map((label: string, idx: number) => (
+                                  <span key={idx} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{label}</span>
+                                ))
+                              ) : (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-dashed border-gray-300">No trades set</span>
+                              )}
+                            </div>
+                          )}
+
+                          {isInstFm && (
+                            <div className="flex items-center gap-2 pt-3 mt-auto border-t border-gray-100">
+                              <button
+                                onClick={() => editingScheduleId === m.id ? setEditingScheduleId(null) : openSchedule(m)}
+                                className={"flex-1 text-xs rounded-lg px-3 py-1.5 transition-colors " + (editingScheduleId === m.id ? "border border-teal-400 text-teal-600 bg-teal-50" : "border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600")}
+                              >
+                                {editingScheduleId === m.id ? "Close" : "Schedule"}
+                              </button>
+                              <div className="relative">
+                                <button
+                                  onClick={() => setOpenMenuMemberId(menuOpen ? null : m.id)}
+                                  className="text-xs border border-gray-200 text-gray-600 hover:border-gray-300 rounded-lg px-2.5 py-1.5 transition-colors"
+                                  aria-label="More actions"
+                                >
+                                  ...
+                                </button>
+                                {menuOpen && (
+                                  <>
+                                    <div
+                                      className="fixed inset-0 z-10"
+                                      onClick={() => setOpenMenuMemberId(null)}
+                                    />
+                                    <div className="absolute right-0 bottom-full mb-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 w-44">
+                                      <button onClick={() => { resendInvite(m.email, m.name); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50">Resend invite</button>
+                                      <button onClick={() => { resetPin(m.id); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50">Reset PIN</button>
+                                      <button onClick={() => { toggleActive(m.id, isActive); setOpenMenuMemberId(null) }} className={"w-full text-left text-xs px-3 py-2 hover:bg-gray-50 " + (isActive ? "text-amber-600" : "text-teal-600")}>{isActive ? "Suspend" : "Reactivate"}</button>
+                                      <div className="border-t border-gray-100 my-1"></div>
+                                      <button onClick={() => { removeMember(m.id, m.auth_user_id); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 text-red-600 hover:bg-red-50">Remove</button>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+
+                  {editingScheduleId && filteredTeamMembers.find((m: any) => m.id === editingScheduleId) && (() => {
+                    const m = filteredTeamMembers.find((mm: any) => mm.id === editingScheduleId)
+                    return (
+                      <div className="border-t border-gray-100 px-4 py-4">
+                        <MemberSchedule
+                          member={m}
+                          onSave={async (schedule) => {
+                            await fetch("/api/admin/team/schedule", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ userId: m.id, weekly_schedule: schedule })
+                            })
+                            setEditingScheduleId(null)
+                            router.refresh()
+                          }}
+                          onCancel={() => setEditingScheduleId(null)}
+                        />
+                      </div>
+                    )
+                  })()}
+                </>
+              )}
             </div>
           </div>
         )}
