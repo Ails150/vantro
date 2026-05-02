@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
+import { AI_AUDIT_PACK } from '@/lib/billing'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -81,6 +82,36 @@ export async function POST(request: Request) {
       case 'invoice.payment_succeeded': {
         const invoice = event.data.object as Stripe.Invoice
         await service.from('companies').update({ subscription_status: 'active' }).eq('stripe_customer_id', invoice.customer as string)
+        break
+      }
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription
+        const customerId = sub.customer as string
+        const hasAiAudit = sub.items.data.some(
+          (item) => item.price.id === AI_AUDIT_PACK.priceId
+        )
+        const { error: updateErr } = await service
+          .from('companies')
+          .update({
+            ai_audit_enabled: hasAiAudit,
+            subscription_status: sub.status,
+          })
+          .eq('stripe_customer_id', customerId)
+        if (updateErr) console.error('[webhook] subscription.updated update failed:', updateErr)
+        else console.log('[webhook] subscription.updated: ai_audit_enabled=', hasAiAudit, 'status=', sub.status)
+        break
+      }
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object as Stripe.Subscription
+        const customerId = sub.customer as string
+        await service
+          .from('companies')
+          .update({
+            ai_audit_enabled: false,
+            subscription_status: 'cancelled',
+          })
+          .eq('stripe_customer_id', customerId)
+        console.log('[webhook] subscription deleted for customer', customerId)
         break
       }
     }

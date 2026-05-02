@@ -1,12 +1,14 @@
 "use client"
 
 import { useState } from "react"
+import UpgradeAIAuditPack from "./UpgradeAIAuditPack"
 
 interface Props {
   jobs: any[]
 }
 
-export default function AuditTab({ jobs }: Props) {
+export default function AuditTab({ jobs, aiAuditEnabled }: Props) {
+  if (!aiAuditEnabled) return <UpgradeAIAuditPack />
   const [selectedJob, setSelectedJob] = useState("")
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")

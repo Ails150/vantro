@@ -22,6 +22,13 @@ export const TIERS = {
   },
 } as const
 
+export const AI_AUDIT_PACK = {
+  name: 'AI Audit Pack',
+  price: 79,
+  priceId: process.env.STRIPE_PRICE_AI_AUDIT_PACK!,
+  description: 'AI-powered compliance reports, video summaries, and executive briefings',
+} as const
+
 export type TierKey = keyof typeof TIERS
 
 /**

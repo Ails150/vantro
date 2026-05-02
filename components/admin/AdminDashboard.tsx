@@ -1964,7 +1964,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         )}
         {activeTab === "sites" && <SitesTab />}
         {activeTab === "trades" && <TradesTab />}
-        {activeTab === "audit" && <AuditTab jobs={jobs} />}
+        {activeTab === "audit" && <AuditTab jobs={jobs} aiAuditEnabled={!!company?.ai_audit_enabled} />}
         {activeTab === "map" && <MapTab />}
           {activeTab === "defects" && <DefectsTab />}
         {activeTab === "schedule" && <ScheduleTab />}
