@@ -243,6 +243,143 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return m
   }, [staffingResults])
 
+  // ============================================================
+  // Overview triage view: derived data
+  // ============================================================
+  const overviewData = useMemo(() => {
+    const now = new Date()
+    const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0)
+    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0,0,0,0)
+    const startOfLastWeek = new Date(startOfWeek); startOfLastWeek.setDate(startOfLastWeek.getDate() - 7)
+
+    // Resolved alert ids set for fast lookup
+    const resolvedIds = new Set((resolvedAlerts || []).map((r: any) => r.alert_id || r.id))
+
+    // ZONE 1: Action queue
+    const unreadBlockerAlerts = (alerts || []).filter((a: any) => a.alert_type === "blocker" && !resolvedIds.has(a.id))
+    const understaffedJobs = staffingAlerts // already filtered to non-unspecified ops issues
+    const unspecifiedJobs = staffingResults.filter((r: any) => r.status === "unspecified")
+    const oldestPendingQA = (pendingQA || []).reduce((oldest: any, q: any) => {
+      if (!oldest) return q
+      return new Date(q.created_at) < new Date(oldest.created_at) ? q : oldest
+    }, null)
+    const oldestQAAgeHours = oldestPendingQA
+      ? Math.floor((now.getTime() - new Date(oldestPendingQA.created_at).getTime()) / (1000 * 60 * 60))
+      : 0
+
+    const actionItems = [
+      pendingQA.length > 0 && {
+        key: "qa",
+        label: pendingQA.length === 1 ? "QA approval waiting" : `${pendingQA.length} QA approvals waiting`,
+        sub: oldestQAAgeHours > 24 ? `Oldest ${Math.floor(oldestQAAgeHours/24)}d` : `Oldest ${oldestQAAgeHours}h`,
+        tab: "approvals",
+        severity: oldestQAAgeHours > 48 ? "high" : "medium",
+      },
+      unreadBlockerAlerts.length > 0 && {
+        key: "blockers",
+        label: unreadBlockerAlerts.length === 1 ? "Unread blocker alert" : `${unreadBlockerAlerts.length} unread blocker alerts`,
+        sub: "",
+        tab: "alerts",
+        severity: "high",
+      },
+      understaffedJobs.length > 0 && {
+        key: "staffing",
+        label: understaffedJobs.length === 1 ? "Job needs staffing" : `${understaffedJobs.length} jobs need staffing`,
+        sub: "",
+        tab: "jobs",
+        severity: "medium",
+      },
+      unspecifiedJobs.length > 0 && {
+        key: "trades",
+        label: unspecifiedJobs.length === 1 ? "Job has no trades set" : `${unspecifiedJobs.length} jobs have no trades set`,
+        sub: "Setup task",
+        tab: "jobs",
+        severity: "low",
+      },
+    ].filter(Boolean) as any[]
+
+    // ZONE 2: Live state
+    const todaySignins = (signins || []).filter((s: any) => new Date(s.signed_in_at) >= startOfToday)
+    const onSiteByJobId: Record<string, number> = {}
+    for (const s of todaySignins) {
+      if (!s.signed_out_at) {
+        onSiteByJobId[s.job_id] = (onSiteByJobId[s.job_id] || 0) + 1
+      }
+    }
+    const activeJobs = jobs.filter((j: any) => j.status === "active")
+    const onSiteTiles = activeJobs.map((j: any) => {
+      const onSiteCount = onSiteByJobId[j.id] || 0
+      const assignedCount = jobAssignments.filter((a: any) => a.job_id === j.id).length
+      return { jobId: j.id, jobName: j.name, onSiteCount, assignedCount }
+    })
+
+    // Today's hours signed (only completed signins)
+    let todayHours = 0
+    for (const s of todaySignins) {
+      if (s.signed_in_at && s.signed_out_at) {
+        const ms = new Date(s.signed_out_at).getTime() - new Date(s.signed_in_at).getTime()
+        if (ms > 0) todayHours += ms / (1000 * 60 * 60)
+      }
+    }
+
+    // Last 7 days sparkline (hours per day, oldest -> newest)
+    const sparkline: number[] = []
+    for (let i = 6; i >= 0; i--) {
+      const dayStart = new Date(startOfToday); dayStart.setDate(dayStart.getDate() - i)
+      const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1)
+      let dayHours = 0
+      for (const s of (signins || [])) {
+        if (!s.signed_in_at || !s.signed_out_at) continue
+        const t = new Date(s.signed_in_at)
+        if (t >= dayStart && t < dayEnd) {
+          const ms = new Date(s.signed_out_at).getTime() - t.getTime()
+          if (ms > 0) dayHours += ms / (1000 * 60 * 60)
+        }
+      }
+      sparkline.push(Math.round(dayHours))
+    }
+
+    // ZONE 3: Trajectory (this week vs last week)
+    function hoursInRange(start: Date, end: Date): number {
+      let h = 0
+      for (const s of (signins || [])) {
+        if (!s.signed_in_at || !s.signed_out_at) continue
+        const t = new Date(s.signed_in_at)
+        if (t >= start && t < end) {
+          const ms = new Date(s.signed_out_at).getTime() - t.getTime()
+          if (ms > 0) h += ms / (1000 * 60 * 60)
+        }
+      }
+      return Math.round(h)
+    }
+    const hoursThisWeek = hoursInRange(startOfWeek, now)
+    const hoursLastWeek = hoursInRange(startOfLastWeek, startOfWeek)
+
+    // Jobs completed this week vs last week (uses updated_at if present, falls back to created_at)
+    function jobsCompletedInRange(start: Date, end: Date): number {
+      return jobs.filter((j: any) => {
+        if (j.status !== "completed") return false
+        const ts = j.updated_at || j.created_at
+        if (!ts) return false
+        const t = new Date(ts)
+        return t >= start && t < end
+      }).length
+    }
+    const jobsCompletedThisWeek = jobsCompletedInRange(startOfWeek, now)
+    const jobsCompletedLastWeek = jobsCompletedInRange(startOfLastWeek, startOfWeek)
+
+    return {
+      actionItems,
+      onSiteTiles,
+      todayHours: Math.round(todayHours),
+      sparkline,
+      hoursThisWeek,
+      hoursLastWeek,
+      jobsCompletedThisWeek,
+      jobsCompletedLastWeek,
+    }
+  }, [jobs, signins, alerts, resolvedAlerts, pendingQA, jobAssignments, staffingAlerts, staffingResults])
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -804,55 +941,121 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       <div className="px-4 md:px-8 py-4 md:py-6 max-w-6xl">
 
         {activeTab === "overview" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className={card}>
-              <div className={cardHeader}>
-                <span className="font-semibold">Live on site</span>
-                <span className="text-sm bg-teal-50 text-teal-600 px-3 py-1 rounded-full">{signins.length} active</span>
-              </div>
-              {signins.length === 0 ? <div className={"px-6 py-10 text-center " + sub}>No one signed in yet today</div>
-              : signins.map((s: any) => (
-                <div key={s.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
-                  <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center text-sm font-bold text-teal-600">{s.users?.initials || "?"}</div>
-                  <div className="flex-1"><div className="font-semibold">{s.users?.name}</div><div className={"text-sm " + sub}>In at {new Date(s.signed_in_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}</div></div>
-                  <span className="text-sm text-teal-500 font-medium">On site</span>
+          <div className="space-y-5">
+            {/* ZONE 1: Action queue */}
+            {overviewData.actionItems.length === 0 ? (
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold">✓</div>
+                <div>
+                  <div className="font-semibold text-teal-900">All clear</div>
+                  <div className="text-sm text-teal-700">Nothing needs your attention right now.</div>
                 </div>
-              ))}
-            </div>
-            <div className={card}>
-              <div className={cardHeader}>
-                <span className="font-semibold">Recent alerts</span>
-                {alerts.length > 0 && <span className="text-sm bg-red-50 text-red-500 px-3 py-1 rounded-full">{alerts.length} unread</span>}
               </div>
-              {alerts.length === 0 ? <div className={"px-6 py-10 text-center " + sub}>No alerts - all clear</div>
-              : liveAlerts.slice(0, 5).map((a: any) => (
-                <div key={a.id} className={"px-6 py-4 border-b border-gray-50 last:border-0" + (a.alert_type === "blocker" ? " border-l-4 border-l-red-400" : "")}>
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full font-bold border border-red-200">"BLOCKER"</span>}
-                    {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full border border-amber-200">ISSUE</span>}
-                    <span className={"text-xs font-medium text-gray-700"}>{a.jobs?.name}</span>
-                    <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
-                  </div>
-                  <div className="text-sm text-gray-600">{a.message}</div>
+            ) : (
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <h3 className="font-semibold mb-3">Needs you today</h3>
+                <ul className="space-y-2">
+                  {overviewData.actionItems.map((item: any) => {
+                    const sevCls = item.severity === "high" ? "border-red-200 bg-red-50" : item.severity === "medium" ? "border-amber-200 bg-amber-50" : "border-gray-200 bg-gray-50"
+                    const dotCls = item.severity === "high" ? "bg-red-500" : item.severity === "medium" ? "bg-amber-500" : "bg-gray-400"
+                    return (
+                      <li key={item.key} className={"flex items-center justify-between gap-3 border rounded-xl px-4 py-3 " + sevCls}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={"w-2 h-2 rounded-full flex-shrink-0 " + dotCls}></span>
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm">{item.label}</div>
+                            {item.sub && <div className="text-xs text-gray-600 mt-0.5">{item.sub}</div>}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setActiveTab(item.tab)}
+                          className="text-xs font-semibold text-teal-700 hover:text-teal-900 flex-shrink-0"
+                        >
+                          View →
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )}
+
+            {/* ZONE 2: Live state */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Left: On-site tiles */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold">On site now</h3>
+                  <button onClick={() => setActiveTab("map")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">View map →</button>
                 </div>
-              ))}
-            </div>
-            <div className={card + " md:col-span-2"}>
-              <div className={cardHeader}>
-                <span className="font-semibold">Active jobs</span>
-                <span className={"text-sm " + sub}>{jobs.length} total</span>
-              </div>
-              {jobs.length === 0 ? <div className={"px-6 py-10 text-center " + sub}>No jobs yet</div>
-              : jobs.slice(0, 6).map((j: any) => {
-                const assigned = getAssigned(j.id)
-                return (
-                  <div key={j.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
-                    <div className="flex-1"><div className="font-semibold">{j.name}</div><div className={"text-sm " + sub}>{j.address}</div></div>{(j.job_checklists||[]).length > 0 && <div className="flex gap-1 mt-1">{(j.job_checklists||[]).map((jc:any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 border border-teal-200 rounded-full px-2 py-0.5">{checklistTemplates.find((t:any)=>t.id===jc.template_id)?.name||""}</span>)}</div>}
-                    {assigned.length > 0 && <div className="flex gap-1">{assigned.map((a: any) => <div key={a.id} className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold">{a.initials}</div>)}</div>}
-                    <span className={"text-sm px-3 py-1 rounded-full font-medium " + (j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500")}>{j.status}</span>
+                {overviewData.onSiteTiles.length === 0 ? (
+                  <div className={"text-sm py-6 text-center " + sub}>No active jobs</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {overviewData.onSiteTiles.slice(0, 8).map((tile: any) => {
+                      const empty = tile.onSiteCount === 0
+                      const full = tile.assignedCount > 0 && tile.onSiteCount >= tile.assignedCount
+                      const cls = empty ? "bg-red-50 border-red-200" : full ? "bg-teal-50 border-teal-200" : "bg-amber-50 border-amber-200"
+                      const numCls = empty ? "text-red-700" : full ? "text-teal-700" : "text-amber-700"
+                      return (
+                        <div key={tile.jobId} className={"border rounded-xl px-3 py-2.5 " + cls}>
+                          <div className="text-xs font-medium truncate" title={tile.jobName}>{tile.jobName}</div>
+                          <div className={"text-2xl font-bold mt-0.5 leading-none " + numCls}>{tile.onSiteCount}</div>
+                          <div className="text-[10px] text-gray-500 mt-1">of {tile.assignedCount || 0} assigned</div>
+                        </div>
+                      )
+                    })}
                   </div>
-                )
-              })}
+                )}
+              </div>
+
+              {/* Right: Today's hours + sparkline */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <h3 className="font-semibold mb-3">Hours logged today</h3>
+                <div className="text-3xl font-bold text-gray-900">{overviewData.todayHours}h</div>
+                <div className="text-xs text-gray-500 mt-1 mb-4">From signed-out shifts only</div>
+                <div className="flex items-end gap-1 h-12">
+                  {overviewData.sparkline.map((v: number, idx: number) => {
+                    const max = Math.max(...overviewData.sparkline, 1)
+                    const pct = (v / max) * 100
+                    const isToday = idx === overviewData.sparkline.length - 1
+                    return (
+                      <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full" title={v + "h"}>
+                        <div className={"w-full rounded-sm " + (isToday ? "bg-teal-500" : "bg-gray-300")} style={{ height: pct + "%" }}></div>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                  <span>7d ago</span>
+                  <span>today</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ZONE 3: Week-over-week trajectory */}
+            <div className="grid grid-cols-2 md:grid-cols-2 gap-5">
+              {(() => {
+                const tiles = [
+                  { label: "Hours signed", current: overviewData.hoursThisWeek, previous: overviewData.hoursLastWeek, suffix: "h" },
+                  { label: "Jobs completed", current: overviewData.jobsCompletedThisWeek, previous: overviewData.jobsCompletedLastWeek, suffix: "" },
+                ]
+                return tiles.map((t) => {
+                  const delta = t.current - t.previous
+                  const pct = t.previous > 0 ? Math.round((delta / t.previous) * 100) : 0
+                  const arrow = delta > 0 ? "↗" : delta < 0 ? "↘" : "="
+                  const deltaCls = delta > 0 ? "text-teal-600" : delta < 0 ? "text-red-600" : "text-gray-500"
+                  return (
+                    <div key={t.label} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t.label}</div>
+                      <div className="text-3xl font-bold mt-1">{t.current}{t.suffix}</div>
+                      <div className={"text-sm mt-1 " + deltaCls}>
+                        {arrow} {Math.abs(delta)}{t.suffix} vs last week{t.previous > 0 ? " (" + (delta >= 0 ? "+" : "") + pct + "%)" : ""}
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
             </div>
           </div>
         )}
