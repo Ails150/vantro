@@ -813,28 +813,28 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return teamMembers.filter((m: any) => ids.includes(m.id))
   }
 
-  const setupTabs = [
+  const setupTabs: Array<{ id: string; label: string; badge?: number }> = [
     { id: "team", label: "Team" },
     { id: "sites", label: "Sites" },
     { id: "trades", label: "Trades" },
     { id: "jobs", label: "Jobs" },
-    { id: "checklists", label: "Checklists" },
+    { id: "checklists", label: "Checklist Templates" },
     { id: "schedule", label: "Scheduler" }, // schedule_link_added
     { id: "calendar", label: "Calendar" }, // calendar_sidebar_marker
     { id: "settings", label: "Settings" },
-    { id: "alerts", label: "Alerts", badge: alerts.length },
   ]
 
-  const operationsTabs = [
+  const operationsTabs: Array<{ id: string; label: string; badge?: number }> = [
     { id: "overview", label: "Overview" },
+    { id: "alerts", label: "Alerts", badge: alerts.length },
+    { id: "approvals", label: "QA Reviews", badge: pendingQA.length },
+    { id: "diary", label: "Diary" },
+    { id: "defects", label: "Defects" },
+    { id: "map", label: "Map" },
     { id: "analytics", label: "Analytics" },
     { id: "performance", label: "Performance" },
     { id: "payroll", label: "Payroll" },
-    { id: "map", label: "Map" },
     { id: "audit", label: "Audit" },
-    { id: "approvals", label: "Approvals", badge: pendingQA.length },
-    { id: "diary", label: "Diary" },
-    { id: "defects", label: "Defects" },
   ]
 
   const inp = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
