@@ -1701,7 +1701,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             await fetch("/api/admin/team/schedule", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ userId: m.id, weekly_schedule: schedule })
+                              body: JSON.stringify({ userId: m.id, weekly_pattern: schedule })
                             })
                             setEditingScheduleId(null)
                             router.refresh()
