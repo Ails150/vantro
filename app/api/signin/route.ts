@@ -159,8 +159,20 @@ export async function POST(request: Request) {
   const state = await isInstallerWorking(installer.userId)
   const expectedSignOutTime = state.expectedSignOut ?? null
 
-  // Job-level override still wins if set (per-job custom sign-out)
-  const finalExpectedSignOut = job.sign_out_time || expectedSignOutTime
+  // If the resolver says today is non-working for this user (day off,
+  // public holiday, time off, or no schedule defined), DO NOT set an
+  // expected sign-out. Sign-in itself is still allowed for emergency
+  // cover, but the cron, performance dashboard, and departed-early
+  // logic must NOT police this shift. Hours still recorded accurately
+  // from signed_in_at to signed_out_at - payroll unaffected.
+  // Installer signs out manually in this case.
+  //
+  // For working days, prefer the resolver. Fall back to job.sign_out_time
+  // only if the user has no schedule entry.
+  const NON_WORKING_REASONS = ['day_off', 'public_holiday', 'time_off', 'no_schedule']
+  const finalExpectedSignOut = NON_WORKING_REASONS.includes(state.reason)
+    ? null
+    : (expectedSignOutTime || job.sign_out_time || null)
 
   const { data: inserted, error } = await service
     .from("signins")
