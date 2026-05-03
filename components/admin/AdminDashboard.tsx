@@ -10,7 +10,7 @@ import ComplianceTab from "@/components/admin/ComplianceTab"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
-import { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import PaywallOverlay from '@/components/billing/PaywallOverlay' // paywall_wired_v2
@@ -1618,8 +1618,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       const menuOpen = openMenuMemberId === m.id
                       const roleBadgeCls = roleColors[m.role] || "bg-gray-100 text-gray-600"
                       return (
+                        <React.Fragment key={m.id}>
                         <div
-                          key={m.id}
                           className={"relative border rounded-2xl p-4 transition-colors flex flex-col min-h-[180px] " + (!isActive ? "bg-gray-50 border-gray-200 opacity-75" : (!m.pin_hash && m.role === "installer") ? "bg-red-50 border-red-200 hover:border-red-300" : "bg-white border-gray-200 hover:border-teal-300")}
                         >
                           <div className="flex items-start gap-3 mb-3">
@@ -1687,30 +1687,29 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             </div>
                           )}
                         </div>
-                      )
+                        {editingScheduleId === m.id && (
+                          <div className="col-span-full bg-gray-50 border border-gray-200 rounded-2xl">
+                            <MemberSchedule
+                              member={m}
+                              onSave={async (schedule) => {
+                                await fetch("/api/admin/team/schedule", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ userId: m.id, weekly_pattern: schedule })
+                                })
+                                setEditingScheduleId(null)
+                                router.refresh()
+                              }}
+                              onCancel={() => setEditingScheduleId(null)}
+                            />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    )
                     })}
                   </div>
 
-                  {editingScheduleId && filteredTeamMembers.find((m: any) => m.id === editingScheduleId) && (() => {
-                    const m = filteredTeamMembers.find((mm: any) => mm.id === editingScheduleId)
-                    return (
-                      <div className="border-t border-gray-100 px-4 py-4">
-                        <MemberSchedule
-                          member={m}
-                          onSave={async (schedule) => {
-                            await fetch("/api/admin/team/schedule", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({ userId: m.id, weekly_pattern: schedule })
-                            })
-                            setEditingScheduleId(null)
-                            router.refresh()
-                          }}
-                          onCancel={() => setEditingScheduleId(null)}
-                        />
-                      </div>
-                    )
-                  })()}
+
                 </>
               )}
             </div>
