@@ -70,3 +70,31 @@ apply-*.ps1
 vantro-*.ps1
 apply-*.ps1
 
+
+# Sentry Config File
+.env.sentry-build-plugin
+
+# Patch helper scripts (one-off Python patches, ps1 scripts, dump files)
+# These are transient files used during development sessions and should
+# not be committed. Keep them locally for reference.
+_*.py
+_*.txt
+_*.bin
+patch*.py
+patchM*.py
+patchH*.py
+patch_*.py
+drop-*.ps1
+wire-*.ps1
+wire_*.py
+*.tsx.txt
+*.ts.txt
+*-section.txt
+*-tab.txt
+admin-dashboard.tsx.txt
+audit-route.ts
+
+# Backup folders, temp settings dumps, anything not intentionally committed
+_backups/
+settings-page.txt
+*-page.txt
