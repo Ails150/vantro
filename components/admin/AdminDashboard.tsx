@@ -194,22 +194,22 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             (newest?.alert_type === "blocker" ? "BLOCKER" : "ISSUE") + " - " + (newest?.jobs?.name || "Unknown job") + (newest?.jobs?.name || "Job") + ": " + newest?.message,
             newest?.alert_type === "blocker" ? "blocker" : "issue"
           )
-          // Play sound
+          // Play sound: two-tone chime. Each tone needs its own oscillator
+          // because Web Audio API does not allow restarting a stopped one.
           try {
             const ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
-            const osc = ctx.createOscillator()
-            const gain = ctx.createGain()
-            osc.connect(gain)
-            gain.connect(ctx.destination)
-            osc.frequency.value = 880
-            gain.gain.value = 0.3
-            osc.start()
-            osc.stop(ctx.currentTime + 0.3)
-            setTimeout(() => {
-              osc.frequency.value = 1100
-              osc.start(ctx.currentTime + 0.4)
-              osc.stop(ctx.currentTime + 0.6)
-            }, 400)
+            const playBeep = (freq: number, startOffset: number, duration: number) => {
+              const osc = ctx.createOscillator()
+              const gain = ctx.createGain()
+              osc.connect(gain)
+              gain.connect(ctx.destination)
+              osc.frequency.value = freq
+              gain.gain.value = 0.3
+              osc.start(ctx.currentTime + startOffset)
+              osc.stop(ctx.currentTime + startOffset + duration)
+            }
+            playBeep(880, 0, 0.3)
+            playBeep(1100, 0.4, 0.2)
           } catch {}
         }
         prevAlertCount.current = newAlerts.length
