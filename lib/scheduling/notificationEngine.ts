@@ -12,6 +12,7 @@
 // This removes every UK-hardcoded assumption.
 
 import { combineDateAndLocalTime, nowInTimezone, type LocalNow } from "./timezone"
+import { isInstallerWorking } from "./resolver"
 
 type Service = any // SupabaseClient - typed as any to avoid SDK version coupling
 
@@ -199,6 +200,27 @@ export async function runNotificationEngine(
           companyResult.time_off_skipped.push({ user: user.name, job: job.name, reason: "time_off_or_holiday" })
           result.time_off_skipped++
           continue
+        }
+        // Per-user working-day check - skip if today is a day off, holiday,
+        // time off, or user has no schedule. Catches cases protectedIds misses
+        // (notably users whose weekly schedule says day_off but who don't have
+        // a time_off_entry row).
+        try {
+          const userState = await isInstallerWorking(a.user_id, now)
+          if (
+            userState.reason === "day_off" ||
+            userState.reason === "public_holiday" ||
+            userState.reason === "time_off" ||
+            userState.reason === "no_schedule"
+          ) {
+            companyResult.time_off_skipped.push({ user: user.name, job: job.name, reason: userState.reason })
+            result.time_off_skipped++
+            continue
+          }
+        } catch (e) {
+          console.error("[cron] resolver check failed", { userId: a.user_id, err: e })
+          // Fail safe: if resolver errors, fall through and reminder fires.
+          // Better to over-notify than block legitimate reminders.
         }
         companyResult.signin_reminders.push({
           job: job.name,
