@@ -1,0 +1,2 @@
+table_name,column_name,data_type,is_nullable,column_default,ordinal_position,fk_references
+# Placeholder. Run docs/schema.sql in Supabase SQL Editor and overwrite this with the CSV export.
