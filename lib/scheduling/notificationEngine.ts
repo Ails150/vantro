@@ -251,6 +251,69 @@ export async function runNotificationEngine(
       }
     }
 
+    // - GPS PING REQUESTS (every 15 min for 3 hours before sign-out) -
+    // For each open signin where now is within the 3-hour pre-signout window,
+    // and the last ping was >= 15 min ago (or never), send a silent push to
+    // the installer's phone asking it to log current GPS. Mobile app handles
+    // the push by calling getCurrentPositionAsync and POSTing to /api/location.
+    //
+    // This gives admins a deliberate "are they on site at end of shift" trail
+    // instead of relying on phone-driven background ticks that Android often
+    // kills for battery optimization.
+    const PING_WINDOW_HOURS = 3
+    const PING_INTERVAL_MINUTES = 15
+
+    const { data: pingCandidates } = await service
+      .from("signins")
+      .select("id, user_id, job_id, signed_in_at, expected_sign_out_time, last_gps_ping_at, jobs(name), users(name, push_token)")
+      .eq("company_id", company.id)
+      .is("signed_out_at", null)
+      .not("expected_sign_out_time", "is", null)
+      .limit(200)
+
+    for (const signin of pingCandidates || []) {
+      const user = signin.users as any
+      const job = signin.jobs as any
+      if (!user?.push_token) continue
+
+      // Compute the same window the mobile app uses
+      const scheduledSignOutAt = combineDateAndLocalTime(
+        signin.signed_in_at,
+        signin.expected_sign_out_time,
+        tz,
+      )
+      const windowStart = new Date(scheduledSignOutAt.getTime() - PING_WINDOW_HOURS * 3600000)
+
+      // Only fire during the window
+      if (now < windowStart || now > scheduledSignOutAt) continue
+
+      // Throttle: 15 min minimum between pings per signin
+      if (signin.last_gps_ping_at) {
+        const lastPing = new Date(signin.last_gps_ping_at)
+        const minutesSinceLast = (now.getTime() - lastPing.getTime()) / 60000
+        if (minutesSinceLast < PING_INTERVAL_MINUTES) continue
+      }
+
+      if (!dryRun) {
+        await sendPushNotification(
+          [user.push_token],
+          "",  // silent push: no title
+          "",  // silent push: no body
+          {
+            type: "gps_ping_request",
+            signinId: signin.id,
+            jobId: signin.job_id,
+            silent: true,
+          },
+        )
+        await service
+          .from("signins")
+          .update({ last_gps_ping_at: now.toISOString() })
+          .eq("id", signin.id)
+        result.reminders_sent++
+      }
+    }
+
     // - SIGN-OUT REMINDERS + AUTO-CLOSE -
     const { data: activeSignins } = await service
       .from("signins")
