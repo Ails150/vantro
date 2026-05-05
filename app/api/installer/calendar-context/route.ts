@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { verifyInstallerToken } from "@/lib/auth"
 
@@ -45,17 +45,43 @@ export async function GET(request: Request) {
   const leaveYearDay = company?.leave_year_start_day ?? countryCfg?.leave_year_start_day ?? 1
   const leaveYear = computeLeaveYear(new Date(), leaveYearMonth, leaveYearDay)
 
-  // Per-user shift override (if any)
+  // Per-user shift override (if any) - rows are per-day
+  const today = new Date().toISOString().slice(0, 10)
   const { data: shifts } = await service
     .from("user_shifts")
-    .select("*")
+    .select("day_of_week, start_time, end_time")
     .eq("user_id", installer.userId)
-    .order("effective_from", { ascending: false })
-    .limit(1)
-  const userShift = shifts && shifts.length > 0 ? shifts[0] : null
+    .lte("effective_from", today)
+    .or(`effective_until.is.null,effective_until.gte.${today}`)
 
   // Resolve weekly schedule: user override else company default
-  const weeklySchedule = userShift?.schedule || company?.default_schedule || defaultSchedule()
+  let weeklySchedule: any
+  if (shifts && shifts.length > 0) {
+    // Build weekly_schedule from per-day rows (day_of_week: 0=Sun..6=Sat)
+    const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+    weeklySchedule = {
+      mon: { working: false, start: null, end: null },
+      tue: { working: false, start: null, end: null },
+      wed: { working: false, start: null, end: null },
+      thu: { working: false, start: null, end: null },
+      fri: { working: false, start: null, end: null },
+      sat: { working: false, start: null, end: null },
+      sun: { working: false, start: null, end: null },
+    }
+    for (const s of shifts) {
+      const key = dayKeys[s.day_of_week]
+      if (key) {
+        weeklySchedule[key] = {
+          working: true,
+          enabled: true,
+          start: s.start_time.slice(0, 5),
+          end: s.end_time.slice(0, 5),
+        }
+      }
+    }
+  } else {
+    weeklySchedule = company?.default_schedule || defaultSchedule()
+  }
 
   // Leave allowance for current leave year
   const { data: allowance } = await service
@@ -86,7 +112,7 @@ export async function GET(request: Request) {
     .reduce((sum, e) => sum + countDays(e.start_date, e.end_date, !!e.is_half_day), 0)
 
   // Team context: count of approved teammates per day in window
-  // (anonymised — just a count, no names)
+  // (anonymised â€” just a count, no names)
   const { data: teamApproved } = await service
     .from("time_off_entries")
     .select("start_date, end_date")
