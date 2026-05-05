@@ -1,12 +1,12 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
 /**
  * POST /api/onboarding
  *
- * Steps must run in order: company → installers → jobs
+ * Steps must run in order: company â†’ installers â†’ jobs
  * Step N requires step N-1 to have completed successfully.
- * No silent fallbacks — if a step's prerequisite is missing, return 412 Precondition Failed.
+ * No silent fallbacks â€” if a step's prerequisite is missing, return 412 Precondition Failed.
  *
  * Response shape on error:
  *   { error: string, detail?: string, code?: string }
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
   const service = await createServiceClient()
 
-  // ─── STEP 1: COMPANY ──────────────────────────────────────────
+  // â”€â”€â”€ STEP 1: COMPANY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (step === 'company') {
     const { companyName } = body
     if (!companyName?.trim()) {
@@ -69,11 +69,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, companyId: existingUser.company_id, alreadyExisted: true })
     }
 
-    // Create company — DB defaults handle country_code, status, trial_ends_at
+    // Create company â€” DB defaults handle country_code, status, trial_ends_at
     const slug = body.companySlug?.trim() || generateSlug(companyName)
+    const defaultSchedule = {
+      mon: { enabled: true, start: "08:00", end: "17:00" },
+      tue: { enabled: true, start: "08:00", end: "17:00" },
+      wed: { enabled: true, start: "08:00", end: "17:00" },
+      thu: { enabled: true, start: "08:00", end: "17:00" },
+      fri: { enabled: true, start: "08:00", end: "17:00" },
+      sat: { enabled: false },
+      sun: { enabled: false },
+    }
     const { data: company, error: compErr } = await service
       .from('companies')
-      .insert({ name: companyName.trim(), slug })
+      .insert({ name: companyName.trim(), slug, default_schedule: defaultSchedule })
       .select('id')
       .single()
 
@@ -112,7 +121,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, companyId: company.id })
   }
 
-  // ─── STEP 2: INSTALLERS ───────────────────────────────────────
+  // â”€â”€â”€ STEP 2: INSTALLERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (step === 'installers') {
     const { installers } = body
 
@@ -177,7 +186,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, addedCount: inserted?.length || 0 })
   }
 
-  // ─── STEP 3: JOBS ─────────────────────────────────────────────
+  // â”€â”€â”€ STEP 3: JOBS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (step === 'jobs') {
     const { jobs } = body
 
@@ -194,7 +203,7 @@ export async function POST(request: Request) {
       }, { status: 412 })
     }
 
-    // Jobs are optional at onboarding — empty array is fine
+    // Jobs are optional at onboarding â€” empty array is fine
     if (!jobs?.length) {
       return NextResponse.json({ success: true, addedCount: 0 })
     }
