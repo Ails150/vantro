@@ -53,7 +53,8 @@ export async function POST(request: Request) {
         const adminEmail = authUser.user.email!
         const adminName = meta.admin_name || authUser.user.user_metadata?.full_name || 'Admin'
         const slug = generateSlug(companyName)
-        const { data: company, error: compErr } = await service.from('companies').insert({ name: companyName, slug, plan, installer_limit: parseInt(meta.installer_limit || '40', 10), stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, subscription_status: 'trialing' }).select('id').single()
+        const defaultSchedule = { mon: { enabled: true, start: "08:00", end: "17:00" }, tue: { enabled: true, start: "08:00", end: "17:00" }, wed: { enabled: true, start: "08:00", end: "17:00" }, thu: { enabled: true, start: "08:00", end: "17:00" }, fri: { enabled: true, start: "08:00", end: "17:00" }, sat: { enabled: false }, sun: { enabled: false } }
+        const { data: company, error: compErr } = await service.from('companies').insert({ name: companyName, slug, plan, installer_limit: parseInt(meta.installer_limit || '40', 10), stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, subscription_status: 'trialing', default_schedule: defaultSchedule }).select('id').single()
         if (compErr || !company) { console.error('[webhook] company insert failed:', compErr); break }
         const { error: userErr } = await service.from('users').insert({ company_id: company.id, auth_user_id: authUserId, email: adminEmail, name: adminName, initials: getInitials(adminName), role: 'admin', is_active: true })
         if (userErr) { await service.from('companies').delete().eq('id', company.id); console.error('[webhook] user insert failed:', userErr); break }
