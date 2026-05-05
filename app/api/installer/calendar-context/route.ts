@@ -186,7 +186,7 @@ export async function GET(request: Request) {
       used: daysUsed,
       remaining: entitlement - daysUsed,
     },
-    weekly_schedule: (() => { console.log('[debug-schedule]', JSON.stringify({ userId: installer.userId, shiftCount: shifts?.length || 0, weeklySchedule })); return weeklySchedule; })(),
+    weekly_schedule: weeklySchedule,
     my_jobs: myJobs,
     // notes_field_fixed: rename DB column 'notes' to 'note' for mobile compat
     my_entries: (myEntries || []).map((e) => ({
