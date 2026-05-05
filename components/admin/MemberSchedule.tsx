@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useEffect, useState } from "react"
 
 const DAYS = [
@@ -52,10 +52,15 @@ export default function MemberSchedule({ member, onSave, onCancel }: { member: a
   }, [member.id])
 
   function toggleDay(day: string) {
-    setSchedule((prev: any) => ({
-      ...prev,
-      [day]: { ...prev[day], enabled: !prev[day].enabled }
-    }))
+    setSchedule((prev: any) => {
+      const wasEnabled = prev[day]?.enabled
+      return {
+        ...prev,
+        [day]: wasEnabled
+          ? { enabled: false }
+          : { enabled: true, start: prev[day]?.start || "08:00", end: prev[day]?.end || "17:00" }
+      }
+    })
   }
 
   function setTime(day: string, field: "start" | "end", value: string) {
