@@ -46,13 +46,13 @@ export async function GET(request: Request) {
   const leaveYear = computeLeaveYear(new Date(), leaveYearMonth, leaveYearDay)
 
   // Per-user shift override (if any) - rows are per-day
-  const today = new Date().toISOString().slice(0, 10)
+  const todayStr = new Date().toISOString().slice(0, 10)
   const { data: shifts } = await service
     .from("user_shifts")
     .select("day_of_week, start_time, end_time")
     .eq("user_id", installer.userId)
-    .lte("effective_from", today)
-    .or(`effective_until.is.null,effective_until.gte.${today}`)
+    .lte("effective_from", todayStr)
+    .or(`effective_until.is.null,effective_until.gte.${todayStr}`)
 
   // Resolve weekly schedule: user override else company default
   let weeklySchedule: any
