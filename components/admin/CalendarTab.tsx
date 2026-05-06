@@ -317,7 +317,7 @@ export default function CalendarTab() {
             onClick={goPrev}
             className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
           >
-            â†
+            ←
           </button>
           <button
             onClick={goToday}
@@ -329,7 +329,7 @@ export default function CalendarTab() {
             onClick={goNext}
             className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
           >
-            â†’
+            →
           </button>
           <div className="ml-3 flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <button
