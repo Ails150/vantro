@@ -828,7 +828,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   const setupTabs: Array<{ id: string; label: string; badge?: number }> = [
     { id: "team", label: "Team" },
-    { id: "sites", label: "Sites" },
     { id: "trades", label: "Trades" },
     { id: "jobs", label: "Jobs" },
     { id: "checklists", label: "Checklist Templates" },
