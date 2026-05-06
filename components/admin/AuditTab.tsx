@@ -6,10 +6,23 @@ import UpgradeAIAuditPack from "./UpgradeAIAuditPack"
 interface Props {
   jobs: any[]
   aiAuditEnabled?: boolean
+  aiAuditTrialEndsAt?: string | null
+  stripeAiAuditSubscriptionItemId?: string | null
 }
 
-export default function AuditTab({ jobs, aiAuditEnabled }: Props) {
+function getAiAuditView(trialEndsAt?: string | null, subscriptionItemId?: string | null) {
+  if (subscriptionItemId) return { kind: "paid" as const }
+  if (trialEndsAt && new Date(trialEndsAt) > new Date()) {
+    const ms = new Date(trialEndsAt).getTime() - Date.now()
+    const daysLeft = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)))
+    return { kind: "trial" as const, daysLeft, endsAt: trialEndsAt }
+  }
+  return { kind: "none" as const }
+}
+
+export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, stripeAiAuditSubscriptionItemId }: Props) {
   if (!aiAuditEnabled) return <UpgradeAIAuditPack />
+  const aiAuditView = getAiAuditView(aiAuditTrialEndsAt, stripeAiAuditSubscriptionItemId)
   const [selectedJob, setSelectedJob] = useState("")
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
@@ -170,6 +183,24 @@ ${report.qa.map((q: any) => `<tr><td>${new Date(q.created_at).toLocaleString("en
 
   return (
     <div className="space-y-5">
+      {aiAuditView.kind === "trial" && (
+        <div className="mb-4 bg-gradient-to-r from-teal-50 to-amber-50 border border-teal-200 rounded-xl px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🎉</span>
+            <div>
+              <div className="text-sm font-semibold text-gray-900">AI Audit Pack — free during trial</div>
+              <div className="text-xs text-gray-600">{aiAuditView.daysLeft} {aiAuditView.daysLeft === 1 ? "day" : "days"} remaining · Add £79/mo to keep it past your trial</div>
+            </div>
+          </div>
+          <a href="/admin?tab=settings" className="text-sm font-semibold text-teal-700 hover:text-teal-800 whitespace-nowrap">Add £79/mo →</a>
+        </div>
+      )}
+      {aiAuditView.kind === "paid" && (
+        <div className="mb-4 inline-flex items-center gap-2 bg-green-50 border border-green-200 rounded-full px-3 py-1 text-xs font-medium text-green-700">
+          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+          AI Audit Pack · Active
+        </div>
+      )}
       <div className={card + " p-6"}>
         <h2 className="text-xl font-semibold text-gray-900 mb-1">Audit and Dispute Report</h2>
         <p className="text-sm text-gray-500 mb-5">

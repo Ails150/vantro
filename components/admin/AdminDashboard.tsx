@@ -1976,7 +1976,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         )}
         {activeTab === "sites" && <SitesTab />}
         {activeTab === "trades" && <TradesTab />}
-        {activeTab === "audit" && <AuditTab jobs={jobs} aiAuditEnabled={!!company?.ai_audit_enabled} />}
+        {activeTab === "audit" && <AuditTab jobs={jobs} aiAuditEnabled={!!company?.ai_audit_enabled} aiAuditTrialEndsAt={company?.ai_audit_trial_ends_at} stripeAiAuditSubscriptionItemId={company?.stripe_ai_audit_subscription_item_id} />}
         {activeTab === "map" && <MapTab />}
           {activeTab === "defects" && <DefectsTab />}
         {activeTab === "schedule" && <ScheduleTab />}
