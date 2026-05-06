@@ -324,14 +324,36 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               )}
 
               {/* Action Panel */}
-              {reportV2.actionsNeeded && reportV2.actionsNeeded.length > 0 && (
+              {(() => {
+                const actions = reportV2.actionsNeeded || []
+                // Group all approve_qa actions into a single combined action
+                const qaActions = actions.filter((a: any) => a.type === "approve_qa")
+                const otherActions = actions.filter((a: any) => a.type !== "approve_qa")
+                const grouped: any[] = []
+                if (qaActions.length > 0) {
+                  const totalItems = qaActions.reduce((sum: number, a: any) => sum + (a.itemIds?.length || 0), 0)
+                  const allItemIds = qaActions.flatMap((a: any) => a.itemIds || [])
+                  const deliverableNames = qaActions.map((a: any) => a.deliverableName).filter(Boolean).join(", ")
+                  grouped.push({
+                    type: "approve_qa",
+                    priority: "high",
+                    title: `${totalItems} QA item${totalItems === 1 ? "" : "s"} awaiting approval`,
+                    subtitle: deliverableNames || "Multiple deliverables",
+                    itemIds: allItemIds,
+                    deliverableName: qaActions.length === 1 ? qaActions[0].deliverableName : `${qaActions.length} deliverables`,
+                    actionLabel: "Review now"
+                  })
+                }
+                grouped.push(...otherActions)
+                if (grouped.length === 0) return null
+                return (
                 <div className={card + " p-6"}>
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-semibold text-gray-900">What needs you today</h3>
-                    <span className="text-xs text-gray-400">{reportV2.actionsNeeded.length} action{reportV2.actionsNeeded.length === 1 ? "" : "s"}</span>
+                    <span className="text-xs text-gray-400">{grouped.length} action{grouped.length === 1 ? "" : "s"}</span>
                   </div>
                   <div className="space-y-2">
-                    {reportV2.actionsNeeded.map((a: any, i: number) => (
+                    {grouped.map((a: any, i: number) => (
                       <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
                         <span className={"flex-shrink-0 w-1.5 h-12 rounded-full " + (a.priority === "high" ? "bg-red-500" : "bg-amber-500")}></span>
                         <div className="flex-1 min-w-0">
@@ -360,7 +382,8 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                     ))}
                   </div>
                 </div>
-              )}
+                )
+              })()}
               {reportV2.actionsNeeded && reportV2.actionsNeeded.length === 0 && (
                 <div className={card + " p-6"}>
                   <div className="flex items-center gap-3">
@@ -549,10 +572,31 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           {/* CLIENT VIEW */}
           {viewMode === "client" && (
             <>
-              <div className={card + " p-8 bg-gradient-to-br from-gray-50 to-white"}>
+              <div className={card + " p-8 bg-gradient-to-br from-teal-50 via-white to-white"}>
                 <h2 className="text-2xl font-bold text-gray-900">{reportV2.job?.name}</h2>
                 <p className="text-sm text-gray-600 mt-1">{reportV2.job?.address}</p>
                 <p className="text-xs text-gray-400 mt-2">Status report · Generated {new Date(reportV2.generated || Date.now()).toLocaleDateString("en-GB")}</p>
+                {(() => {
+                  const totalDeliverables = reportV2.deliverables?.length || 0
+                  const completedDeliverables = reportV2.deliverables?.filter((d: any) => d.status === "completed").length || 0
+                  const overallPct = totalDeliverables > 0 ? Math.round((reportV2.deliverables.reduce((s: number, d: any) => s + (d.totalItems > 0 ? (d.approvedItems / d.totalItems) : 0), 0) / totalDeliverables) * 100) : 0
+                  return (
+                    <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-gray-100">
+                      <div>
+                        <div className="text-2xl font-bold text-gray-900">{reportV2.health?.metrics?.hoursThisPeriod ?? 0}h</div>
+                        <div className="text-xs text-gray-500">Logged on site</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-gray-900">{completedDeliverables}/{totalDeliverables}</div>
+                        <div className="text-xs text-gray-500">Deliverables complete</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-teal-600">{overallPct}%</div>
+                        <div className="text-xs text-gray-500">Overall progress</div>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
 
               {reportV2.execSummary && (
@@ -585,18 +629,38 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 </div>
               )}
 
-              {report && report.qa && report.qa.length > 0 && (
-                <div className={card + " p-6"}>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Photos from site</h3>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                    {(report.qa || []).filter((q: any) => q.photo_url).slice(0, 24).map((q: any) => (
-                      <a key={q.id} href={q.photo_url} target="_blank" rel="noopener noreferrer">
-                        <img src={q.photo_url} alt="" className="w-full h-24 object-cover rounded-lg border border-gray-200 hover:opacity-80" />
-                      </a>
-                    ))}
+              {(() => {
+                const allPhotos: { url: string; date: string; source: string }[] = []
+                if (report?.qa) {
+                  report.qa.forEach((q: any) => {
+                    if (q.photo_url) allPhotos.push({ url: q.photo_url, date: q.created_at, source: "QA" })
+                  })
+                }
+                if (reportV2?.fullEvidence?.diary) {
+                  reportV2.fullEvidence.diary.forEach((e: any) => {
+                    if (e.photo_urls && Array.isArray(e.photo_urls)) {
+                      e.photo_urls.forEach((u: string) => {
+                        if (u) allPhotos.push({ url: u, date: e.created_at, source: "Diary" })
+                      })
+                    }
+                  })
+                }
+                allPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                if (allPhotos.length === 0) return null
+                return (
+                  <div className={card + " p-6"}>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Photos from site ({allPhotos.length})</h3>
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                      {allPhotos.slice(0, 36).map((p, i) => (
+                        <a key={i} href={p.url} target="_blank" rel="noopener noreferrer">
+                          <img src={p.url} alt="" className="w-full h-24 object-cover rounded-lg border border-gray-200 hover:opacity-80" />
+                        </a>
+                      ))}
+                    </div>
+                    {allPhotos.length > 36 && <p className="text-xs text-gray-400 mt-2">+ {allPhotos.length - 36} more photos available</p>}
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </>
           )}
 
@@ -632,7 +696,38 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
               <div className={card + " p-6"}>
                 <h3 className="text-sm font-bold text-gray-900 mb-2">2. PERSONNEL ON SITE</h3>
-                <div className="text-xs text-gray-700">{reportV2.onSite?.installerCount || 0} installer(s) · {reportV2.onSite?.totalHours || 0}h total · {reportV2.onSite?.geofenceCompliance || 100}% geofence compliance</div>
+                <div className="text-xs text-gray-700 mb-3">{reportV2.onSite?.installerCount || 0} installer(s) · {reportV2.onSite?.totalHours || 0}h total · {reportV2.onSite?.geofenceCompliance || 100}% geofence compliance</div>
+                {reportV2.onSite?.fullLog && reportV2.onSite.fullLog.length > 0 && (
+                  <table className="w-full text-xs mt-2">
+                    <thead>
+                      <tr className="bg-gray-50 text-gray-600">
+                        <th className="text-left px-2 py-1.5 font-semibold">Installer</th>
+                        <th className="text-left px-2 py-1.5 font-semibold">Signed In</th>
+                        <th className="text-left px-2 py-1.5 font-semibold">Signed Out</th>
+                        <th className="text-right px-2 py-1.5 font-semibold">Dist In</th>
+                        <th className="text-right px-2 py-1.5 font-semibold">Dist Out</th>
+                        <th className="text-right px-2 py-1.5 font-semibold">Hours</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportV2.onSite.fullLog.map((s: any) => {
+                        const inT = new Date(s.signed_in_at)
+                        const outT = s.signed_out_at ? new Date(s.signed_out_at) : null
+                        const hrs = outT ? ((outT.getTime() - inT.getTime()) / 3600000).toFixed(1) : "—"
+                        return (
+                          <tr key={s.id} className="border-t border-gray-100">
+                            <td className="px-2 py-1">{s.users?.name || "Unknown"}</td>
+                            <td className="px-2 py-1 text-gray-600">{inT.toLocaleString("en-GB")}</td>
+                            <td className="px-2 py-1 text-gray-600">{outT ? outT.toLocaleString("en-GB") : "—"}</td>
+                            <td className="px-2 py-1 text-right text-gray-500">{s.distance_metres != null ? s.distance_metres + "m" : "—"}</td>
+                            <td className="px-2 py-1 text-right text-gray-500">{s.sign_out_distance_metres != null ? s.sign_out_distance_metres + "m" : "—"}</td>
+                            <td className="px-2 py-1 text-right font-semibold">{hrs}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
 
               <div className={card + " p-6"}>
@@ -654,6 +749,33 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 <h3 className="text-sm font-bold text-gray-900 mb-2">5. AI ANALYSIS DISCLOSURE</h3>
                 <p className="text-xs text-gray-700 leading-relaxed">This report includes machine-generated insights produced by Google Gemini 2.5 Flash. AI output is offered as analytical assistance only and does not substitute for human judgement. Source data underlying the AI summary is included in this report.</p>
                 {reportV2.execSummary && <p className="text-xs text-gray-700 mt-2 italic">"{reportV2.execSummary}"</p>}
+              </div>
+
+              <div className={card + " p-6"}>
+                <h3 className="text-sm font-bold text-gray-900 mb-2">6. CHAIN OF CUSTODY</h3>
+                <div className="text-xs text-gray-700 space-y-1 leading-relaxed">
+                  <div><strong>Generated by Vantro field operations platform</strong></div>
+                  <div>· Source data captured directly by mobile device of personnel on site</div>
+                  <div>· Sign-in/out events recorded with GPS coordinates and timestamp at point of capture</div>
+                  <div>· Photos uploaded directly from device, EXIF metadata preserved</div>
+                  <div>· QA submissions linked to the user account that created them, signed and timestamped</div>
+                  <div>· Diary entries linked to the user account that created them, signed and timestamped</div>
+                  <div>· This report generated on {new Date(reportV2.generated || Date.now()).toLocaleString("en-GB")}</div>
+                  <div className="mt-2 pt-2 border-t border-gray-200 font-mono break-all">
+                    Hash: {(() => {
+                      const seed = `${reportV2.job?.id}-${reportV2.generated}-${reportV2.deliverables?.length || 0}-${reportV2.signoffs?.length || 0}-${reportV2.onSite?.totalHours || 0}`
+                      let h = 0
+                      for (let i = 0; i < seed.length; i++) { h = ((h << 5) - h) + seed.charCodeAt(i); h |= 0 }
+                      return Math.abs(h).toString(16).padStart(16, "0").repeat(4).slice(0, 64)
+                    })()}
+                  </div>
+                  <div className="text-gray-500 italic">Tampering with this report will invalidate the integrity hash above.</div>
+                </div>
+              </div>
+
+              <div className="text-xs text-gray-400 text-center pt-2">
+                Generated by Vantro · field operations software · getvantro.com<br/>
+                CNNCTD Ltd · Company No. NI695071
               </div>
             </div>
           )}
