@@ -23,8 +23,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!alert) return NextResponse.json({ error: "Alert not found" }, { status: 404 })
 
   const updateData: any = { is_read: true }
-  if (resolution !== undefined) updateData.resolution = resolution
-  if (status) updateData.status = status
+  if (resolution !== undefined) {
+    updateData.resolution_note = resolution
+    updateData.resolved_at = new Date().toISOString()
+    updateData.resolved_by = adminUser.id
+    updateData.status = "resolved"
+  } else if (status) {
+    updateData.status = status
+  }
   const { error: updErr } = await service.from("alerts").update(updateData).eq("id", id)
   if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 })
 
