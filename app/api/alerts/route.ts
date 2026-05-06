@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
         data: { type: "alert_resolved", alertId },
         channelId: "vantro",
       })
-    }).catch(() => {})
+    ).then(r=>r.json()).then(d=>console.log("[alert resolve] Push response:",JSON.stringify(d))).catch(e=>console.error("[alert resolve] Push error:",e))
   }
 
 return NextResponse.json({ success: true })
