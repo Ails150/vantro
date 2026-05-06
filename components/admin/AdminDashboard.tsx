@@ -156,7 +156,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [alertFilter, setAlertFilter] = useState<'all'|'blocker'|'issue'|'24h'>('all')
   const [showResolved, setShowResolved] = useState(false)
   const [expandedJobGroups, setExpandedJobGroups] = useState<Set<string>>(new Set())
-  const [diaryFilter, setDiaryFilter] = useState<'all'|'blocker'|'issue'|'photos'|'videos'|'24h'>('all')
+  const [diaryFilter, setDiaryFilter] = useState<'all'|'blocker'|'issue'|'photos'|'videos'|'today'|'7d'|'30d'>('all')
   const [diarySearch, setDiarySearch] = useState('')
   const [resolutionNote, setResolutionNote] = useState("")
   const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
@@ -1848,8 +1848,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   placeholder="Search installer, job, or note..."
                   className="flex-1 min-w-[200px] bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal-400"
                 />
-                {(['all','blocker','issue','photos','videos','24h'] as const).map(f => {
-                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'photos' ? 'With photos' : f === 'videos' ? 'With videos' : 'Last 24h'
+                {(['all','blocker','issue','photos','videos','today','7d','30d'] as const).map(f => {
+                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'photos' ? 'With photos' : f === 'videos' ? 'With videos' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
                   return (
                     <button
                       key={f}
@@ -1870,7 +1870,13 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 if (diaryFilter === 'issue' && d.ai_alert_type !== 'issue') return false
                 if (diaryFilter === 'photos' && (!d.photo_urls || d.photo_urls.length === 0)) return false
                 if (diaryFilter === 'videos' && !d.video_url) return false
-                if (diaryFilter === '24h' && new Date(d.created_at).getTime() < now - 86400000) return false
+                if (diaryFilter === 'today') {
+                  const startOfDay = new Date()
+                  startOfDay.setHours(0,0,0,0)
+                  if (new Date(d.created_at).getTime() < startOfDay.getTime()) return false
+                }
+                if (diaryFilter === '7d' && new Date(d.created_at).getTime() < now - 7*86400000) return false
+                if (diaryFilter === '30d' && new Date(d.created_at).getTime() < now - 30*86400000) return false
                 if (q) {
                   const hay = [
                     d.users?.name || '',
