@@ -52,6 +52,35 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   const [defectModal, setDefectModal] = useState<any>(null)
   const [completeModal, setCompleteModal] = useState<any>(null)
 
+  // Compliance integrity hash (real SHA-256)
+  const [complianceHash, setComplianceHash] = useState<string>("")
+
+  useEffect(() => {
+    if (!reportV2) { setComplianceHash(""); return }
+    (async () => {
+      try {
+        const canonical = JSON.stringify({
+          jobId: reportV2.job?.id,
+          generated: reportV2.generated,
+          deliverables: reportV2.deliverables?.map((d: any) => ({
+            id: d.id, name: d.name, status: d.status, items: d.items?.map((i: any) => ({ id: i.id, state: i.state }))
+          })),
+          signoffs: reportV2.signoffs?.length || 0,
+          totalHours: reportV2.onSite?.totalHours,
+          installerCount: reportV2.onSite?.installerCount,
+          blockers: reportV2.issues?.blockers?.length || 0,
+          openDefects: reportV2.issues?.openDefects?.length || 0,
+        })
+        const buf = new TextEncoder().encode(canonical)
+        const hashBuf = await crypto.subtle.digest("SHA-256", buf)
+        const hex = Array.from(new Uint8Array(hashBuf)).map(b => b.toString(16).padStart(2, "0")).join("")
+        setComplianceHash(hex)
+      } catch (e) {
+        setComplianceHash("")
+      }
+    })()
+  }, [reportV2])
+
   // Persist view mode and cost toggle
   useEffect(() => {
     const v = localStorage.getItem("vantro_audit_view")
@@ -731,18 +760,107 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               </div>
 
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-2">3. DELIVERABLES & QUALITY CONTROL</h3>
+                <h3 className="text-sm font-bold text-gray-900 mb-3">3. DELIVERABLES & QUALITY CONTROL</h3>
                 {reportV2.deliverables?.map((d: any, i: number) => (
-                  <div key={d.id} className="mt-2 pl-3 border-l-2 border-gray-200">
-                    <div className="text-xs font-semibold">3.{i+1} {d.name}</div>
-                    <div className="text-xs text-gray-600">{d.approvedItems}/{d.totalItems} approved · {d.status}</div>
+                  <div key={d.id} className="mt-3 pl-3 border-l-2 border-gray-300">
+                    <div className="text-xs font-bold mb-1">3.{i+1} {d.name}</div>
+                    <div className="text-xs text-gray-600 mb-2">{d.approvedItems} of {d.totalItems} items approved · Status: {d.status}</div>
+                    {d.items && d.items.length > 0 && (
+                      <table className="w-full text-xs mt-2 border border-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Item</th>
+                            <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">State</th>
+                            <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Approver</th>
+                            <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Approved at</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {d.items.map((it: any, j: number) => (
+                            <tr key={it.id} className="border-b border-gray-100">
+                              <td className="px-2 py-1">3.{i+1}.{j+1} {it.label}</td>
+                              <td className="px-2 py-1">{it.state || "pending"}</td>
+                              <td className="px-2 py-1">{it.approvedBy || "—"}</td>
+                              <td className="px-2 py-1">{it.approvedAt ? new Date(it.approvedAt).toLocaleString("en-GB") : "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
                   </div>
                 ))}
               </div>
 
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-2">4. ISSUES LOG</h3>
-                <div className="text-xs text-gray-700">Blockers: {reportV2.issues?.blockers?.length || 0} · Issues: {reportV2.issues?.issues?.length || 0} · Open defects: {reportV2.issues?.openDefects?.length || 0}</div>
+                <h3 className="text-sm font-bold text-gray-900 mb-3">4. ISSUES LOG</h3>
+
+                {/* 4.1 Blockers */}
+                <div className="mb-4 pl-3 border-l-2 border-red-300">
+                  <div className="text-xs font-bold mb-2">4.1 Blockers ({reportV2.issues?.blockers?.length || 0})</div>
+                  {reportV2.issues?.blockers?.length === 0 && <div className="text-xs text-gray-500 italic">None recorded.</div>}
+                  {reportV2.issues?.blockers?.map((b: any, j: number) => (
+                    <div key={b.id} className="text-xs mb-3 pb-2 border-b border-gray-100 last:border-0">
+                      <div className="font-semibold mb-0.5">4.1.{j+1} · {new Date(b.created_at).toLocaleString("en-GB")} · {b.users?.name || "Unknown"}</div>
+                      {b.entry_text && <div className="text-gray-700 whitespace-pre-wrap">“{b.entry_text}”</div>}
+                      {b.ai_summary && b.ai_summary !== b.entry_text && <div className="text-gray-500 italic mt-0.5">AI: {b.ai_summary}</div>}
+                      {b.photo_urls && b.photo_urls.length > 0 && (
+                        <div className="flex gap-1.5 mt-1.5">
+                          {b.photo_urls.map((u: string, k: number) => (
+                            <a key={k} href={u} target="_blank" rel="noopener noreferrer">
+                              <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-gray-200" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 4.2 Issues */}
+                <div className="mb-4 pl-3 border-l-2 border-amber-300">
+                  <div className="text-xs font-bold mb-2">4.2 Issues ({reportV2.issues?.issues?.length || 0})</div>
+                  {reportV2.issues?.issues?.length === 0 && <div className="text-xs text-gray-500 italic">None recorded.</div>}
+                  {reportV2.issues?.issues?.map((iss: any, j: number) => (
+                    <div key={iss.id} className="text-xs mb-3 pb-2 border-b border-gray-100 last:border-0">
+                      <div className="font-semibold mb-0.5">4.2.{j+1} · {new Date(iss.created_at).toLocaleString("en-GB")} · {iss.users?.name || "Unknown"}</div>
+                      {iss.entry_text && <div className="text-gray-700 whitespace-pre-wrap">“{iss.entry_text}”</div>}
+                      {iss.ai_summary && iss.ai_summary !== iss.entry_text && <div className="text-gray-500 italic mt-0.5">AI: {iss.ai_summary}</div>}
+                      {iss.photo_urls && iss.photo_urls.length > 0 && (
+                        <div className="flex gap-1.5 mt-1.5">
+                          {iss.photo_urls.map((u: string, k: number) => (
+                            <a key={k} href={u} target="_blank" rel="noopener noreferrer">
+                              <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-gray-200" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 4.3 Defects */}
+                <div className="pl-3 border-l-2 border-orange-300">
+                  <div className="text-xs font-bold mb-2">4.3 Defects ({reportV2.issues?.allDefects?.length || 0})</div>
+                  {(reportV2.issues?.allDefects?.length || 0) === 0 && <div className="text-xs text-gray-500 italic">None recorded.</div>}
+                  {reportV2.issues?.allDefects?.map((df: any, j: number) => (
+                    <div key={df.id} className="text-xs mb-3 pb-2 border-b border-gray-100 last:border-0">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="font-semibold">4.3.{j+1}</span>
+                        <span className={"px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (df.severity === "high" || df.severity === "critical" ? "bg-red-100 text-red-700" : df.severity === "medium" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600")}>{df.severity || "unspecified"}</span>
+                        <span className="text-gray-500">{new Date(df.created_at).toLocaleString("en-GB")}</span>
+                        <span className="text-gray-500">· {df.users?.name || "Unknown"}</span>
+                        <span className={"ml-auto px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (df.status === "resolved" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700")}>{df.status || "open"}</span>
+                      </div>
+                      {df.description && <div className="text-gray-700 mt-0.5">{df.description}</div>}
+                      {df.resolution_note && <div className="text-gray-500 italic mt-0.5">Resolution: {df.resolution_note}</div>}
+                      {df.photo_url && (
+                        <a href={df.photo_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-1.5">
+                          <img src={df.photo_url} alt="" className="w-16 h-16 object-cover rounded border border-gray-200" />
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className={card + " p-6"}>
@@ -757,19 +875,20 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <div><strong>Generated by Vantro field operations platform</strong></div>
                   <div>· Source data captured directly by mobile device of personnel on site</div>
                   <div>· Sign-in/out events recorded with GPS coordinates and timestamp at point of capture</div>
-                  <div>· Photos uploaded directly from device, EXIF metadata preserved</div>
+                  <div>· Photos uploaded directly from device, server-stored with original timestamps</div>
                   <div>· QA submissions linked to the user account that created them, signed and timestamped</div>
                   <div>· Diary entries linked to the user account that created them, signed and timestamped</div>
+                  <div>· Defect records linked to the user account that created them, signed and timestamped</div>
                   <div>· This report generated on {new Date(reportV2.generated || Date.now()).toLocaleString("en-GB")}</div>
-                  <div className="mt-2 pt-2 border-t border-gray-200 font-mono break-all">
-                    Hash: {(() => {
-                      const seed = `${reportV2.job?.id}-${reportV2.generated}-${reportV2.deliverables?.length || 0}-${reportV2.signoffs?.length || 0}-${reportV2.onSite?.totalHours || 0}`
-                      let h = 0
-                      for (let i = 0; i < seed.length; i++) { h = ((h << 5) - h) + seed.charCodeAt(i); h |= 0 }
-                      return Math.abs(h).toString(16).padStart(16, "0").repeat(4).slice(0, 64)
-                    })()}
-                  </div>
-                  <div className="text-gray-500 italic">Tampering with this report will invalidate the integrity hash above.</div>
+                  <div>· Source database: Vantro production (Supabase, EU region)</div>
+                  <div>· This report can be independently verified against the live Vantro database by the report originator</div>
+                  {complianceHash && (
+                    <div className="mt-3 pt-2 border-t border-gray-200">
+                      <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">SHA-256 integrity digest</div>
+                      <div className="font-mono break-all text-[11px]">{complianceHash}</div>
+                      <div className="text-gray-500 italic text-[11px] mt-0.5">Computed from job ID, generation timestamp, deliverable items, sign-offs and on-site hours. Modifying any of these fields will produce a different digest.</div>
+                    </div>
+                  )}
                 </div>
               </div>
 
