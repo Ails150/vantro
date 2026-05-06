@@ -161,7 +161,7 @@ Return ONLY valid JSON, no preamble, no markdown:
           job_id: jobId,
           user_id: payload.userId,
           alert_type: finalSeverity,
-          message: aiSummary || (entryText || "").slice(0, 100),
+          message: (entryText && entryText.trim()) ? entryText.trim().slice(0, 200) : (aiSummary || "Diary entry"),
           diary_entry_id: diary.id,
           status: "open",
           urgency,
