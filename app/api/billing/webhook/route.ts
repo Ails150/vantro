@@ -45,7 +45,8 @@ export async function POST(request: Request) {
         if (!authUserId || !companyName) break
         const { data: existingUser } = await service.from('users').select('company_id').eq('auth_user_id', authUserId).maybeSingle()
         if (existingUser?.company_id) {
-          await service.from('companies').update({ stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, subscription_status: 'trialing' }).eq('id', existingUser.company_id)
+          const trialEndsAtExisting = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+          await service.from('companies').update({ stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, subscription_status: 'trialing', ai_audit_enabled: true, ai_audit_trial_ends_at: trialEndsAtExisting, trial_ends_at: trialEndsAtExisting }).eq('id', existingUser.company_id)
           break
         }
         const { data: authUser } = await service.auth.admin.getUserById(authUserId)
@@ -54,7 +55,8 @@ export async function POST(request: Request) {
         const adminName = meta.admin_name || authUser.user.user_metadata?.full_name || 'Admin'
         const slug = generateSlug(companyName)
         const defaultSchedule = { mon: { enabled: true, start: "08:00", end: "17:00" }, tue: { enabled: true, start: "08:00", end: "17:00" }, wed: { enabled: true, start: "08:00", end: "17:00" }, thu: { enabled: true, start: "08:00", end: "17:00" }, fri: { enabled: true, start: "08:00", end: "17:00" }, sat: { enabled: false }, sun: { enabled: false } }
-        const { data: company, error: compErr } = await service.from('companies').insert({ name: companyName, slug, plan, installer_limit: parseInt(meta.installer_limit || '40', 10), stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, subscription_status: 'trialing', default_schedule: defaultSchedule }).select('id').single()
+        const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        const { data: company, error: compErr } = await service.from('companies').insert({ name: companyName, slug, plan, installer_limit: parseInt(meta.installer_limit || '40', 10), stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, subscription_status: 'trialing', default_schedule: defaultSchedule, ai_audit_enabled: true, ai_audit_trial_ends_at: trialEndsAt, trial_ends_at: trialEndsAt }).select('id').single()
         if (compErr || !company) { console.error('[webhook] company insert failed:', compErr); break }
         const { error: userErr } = await service.from('users').insert({ company_id: company.id, auth_user_id: authUserId, email: adminEmail, name: adminName, initials: getInitials(adminName), role: 'admin', is_active: true })
         if (userErr) { await service.from('companies').delete().eq('id', company.id); console.error('[webhook] user insert failed:', userErr); break }
@@ -63,16 +65,33 @@ export async function POST(request: Request) {
       }
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
-        const sub = event.data.object as any
+        const sub = event.data.object as Stripe.Subscription
+        const customerId = sub.customer as string
         const companyId = sub.metadata?.company_id
-        let status: string = sub.status === 'canceled' ? 'cancelled' : sub.status
-        if (companyId) await service.from('companies').update({ subscription_status: status, stripe_subscription_id: sub.id }).eq('id', companyId)
-        else await service.from('companies').update({ subscription_status: status }).eq('stripe_customer_id', sub.customer as string)
+        const status: string = sub.status === 'canceled' ? 'cancelled' : sub.status
+        const hasAiAudit = sub.items.data.some(
+          (item) => item.price.id === AI_AUDIT_PACK.priceId
+        )
+        const aiAuditItem = sub.items.data.find(
+          (item) => item.price.id === AI_AUDIT_PACK.priceId
+        )
+        const updates: Record<string, any> = {
+          subscription_status: status,
+          stripe_subscription_id: sub.id,
+          ai_audit_enabled: hasAiAudit,
+          stripe_ai_audit_subscription_item_id: aiAuditItem?.id || null,
+        }
+        const target = companyId
+          ? service.from('companies').update(updates).eq('id', companyId)
+          : service.from('companies').update(updates).eq('stripe_customer_id', customerId)
+        const { error: updateErr } = await target
+        if (updateErr) console.error('[webhook] subscription update failed:', updateErr)
+        else console.log('[webhook] subscription updated: status=', status, 'ai_audit=', hasAiAudit)
         break
       }
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription
-        await service.from('companies').update({ subscription_status: 'cancelled' }).eq('stripe_subscription_id', sub.id)
+        await service.from('companies').update({ subscription_status: 'cancelled', ai_audit_enabled: false, stripe_ai_audit_subscription_item_id: null }).eq('stripe_subscription_id', sub.id)
         break
       }
       case 'invoice.payment_failed': {
@@ -85,36 +104,7 @@ export async function POST(request: Request) {
         await service.from('companies').update({ subscription_status: 'active' }).eq('stripe_customer_id', invoice.customer as string)
         break
       }
-      case 'customer.subscription.updated': {
-        const sub = event.data.object as Stripe.Subscription
-        const customerId = sub.customer as string
-        const hasAiAudit = sub.items.data.some(
-          (item) => item.price.id === AI_AUDIT_PACK.priceId
-        )
-        const { error: updateErr } = await service
-          .from('companies')
-          .update({
-            ai_audit_enabled: hasAiAudit,
-            subscription_status: sub.status,
-          })
-          .eq('stripe_customer_id', customerId)
-        if (updateErr) console.error('[webhook] subscription.updated update failed:', updateErr)
-        else console.log('[webhook] subscription.updated: ai_audit_enabled=', hasAiAudit, 'status=', sub.status)
-        break
-      }
-      case 'customer.subscription.deleted': {
-        const sub = event.data.object as Stripe.Subscription
-        const customerId = sub.customer as string
-        await service
-          .from('companies')
-          .update({
-            ai_audit_enabled: false,
-            subscription_status: 'cancelled',
-          })
-          .eq('stripe_customer_id', customerId)
-        console.log('[webhook] subscription deleted for customer', customerId)
-        break
-      }
+
     }
     return NextResponse.json({ received: true })
   } catch (err: any) {
