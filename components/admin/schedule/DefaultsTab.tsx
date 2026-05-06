@@ -233,16 +233,18 @@ export default function DefaultsTab() {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs text-gray-500 mb-1">Country (ISO 2-letter)</label>
-            <input
-              type="text"
+            <select
               value={countryCode}
-              onChange={(e) => setCountryCode(e.target.value.toUpperCase().slice(0, 2))}
-              maxLength={2}
-              placeholder="GB"
-              className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-teal-400 uppercase"
-            />
+              onChange={(e) => setCountryCode(e.target.value)}
+              className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+            >
+              <option value="GB">United Kingdom (GB)</option>
+              <option value="IE">Ireland (IE)</option>
+              <option value="US">United States (US)</option>
+              <option value="AU">Australia (AU)</option>
+            </select>
             <div className="text-[11px] text-gray-400 mt-1">
-              GB, IE, US, AU supported with public holidays. Other codes accepted but no holidays loaded.
+              Public holidays load automatically based on country.
             </div>
           </div>
           <div>
