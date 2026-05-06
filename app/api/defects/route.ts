@@ -20,11 +20,16 @@ export async function GET(request: Request) {
 
   // Generate signed URLs for photos
   const defectsWithSignedUrls = await Promise.all((data || []).map(async (defect: any) => {
+    let updated = { ...defect }
     if (defect.photo_path) {
       const { data: signedData } = await service.storage.from('vantro-media').createSignedUrl(defect.photo_path, 3600)
-      return { ...defect, photo_url: signedData?.signedUrl || defect.photo_url }
+      if (signedData?.signedUrl) updated.photo_url = signedData.signedUrl
     }
-    return defect
+    if (defect.video_path) {
+      const { data: vidSigned } = await service.storage.from('vantro-media').createSignedUrl(defect.video_path, 3600)
+      if (vidSigned?.signedUrl) updated.video_url = vidSigned.signedUrl
+    }
+    return updated
   }))
 
   return NextResponse.json({ defects: defectsWithSignedUrls })
@@ -52,13 +57,14 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json()
-  const { action, jobId, description, severity, photoUrl, photoPath, defectId, resolutionNote } = body
+  const { action, jobId, description, severity, photoUrl, photoPath, videoUrl, videoPath, defectId, resolutionNote } = body
 
   if (action === 'create') {
     const { data, error } = await service.from('defects').insert({
       job_id: jobId, user_id: userId, company_id: companyId,
       description, severity: severity || 'minor',
-      photo_url: photoUrl || null, photo_path: photoPath || null
+      photo_url: photoUrl || null, photo_path: photoPath || null,
+      video_url: videoUrl || null, video_path: videoPath || null
     }).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
