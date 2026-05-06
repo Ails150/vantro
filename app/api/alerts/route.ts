@@ -21,7 +21,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Alert ID and resolution note required" }, { status: 400 })
   }
 
-  // Get the alert with user info
   const { data: alert } = await service.from("alerts")
     .select("*, jobs(name), users(name, push_token, email)")
     .eq("id", alertId)
@@ -30,7 +29,6 @@ export async function POST(request: Request) {
 
   if (!alert) return NextResponse.json({ error: "Alert not found" }, { status: 404 })
 
-  // Mark as resolved
   await service.from("alerts").update({
     is_read: true,
     status: "resolved",
@@ -39,7 +37,6 @@ export async function POST(request: Request) {
     resolution_note: resolutionNote.trim()
   }).eq("id", alertId)
 
-  // Write resolution to diary entry so installer sees it
   if (alert.diary_entry_id) {
     await service.from("diary_entries").update({
       reply: "Resolved: " + resolutionNote.trim(),
@@ -51,21 +48,28 @@ export async function POST(request: Request) {
   const installer = alert.users as any
   const job = alert.jobs as any
 
-  // Push notification to installer
+  console.log("[alert resolve] installer:", installer?.name, "has_token:", !!installer?.push_token)
+
   if (installer?.push_token) {
-    await fetch("https://exp.host/--/api/v2/push/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        to: installer.push_token,
-        sound: "default",
-        title: "Alert resolved - " + (job?.name || "Job"),
-        body: adminUser.name + ": " + resolutionNote.trim(),
-        data: { type: "alert_resolved", alertId },
-        channelId: "vantro",
+    try {
+      const pushRes = await fetch("https://exp.host/--/api/v2/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json", "Accept-encoding": "gzip, deflate" },
+        body: JSON.stringify({
+          to: installer.push_token,
+          sound: "default",
+          title: "Alert resolved - " + (job?.name || "Job"),
+          body: adminUser.name + ": " + resolutionNote.trim(),
+          data: { type: "alert_resolved", alertId },
+          channelId: "vantro",
+        })
       })
-    ).then(r=>r.json()).then(d=>console.log("[alert resolve] Push response:",JSON.stringify(d))).catch(e=>console.error("[alert resolve] Push error:",e))
+      const pushData = await pushRes.json()
+      console.log("[alert resolve] Expo response:", JSON.stringify(pushData))
+    } catch (e) {
+      console.error("[alert resolve] Push error:", e)
+    }
   }
 
-return NextResponse.json({ success: true })
+  return NextResponse.json({ success: true })
 }
