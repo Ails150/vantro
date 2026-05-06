@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   const { data: alert } = await service.from("alerts")
-    .select("*, jobs(name), users(name, push_token, email)")
+    .select("*, jobs(name), users!alerts_triggered_by_fkey(name, push_token, email)")
     .eq("id", alertId)
     .eq("company_id", adminUser.company_id)
     .single()
@@ -45,7 +45,12 @@ export async function POST(request: Request) {
     }).eq("id", alert.diary_entry_id)
   }
 
-  const installer = alert.users as any
+  const { data: installerRow } = await service
+    .from("users")
+    .select("name, push_token, email")
+    .eq("id", alert.user_id)
+    .single()
+  const installer = installerRow as any
   const job = alert.jobs as any
 
   console.log("[alert resolve] installer:", installer?.name, "has_token:", !!installer?.push_token)
@@ -73,3 +78,6 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true })
 }
+
+
+
