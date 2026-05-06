@@ -146,7 +146,7 @@ export async function POST(request: Request) {
     const item = q.checklist_item_id ? itemMap[q.checklist_item_id] : null
     const photoSigned = await signOne(service, q.photo_url)
     const videoSigned = await signOne(service, q.video_url)
-    const submittedByName = q.users?.name || null
+    const submittedByName = (q.users as any)?.name || null
     deliverablesMap[q.template_id].items.push({
       id: q.id,
       label: item?.label || "(item)",
