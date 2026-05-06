@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 
@@ -292,9 +292,9 @@ export default function CalendarTab() {
     const end = weekDates[weekDates.length - 1]
     const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
     if (sameMonth) {
-      return `${start.getDate()} â€“ ${end.getDate()} ${start.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`
+      return `${start.getDate()} – ${end.getDate()} ${start.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`
     }
-    return `${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} â€“ ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+    return `${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
   }, [weekDates])
 
   const today = new Date()
