@@ -483,6 +483,22 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return () => clearInterval(interval)
   }, [showAddJob])
 
+  useEffect(() => {
+    if (!editingJobId) return
+    const interval = setInterval(() => {
+      if (!(window as any).google || !editAddressRef.current) return
+      clearInterval(interval)
+      const ac = new (window as any).google.maps.places.Autocomplete(editAddressRef.current, { types: ["address"] })
+      ac.addListener("place_changed", () => {
+        const place = ac.getPlace()
+        if (place.formatted_address) setEditJobAddress(place.formatted_address)
+        if (place.geometry?.location) { setEditJobLat(place.geometry.location.lat()); setEditJobLng(place.geometry.location.lng()) }
+        setEditJobPlaceSelected(true)
+      })
+    }, 100)
+    return () => clearInterval(interval)
+  }, [editingJobId])
+
   function switchTab(tab: string) {
     setActiveTab(tab)
     try { localStorage.setItem("vantro_tab", tab) } catch {}
@@ -552,7 +568,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   async function updateJob(jobId: string) {
     if (!editJobName.trim()) { setFormError("Enter a job name"); return }
-    if (!editJobPlaceSelected && !editJobLat) { setFormError("Select an address from the dropdown - do not just type it"); return }
+    if (!editJobPlaceSelected) { setFormError("Address must be verified - please pick from the Google Maps dropdown"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
     const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, required_trades: multiTradeEnabled ? editJobRequiredTrades : null }).eq("id", jobId)
@@ -1274,7 +1290,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobPlaceSelected(true); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobPlaceSelected(false); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -1288,7 +1304,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
                           <h4 className="text-sm font-semibold">Edit job</h4>
                           <input value={editJobName} onChange={e => setEditJobName(e.target.value)} placeholder="Job name" className={inp}/>
-                          <input ref={editAddressRef} value={editJobAddress} onChange={e => { setEditJobAddress(e.target.value); setEditJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
+                          <div className="relative">
+                            <input ref={editAddressRef} value={editJobAddress} onChange={e => { setEditJobAddress(e.target.value); setEditJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
+                            <div className={"absolute right-3 top-3 text-xs font-semibold " + (editJobPlaceSelected ? "text-teal-500" : "text-red-400")}>
+                              {editJobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
+                            </div>
+                          </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
                             <select value={editJobStatus || j.status} onChange={e => setEditJobStatus(e.target.value)} className={inp}>
