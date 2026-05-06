@@ -153,7 +153,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   }, [])
   const [saving, setSaving] = useState(false)
   const [resolvingAlert, setResolvingAlert] = useState<string|null>(null)
-  const [alertFilter, setAlertFilter] = useState<'all'|'blocker'|'issue'|'24h'>('all')
+  const [alertFilter, setAlertFilter] = useState<'all'|'blocker'|'issue'|'today'|'7d'|'30d'>('all')
   const [showResolved, setShowResolved] = useState(false)
   const [expandedJobGroups, setExpandedJobGroups] = useState<Set<string>>(new Set())
   const [diaryFilter, setDiaryFilter] = useState<'all'|'blocker'|'issue'|'photos'|'videos'|'today'|'7d'|'30d'>('all')
@@ -908,7 +908,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             { label: "On Site Now", value: signins.length, color: "text-teal-500" },
             { label: "Active Jobs", value: jobs.filter((j: any) => j.status === "active").length, color: "text-gray-900" },
             { label: "Awaiting Approval", value: pendingQA.length, color: "text-amber-500" },
-            { label: "Today's Alerts", value: todayCount, color: todayCount > 0 ? "text-red-500" : "text-gray-400", onClick: () => { setActiveTab("alerts"); setAlertFilter("24h" as any) } },
+            { label: "Today's Alerts", value: todayCount, color: todayCount > 0 ? "text-red-500" : "text-gray-400", onClick: () => { setActiveTab("alerts"); setAlertFilter("today" as any) } },
             { label: "Open Blockers", value: blockerOpenCount, color: blockerOpenCount > 0 ? "text-red-600" : "text-gray-400", onClick: () => { setActiveTab("alerts"); setAlertFilter("blocker" as any) } },
             { label: "Older than 7d", value: olderCount, color: olderCount > 0 ? "text-amber-600" : "text-gray-400", onClick: () => { setActiveTab("alerts") } },
           ]
@@ -1994,16 +1994,22 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             <div className={cardHeader + " flex items-center justify-between flex-wrap gap-3"}>
               <span className="font-semibold">Alerts</span>
               <div className="flex items-center gap-2 flex-wrap">
-                {(['all','blocker','issue','24h'] as const).map(f => {
+                {(['all','blocker','issue','today','7d','30d'] as const).map(f => {
                   const filtered = liveAlerts.filter((a: any) => {
                     if (f === 'all') return true
                     if (f === 'blocker') return a.alert_type === 'blocker'
                     if (f === 'issue') return a.alert_type === 'issue'
-                    if (f === '24h') return new Date(a.created_at).getTime() > Date.now() - 86400000
+                    const ts = new Date(a.created_at).getTime()
+                    if (f === 'today') {
+                      const sod = new Date(); sod.setHours(0,0,0,0)
+                      return ts >= sod.getTime()
+                    }
+                    if (f === '7d') return ts > Date.now() - 7*86400000
+                    if (f === '30d') return ts > Date.now() - 30*86400000
                     return true
                   })
                   const count = filtered.length
-                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : 'Last 24h'
+                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
                   return (
                     <button key={f} onClick={() => setAlertFilter(f)} className={"text-xs px-3 py-1.5 rounded-full border " + (alertFilter === f ? "bg-teal-500 text-white border-teal-500 font-semibold" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300")}>
                       {label} {count > 0 && <span className="ml-1 opacity-80">({count})</span>}
@@ -2017,7 +2023,13 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 if (alertFilter === 'all') return true
                 if (alertFilter === 'blocker') return a.alert_type === 'blocker'
                 if (alertFilter === 'issue') return a.alert_type === 'issue'
-                if (alertFilter === '24h') return new Date(a.created_at).getTime() > Date.now() - 86400000
+                const ts = new Date(a.created_at).getTime()
+                if (alertFilter === 'today') {
+                  const sod = new Date(); sod.setHours(0,0,0,0)
+                  return ts >= sod.getTime()
+                }
+                if (alertFilter === '7d') return ts > Date.now() - 7*86400000
+                if (alertFilter === '30d') return ts > Date.now() - 30*86400000
                 return true
               })
               if (filtered.length === 0) {
