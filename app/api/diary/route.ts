@@ -26,8 +26,8 @@ const severityRank: Record<string, number> = { normal: 1, issue: 2, blocker: 3 }
 export async function POST(request: Request) {
   try {
     const { entryText, workStatus, jobId, lat, lng, photoUrls, videoUrl } = await request.json()
-    if (!entryText?.trim() && (!photoUrls || photoUrls.length === 0) && !videoUrl) {
-      return NextResponse.json({ error: "Entry requires text, photo, or video" }, { status: 400 })
+    if (!entryText?.trim()) {
+      return NextResponse.json({ error: "Please add a note describing what is happening on site" }, { status: 400 })
     }
 
     const trimmedText = (entryText || "").trim().toLowerCase()
