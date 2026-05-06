@@ -218,6 +218,7 @@ export async function POST(request: Request) {
   let redFlags: any[] = []
 
   if (aiAuditActive && process.env.GEMINI_API_KEY) {
+    console.log("[audit/v2] Starting AI generation, key length:", process.env.GEMINI_API_KEY?.length)
     try {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
       const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" })
@@ -283,9 +284,14 @@ Return only the sentence, no JSON, no quotes, no preamble.`
         if (dlv) dlv.aiNarrative = nr.narrative
       }
     } catch (err: any) {
-      console.error("[audit/v2] AI generation failed:", err?.message)
+      console.error("[audit/v2] AI generation failed:", err?.message, err?.stack)
+      // Surface error in response so frontend can debug
+      ;(globalThis as any).__lastAiError = err?.message || String(err)
     }
   }
+  
+  // Add ai error to response if present
+  const aiError = (globalThis as any).__lastAiError || null
 
   return NextResponse.json({
     job,
@@ -300,6 +306,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     aiAuditActive,
     execSummary,
     redFlags,
+    aiError,
     generated: new Date().toISOString()
   })
 }
