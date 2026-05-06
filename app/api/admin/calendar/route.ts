@@ -1,4 +1,4 @@
-// app/api/admin/calendar/route.ts
+﻿// app/api/admin/calendar/route.ts
 //
 // Returns all the data needed to render the visual week-grid calendar.
 //   GET /api/admin/calendar?start=YYYY-MM-DD&end=YYYY-MM-DD
@@ -93,6 +93,63 @@ export async function GET(request: Request) {
     .lte("holiday_date", end)
     .order("holiday_date", { ascending: true })
 
+  // 6. Weekly schedules per installer: user_shifts override else company default
+  const installerIds = (installers || []).map((i) => i.id)
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const { data: allShifts } = installerIds.length > 0
+    ? await service
+        .from("user_shifts")
+        .select("user_id, day_of_week, start_time, end_time")
+        .in("user_id", installerIds)
+        .lte("effective_from", todayStr)
+        .or(`effective_until.is.null,effective_until.gte.${todayStr}`)
+    : { data: [] }
+
+  const { data: companyDefault } = await service
+    .from("companies")
+    .select("default_schedule")
+    .eq("id", admin.company_id)
+    .single()
+
+  const dayKeys = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+  const emptySchedule = () => ({
+    mon: { working: false, start: null, end: null },
+    tue: { working: false, start: null, end: null },
+    wed: { working: false, start: null, end: null },
+    thu: { working: false, start: null, end: null },
+    fri: { working: false, start: null, end: null },
+    sat: { working: false, start: null, end: null },
+    sun: { working: false, start: null, end: null },
+  })
+
+  const shiftsByUser: Record<string, any[]> = {}
+  for (const s of allShifts || []) {
+    if (!shiftsByUser[s.user_id]) shiftsByUser[s.user_id] = []
+    shiftsByUser[s.user_id].push(s)
+  }
+
+  const weekly_schedules: Record<string, any> = {}
+  for (const inst of installers || []) {
+    const userShifts = shiftsByUser[inst.id]
+    if (userShifts && userShifts.length > 0) {
+      const ws: any = emptySchedule()
+      for (const s of userShifts) {
+        const key = dayKeys[s.day_of_week]
+        if (key) {
+          ws[key] = {
+            working: true,
+            enabled: true,
+            start: s.start_time.slice(0, 5),
+            end: s.end_time.slice(0, 5),
+          }
+        }
+      }
+      weekly_schedules[inst.id] = ws
+    } else {
+      weekly_schedules[inst.id] = companyDefault?.default_schedule || emptySchedule()
+    }
+  }
+
   return NextResponse.json({
     window: { start, end },
     country_code: countryCode,
@@ -104,5 +161,6 @@ export async function GET(request: Request) {
       date: h.holiday_date,
       name: h.name,
     })),
+    weekly_schedules,
   })
 }
