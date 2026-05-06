@@ -202,7 +202,7 @@ export async function POST(request: Request) {
   if (to) diaryQuery = diaryQuery.lte("created_at", to + "T23:59:59Z")
   const { data: diaryRaw } = await diaryQuery
 
-  const diary = await Promise.all((diaryRaw || []).map(async (d: AnyRow) => ({ ...d, photo_urls: await signMany(service, d.photo_urls), video_url: await signOne(service, d.video_url) })))
+  const diary: AnyRow[] = await Promise.all((diaryRaw || []).map(async (d: AnyRow): Promise<AnyRow> => ({ ...d, photo_urls: await signMany(service, d.photo_urls), video_url: await signOne(service, d.video_url) })))
   const blockers = diary.filter(d => d.ai_alert_type === "blocker")
   const issues = diary.filter(d => d.ai_alert_type === "issue")
 
@@ -210,7 +210,7 @@ export async function POST(request: Request) {
   if (from) defectsQuery = defectsQuery.gte("created_at", from)
   if (to) defectsQuery = defectsQuery.lte("created_at", to + "T23:59:59Z")
   const { data: defectsRaw } = await defectsQuery
-  const defects = await Promise.all((defectsRaw || []).map(async (d: AnyRow) => ({ ...d, photo_url: await signOne(service, d.photo_url) })))
+  const defects: AnyRow[] = await Promise.all((defectsRaw || []).map(async (d: AnyRow): Promise<AnyRow> => ({ ...d, photo_url: await signOne(service, d.photo_url) })))
   const openDefects = defects.filter(d => d.status !== "resolved")
 
   // ===== AI PATH (Path B) =====
