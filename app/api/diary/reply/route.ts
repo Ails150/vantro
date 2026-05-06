@@ -64,19 +64,5 @@ export async function POST(request: Request) {
     }).catch(() => {})
   }
 
-  // Email to installer
-  if (installer.email && process.env.RESEND_API_KEY) {
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { "Authorization": "Bearer " + process.env.RESEND_API_KEY, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: "Vantro <alerts@getvantro.com>",
-        to: installer.email,
-        subject: "Message from " + adminUser.name + " re: " + jobName,
-        html: "<div style=\"font-family:sans-serif;max-width:600px;margin:0 auto\"><div style=\"background:#00C896;padding:20px;border-radius:8px 8px 0 0\"><h2 style=\"color:white;margin:0\">Message from " + adminUser.name + "</h2></div><div style=\"padding:24px;background:#f9f9f9;border-radius:0 0 8px 8px\"><p><strong>Job:</strong> " + jobName + "</p><p><strong>Your entry:</strong> " + (entry?.entry_text || "") + "</p><p><strong>Response:</strong> " + message + "</p></div></div>"
-      })
-    }).catch(() => {})
-  }
-
-  return NextResponse.json({ success: true })
+return NextResponse.json({ success: true })
 }
