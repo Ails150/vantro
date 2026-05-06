@@ -80,7 +80,7 @@ export async function POST(request: Request) {
   const { jobId, from, to } = body
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
 
-  const { data: job } = await service.from("jobs").select("id, name, address, lat, lng, status, completed_at, completed_by, required_trades").eq("id", jobId).eq("company_id", companyId).single()
+  const { data: job } = await service.from("jobs").select("*").eq("id", jobId).eq("company_id", companyId).single()
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
   const { data: company } = await service.from("companies").select("id, name, ai_audit_enabled, ai_audit_trial_ends_at, multi_trade_enabled").eq("id", companyId).single()
