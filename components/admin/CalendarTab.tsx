@@ -39,6 +39,16 @@ interface PublicHoliday {
   name: string
 }
 
+interface DaySchedule {
+  working?: boolean
+  enabled?: boolean
+  start: string | null
+  end: string | null
+}
+interface WeeklySchedule {
+  mon: DaySchedule; tue: DaySchedule; wed: DaySchedule; thu: DaySchedule
+  fri: DaySchedule; sat: DaySchedule; sun: DaySchedule
+}
 interface CalendarData {
   window: { start: string; end: string }
   installers: Installer[]
@@ -46,6 +56,7 @@ interface CalendarData {
   assignments: Assignment[]
   time_off: TimeOff[]
   public_holidays: PublicHoliday[]
+  weekly_schedules?: Record<string, WeeklySchedule>
 }
 
 interface JobLite {
@@ -447,6 +458,20 @@ export default function CalendarTab() {
                               {cell.timeOff.is_half_day ? " (half day)" : ""}
                             </div>
                           )}
+                          {!cell?.timeOff && cell?.visitChips.length === 0 && (() => {
+                            const ws = data?.weekly_schedules?.[inst.id]
+                            if (!ws) return null
+                            const dayKey = ["sun","mon","tue","wed","thu","fri","sat"][d.getDay()] as keyof WeeklySchedule
+                            const day = ws[dayKey]
+                            const isWorking = !!(day?.enabled ?? day?.working)
+                            if (cell?.isPublicHoliday) {
+                              return <div className="text-[10px] text-amber-700 italic px-1">Public holiday</div>
+                            }
+                            if (!isWorking) {
+                              return <div className="text-[10px] text-gray-400 italic px-1">Off</div>
+                            }
+                            return <div className="text-[10px] text-gray-500 px-1">{day.start}–{day.end}</div>
+                          })()}
                           {!cell?.timeOff &&
                             cell?.visitChips.map(({ visit: v, assignmentId }) => {
                               const isDragging = draggedAssignment?.id === assignmentId
