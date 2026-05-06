@@ -535,36 +535,164 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               <div id="evidence-section" className={card}>
                 <button onClick={() => setEvidenceOpen(!evidenceOpen)} className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50">
                   <div className="text-sm font-semibold text-gray-900">Full evidence</div>
-                  <div className="text-xs text-gray-400">{evidenceOpen ? "Hide" : "Show"} sign-ins · diary · QA · defects</div>
+                  <div className="text-xs text-gray-400">{evidenceOpen ? "Hide" : "Show"} photos · sign-ins · QA</div>
                 </button>
-                {evidenceOpen && report && (
-                  <div className="px-6 pb-6 space-y-4 border-t border-gray-100 pt-4">
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Sign-ins ({report.signins.length})</h4>
-                      {report.signins.length === 0 ? <p className="text-xs text-gray-400">None</p> :
-                        <div className="text-xs text-gray-600">{report.signins.length} sign-in events · {totalHours.toFixed(1)}h total</div>}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Diary ({report.diary?.length || 0})</h4>
-                      <div className="space-y-1 max-h-64 overflow-y-auto">
-                        {(report.diary || []).slice(0, 20).map((e: any) => (
-                          <div key={e.id} className="flex items-start gap-2 text-xs py-1 border-b border-gray-50">
-                            <span className="text-gray-400 flex-shrink-0">{new Date(e.created_at).toLocaleDateString("en-GB")}</span>
-                            <span className="text-gray-700 truncate flex-1">{e.entry_text || e.ai_summary || "(no text)"}</span>
-                            {e.ai_alert_type && e.ai_alert_type !== "none" && (
-                              <span className={"px-1.5 py-0 rounded text-[10px] flex-shrink-0 " + (e.ai_alert_type === "blocker" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>{e.ai_alert_type}</span>
-                            )}
+                {evidenceOpen && (() => {
+                  // Use reportV2.fullEvidence.diary which has signed photo URLs, falling back to v1 report.diary
+                  const diary = reportV2?.fullEvidence?.diary || report?.diary || []
+                  const signins = reportV2?.onSite?.fullLog || report?.signins || []
+                  const qa = report?.qa || []
+                  const isNoise = (txt: string | null | undefined) => {
+                    if (!txt) return false
+                    const t = txt.trim().toLowerCase()
+                    return /^(test|trst|testing|tst|tset|asdf|qwerty)\.?$/.test(t)
+                  }
+                  // Filter out test/trst entries that have no photos
+                  const meaningfulDiary = diary.filter((e: any) => {
+                    if (e.photo_urls && e.photo_urls.length > 0) return true
+                    if (e.video_url) return true
+                    if (!isNoise(e.entry_text)) return true
+                    return false
+                  })
+                  // Group diary by day
+                  const diaryByDay: Record<string, any[]> = {}
+                  meaningfulDiary.forEach((e: any) => {
+                    const day = new Date(e.created_at).toISOString().slice(0, 10)
+                    if (!diaryByDay[day]) diaryByDay[day] = []
+                    diaryByDay[day].push(e)
+                  })
+                  const dayKeys = Object.keys(diaryByDay).sort().reverse()
+                  const totalPhotos = meaningfulDiary.reduce((sum: number, e: any) => sum + (e.photo_urls?.length || 0), 0)
+                  const filteredCount = diary.length - meaningfulDiary.length
+
+                  return (
+                    <div className="px-6 pb-6 border-t border-gray-100 pt-4 space-y-6">
+                      {/* Sign-ins */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2">Sign-ins · {signins.length} events · {(reportV2?.onSite?.totalHours || totalHours).toFixed(1)}h total</h4>
+                        {signins.length > 0 && (
+                          <div className="overflow-x-auto rounded-lg border border-gray-100">
+                            <table className="w-full text-xs">
+                              <thead className="bg-gray-50 text-gray-600">
+                                <tr>
+                                  <th className="text-left px-3 py-2 font-semibold">Installer</th>
+                                  <th className="text-left px-3 py-2 font-semibold">Signed in</th>
+                                  <th className="text-left px-3 py-2 font-semibold">Signed out</th>
+                                  <th className="text-right px-3 py-2 font-semibold">Hours</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {signins.map((s: any) => {
+                                  const inT = new Date(s.signed_in_at)
+                                  const outT = s.signed_out_at ? new Date(s.signed_out_at) : null
+                                  const hrs = outT ? ((outT.getTime() - inT.getTime()) / 3600000).toFixed(1) : "—"
+                                  return (
+                                    <tr key={s.id} className="border-t border-gray-100">
+                                      <td className="px-3 py-1.5">{s.users?.name || "Unknown"}</td>
+                                      <td className="px-3 py-1.5 text-gray-600">{inT.toLocaleString("en-GB")}</td>
+                                      <td className="px-3 py-1.5 text-gray-600">{outT ? outT.toLocaleString("en-GB") : <span className="text-red-600">Open</span>}</td>
+                                      <td className="px-3 py-1.5 text-right font-medium">{hrs}</td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
                           </div>
-                        ))}
-                        {(report.diary?.length || 0) > 20 && <div className="text-xs text-gray-400 pt-1">+{(report.diary?.length || 0) - 20} more</div>}
+                        )}
                       </div>
+
+                      {/* Site activity grouped by day */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 mb-2">
+                          Site activity · {meaningfulDiary.length} entries · {totalPhotos} photos
+                          {filteredCount > 0 && <span className="ml-2 text-gray-400 font-normal">({filteredCount} test entries hidden)</span>}
+                        </h4>
+                        <div className="space-y-3">
+                          {dayKeys.map(day => {
+                            const dayDate = new Date(day + "T12:00:00")
+                            const entries = diaryByDay[day]
+                            const dayPhotos = entries.reduce((s: number, e: any) => s + (e.photo_urls?.length || 0), 0)
+                            return (
+                              <div key={day} className="border border-gray-100 rounded-lg overflow-hidden">
+                                <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                                  <span className="text-xs font-semibold text-gray-700">
+                                    {dayDate.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "short" })}
+                                  </span>
+                                  <span className="text-xs text-gray-500">{entries.length} entries · {dayPhotos} photos</span>
+                                </div>
+                                <div className="divide-y divide-gray-50">
+                                  {entries.map((e: any) => (
+                                    <div key={e.id} className="px-3 py-2.5 flex items-start gap-3">
+                                      <div className="text-xs text-gray-400 flex-shrink-0 w-12">
+                                        {new Date(e.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="text-xs font-medium text-gray-700">{e.users?.name || "Unknown"}</span>
+                                          {e.ai_alert_type && e.ai_alert_type !== "none" && (
+                                            <span className={"px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase " + (e.ai_alert_type === "blocker" ? "bg-red-100 text-red-700" : e.ai_alert_type === "issue" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600")}>
+                                              {e.ai_alert_type}
+                                            </span>
+                                          )}
+                                        </div>
+                                        {e.entry_text && !isNoise(e.entry_text) && (
+                                          <div className="text-xs text-gray-700 mb-1.5">{e.entry_text}</div>
+                                        )}
+                                        {e.ai_summary && e.ai_summary !== e.entry_text && (
+                                          <div className="text-xs text-gray-500 italic mb-1.5">{e.ai_summary}</div>
+                                        )}
+                                        {e.photo_urls && e.photo_urls.length > 0 && (
+                                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                            {e.photo_urls.map((u: string, i: number) => (
+                                              <a key={i} href={u} target="_blank" rel="noopener noreferrer">
+                                                <img src={u} alt="" className="w-20 h-20 object-cover rounded border border-gray-200 hover:opacity-80" />
+                                              </a>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {e.video_url && (
+                                          <a href={e.video_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-1.5 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-xs">📹 Video</a>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      {/* QA submissions with thumbnails */}
+                      {qa.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-semibold text-gray-700 mb-2">
+                            Quality checks · {qa.length} submissions · {qa.filter((q: any) => q.result === "pass").length} pass · {qa.filter((q: any) => q.result === "fail").length} fail
+                          </h4>
+                          <div className="space-y-1.5">
+                            {qa.map((q: any) => (
+                              <div key={q.id} className="flex items-start gap-3 p-2 bg-gray-50 rounded-lg">
+                                <span className={"flex-shrink-0 px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (q.result === "pass" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
+                                  {q.result || "—"}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-medium text-gray-900 truncate">{q.checklist_items?.label || "Unnamed item"}</div>
+                                  <div className="text-[10px] text-gray-500">{new Date(q.created_at).toLocaleString("en-GB")} · {q.users?.name || "Unknown"}</div>
+                                  {q.note && <div className="text-xs text-gray-700 mt-0.5">{q.note}</div>}
+                                </div>
+                                {q.photo_url && (
+                                  <a href={q.photo_url} target="_blank" rel="noopener noreferrer">
+                                    <img src={q.photo_url} alt="" className="w-14 h-14 object-cover rounded border border-gray-200 hover:opacity-80" />
+                                  </a>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">QA ({report.qa?.length || 0})</h4>
-                      <div className="text-xs text-gray-600">{(report.qa || []).filter((q: any) => q.result === "pass").length} pass · {(report.qa || []).filter((q: any) => q.result === "fail").length} fail</div>
-                    </div>
-                  </div>
-                )}
+                  )
+                })()}
               </div>
             </>
           )}
