@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { getSession } from "@/lib/auth"
-
-const service = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 export async function POST(req: Request) {
-  const session = await getSession()
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-  const { userId, companyId } = session
+  const service = await createServiceClient()
+  const { data: appUser } = await service.from("users").select("id, company_id, role").eq("auth_user_id", user.id).single()
+  if (!appUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const userId = appUser.id
+  const companyId = appUser.company_id
+
   const body = await req.json().catch(() => ({}))
   const { action, ...params } = body
 
@@ -21,7 +22,6 @@ export async function POST(req: Request) {
         const { qaSubmissionId, approve, note } = params
         if (!qaSubmissionId) return NextResponse.json({ error: "Missing qaSubmissionId" }, { status: 400 })
 
-        // Verify the QA belongs to this company
         const { data: qa } = await service.from("qa_submissions")
           .select("id, jobs(company_id)")
           .eq("id", qaSubmissionId)
@@ -67,8 +67,6 @@ export async function POST(req: Request) {
         const { flagKey, jobId, until } = params
         if (!flagKey || !jobId) return NextResponse.json({ error: "Missing flagKey or jobId" }, { status: 400 })
 
-        // Store snooze in a simple keyed table — uses companies.metadata jsonb if no dedicated table
-        // For now, persist in audit_pack_snoozes table if exists, otherwise no-op gracefully
         const { error } = await service.from("audit_pack_snoozes").insert({
           company_id: companyId,
           job_id: jobId,
@@ -77,7 +75,6 @@ export async function POST(req: Request) {
           snoozed_by: userId,
         })
         if (error && error.code !== "42P01") {
-          // 42P01 = table does not exist, treat as no-op so feature degrades gracefully
           return NextResponse.json({ error: error.message }, { status: 500 })
         }
         return NextResponse.json({ ok: true })
