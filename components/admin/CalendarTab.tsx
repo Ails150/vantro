@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 
@@ -104,7 +104,7 @@ export default function CalendarTab() {
     return rows
   }, [weekDates])
 
-  const fmtDate = (d: Date) => d.toISOString().slice(0, 10)
+  const fmtDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   const startStr = weekDates.length > 0 ? fmtDate(weekDates[0]) : ""
   const endStr = weekDates.length > 0 ? fmtDate(weekDates[weekDates.length - 1]) : ""
 
@@ -149,7 +149,7 @@ export default function CalendarTab() {
     const holidayByDate: Record<string, PublicHoliday> = {}
     for (const h of (data.public_holidays || [])) holidayByDate[h.date] = h
 
-    // Index assignments by user → set of visit_ids
+    // Index assignments by user â†’ set of visit_ids
     const assignmentsByUser: Record<string, Map<string, string>> = {}
     for (const a of data.assignments) {
       if (!assignmentsByUser[a.user_id]) assignmentsByUser[a.user_id] = new Map()
@@ -167,7 +167,7 @@ export default function CalendarTab() {
       for (const d of days) timeOffByCell[`${t.user_id}|${d}`] = t
     }
 
-    // For each installer × date, find which visits apply
+    // For each installer Ã— date, find which visits apply
     for (const installer of data.installers) {
       for (const dateObj of weekDates) {
         const dateStr = fmtDate(dateObj)
@@ -281,9 +281,9 @@ export default function CalendarTab() {
     const end = weekDates[weekDates.length - 1]
     const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
     if (sameMonth) {
-      return `${start.getDate()} – ${end.getDate()} ${start.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`
+      return `${start.getDate()} â€“ ${end.getDate()} ${start.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`
     }
-    return `${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+    return `${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} â€“ ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
   }, [weekDates])
 
   const today = new Date()
@@ -306,7 +306,7 @@ export default function CalendarTab() {
             onClick={goPrev}
             className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
           >
-            ←
+            â†
           </button>
           <button
             onClick={goToday}
@@ -318,7 +318,7 @@ export default function CalendarTab() {
             onClick={goNext}
             className="px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
           >
-            →
+            â†’
           </button>
           <div className="ml-3 flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <button
