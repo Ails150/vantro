@@ -293,11 +293,135 @@ Return only the sentence, no JSON, no quotes, no preamble.`
   // Add ai error to response if present
   const aiError = (globalThis as any).__lastAiError || null
 
+  // ===== HEALTH CHECK =====
+  const totalActionsNeeded =
+    deliverables.filter(d => d.items.some(i => i.state === "submitted")).length +
+    openDefects.length +
+    blockers.length +
+    (job.status === "active" && deliverables.length > 0 && deliverables.every(d => d.status === "completed") ? 1 : 0)
+
+  let healthStatus: "healthy" | "at_risk" | "in_trouble" = "healthy"
+  let healthMessage = "Job is on track. No action required."
+
+  if (blockers.length >= 3 || openDefects.filter(d => d.severity === "high" || d.severity === "critical").length > 0) {
+    healthStatus = "in_trouble"
+    healthMessage = `${job.name || "Job"} is in trouble — ${blockers.length} blocker${blockers.length === 1 ? "" : "s"} reported${openDefects.length ? ", " + openDefects.length + " open defect" + (openDefects.length === 1 ? "" : "s") : ""}.`
+  } else if (totalActionsNeeded > 0 || blockers.length > 0 || issues.length > 0 || openDefects.length > 0) {
+    healthStatus = "at_risk"
+    const parts: string[] = []
+    if (blockers.length) parts.push(`${blockers.length} blocker${blockers.length === 1 ? "" : "s"}`)
+    if (issues.length) parts.push(`${issues.length} issue${issues.length === 1 ? "" : "s"}`)
+    if (openDefects.length) parts.push(`${openDefects.length} open defect${openDefects.length === 1 ? "" : "s"}`)
+    if (totalActionsNeeded - blockers.length - openDefects.length > 0) parts.push(`${totalActionsNeeded - blockers.length - openDefects.length} pending approval${totalActionsNeeded - blockers.length - openDefects.length === 1 ? "" : "s"}`)
+    healthMessage = `${job.name || "Job"} is at risk — ${parts.join(", ")}.`
+  }
+
+  const health = {
+    status: healthStatus,
+    message: healthMessage,
+    metrics: {
+      hoursThisPeriod: Math.round(totalHours * 10) / 10,
+      signoffsDone: progressiveSignoffs.length,
+      signoffsNeeded: deliverables.reduce((sum, d) => sum + d.items.filter(i => i.state === "submitted").length, 0),
+      openIssues: blockers.length + issues.length + openDefects.length
+    }
+  }
+
+  // ===== ACTIONS NEEDED =====
+  const actionsNeeded: any[] = []
+
+  // Pending QA approvals per deliverable
+  for (const d of deliverables) {
+    const pending = d.items.filter(i => i.state === "submitted")
+    if (pending.length > 0) {
+      actionsNeeded.push({
+        type: "approve_qa",
+        priority: "high",
+        title: `${pending.length} QA item${pending.length === 1 ? "" : "s"} awaiting approval`,
+        subtitle: d.name,
+        deliverableId: d.id,
+        deliverableName: d.name,
+        itemIds: pending.map(i => i.id),
+        actionLabel: "Review now"
+      })
+    }
+  }
+
+  // Open critical/high defects
+  const criticalDefects = openDefects.filter(d => d.severity === "high" || d.severity === "critical")
+  if (criticalDefects.length > 0) {
+    actionsNeeded.push({
+      type: "resolve_defect",
+      priority: "high",
+      title: `${criticalDefects.length} critical defect${criticalDefects.length === 1 ? "" : "s"} unresolved`,
+      subtitle: criticalDefects.slice(0, 2).map(d => d.description?.slice(0, 60) || "Unnamed").join("; "),
+      defectIds: criticalDefects.map(d => d.id),
+      actionLabel: "Open defects"
+    })
+  }
+
+  // Blockers from diary
+  if (blockers.length > 0) {
+    actionsNeeded.push({
+      type: "review_blocker",
+      priority: "medium",
+      title: `${blockers.length} blocker${blockers.length === 1 ? "" : "s"} reported`,
+      subtitle: blockers[0].ai_summary || blockers[0].entry_text?.slice(0, 80) || "Diary blocker",
+      blockerIds: blockers.map((b: any) => b.id),
+      actionLabel: "Review blockers"
+    })
+  }
+
+  // Mark complete suggestion
+  if (job.status === "active" && deliverables.length > 0 && deliverables.every(d => d.status === "completed")) {
+    actionsNeeded.push({
+      type: "mark_complete",
+      priority: "medium",
+      title: "All deliverables signed off — ready to mark complete",
+      subtitle: "Final job sign-off pending",
+      jobId: job.id,
+      actionLabel: "Mark complete"
+    })
+  }
+
+  // ===== TIMELINE (last 14 days) =====
+  const timelineDays: any[] = []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const dayStart = d.toISOString()
+    const next = new Date(d); next.setDate(next.getDate() + 1)
+    const dayEnd = next.toISOString()
+
+    const signinsThisDay = (signinsRaw || []).filter((s: any) => s.signed_in_at >= dayStart && s.signed_in_at < dayEnd)
+    const diaryThisDay = (diaryRaw || []).filter((e: any) => e.created_at >= dayStart && e.created_at < dayEnd)
+    const qaThisDay = (qaRaw || []).filter((q: any) => (q.submitted_at || q.created_at) >= dayStart && (q.submitted_at || q.created_at) < dayEnd)
+    const defectsThisDay = (defectsRaw || []).filter((df: any) => df.created_at >= dayStart && df.created_at < dayEnd)
+    const blockersThisDay = diaryThisDay.filter((e: any) => e.ai_alert_type === "blocker")
+    const photosThisDay = diaryThisDay.reduce((sum: number, e: any) => sum + ((e.photo_urls?.length) || 0), 0) +
+      qaThisDay.filter((q: any) => q.photo_url).length
+
+    timelineDays.push({
+      date: d.toISOString().slice(0, 10),
+      signins: signinsThisDay.length,
+      diary: diaryThisDay.length,
+      qa: qaThisDay.length,
+      defects: defectsThisDay.length,
+      blockers: blockersThisDay.length,
+      photos: photosThisDay
+    })
+  }
+
   return NextResponse.json({
     job,
     period: { from, to },
     status: job.status,
     finalSignoff,
+    health,
+    actionsNeeded,
+    timeline: timelineDays,
     deliverables,
     signoffs: progressiveSignoffs,
     onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, fullLog: signins },
