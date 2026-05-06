@@ -574,19 +574,93 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                         <div className="text-xs text-gray-600">{report.signins.length} sign-in events · {totalHours.toFixed(1)}h total</div>}
                     </div>
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Diary ({report.diary?.length || 0})</h4>
-                      <div className="space-y-1 max-h-64 overflow-y-auto">
-                        {(report.diary || []).slice(0, 20).map((e: any) => (
-                          <div key={e.id} className="flex items-start gap-2 text-xs py-1 border-b border-gray-50">
-                            <span className="text-gray-400 flex-shrink-0">{new Date(e.created_at).toLocaleDateString("en-GB")}</span>
-                            <span className="text-gray-700 truncate flex-1">{e.entry_text || e.ai_summary || "(no text)"}</span>
-                            {e.ai_alert_type && e.ai_alert_type !== "none" && (
-                              <span className={"px-1.5 py-0 rounded text-[10px] flex-shrink-0 " + (e.ai_alert_type === "blocker" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>{e.ai_alert_type}</span>
-                            )}
-                          </div>
-                        ))}
-                        {(report.diary?.length || 0) > 20 && <div className="text-xs text-gray-400 pt-1">+{(report.diary?.length || 0) - 20} more</div>}
-                      </div>
+                      {(() => {
+                        // Use signed-URL diary from v2, fallback to v1
+                        const diary = reportV2?.fullEvidence?.diary || report?.diary || []
+                        const isNoise = (txt: string | null | undefined) => {
+                          if (!txt) return false
+                          const t = txt.trim().toLowerCase()
+                          return /^(test|trst|testing|tst|tset|asdf|qwerty)\.?$/.test(t)
+                        }
+                        const meaningful = diary.filter((e: any) => {
+                          if (e.photo_urls && e.photo_urls.length > 0) return true
+                          if (e.video_url) return true
+                          if (!isNoise(e.entry_text)) return true
+                          return false
+                        })
+                        const filteredCount = diary.length - meaningful.length
+                        const totalPhotos = meaningful.reduce((s: number, e: any) => s + (e.photo_urls?.length || 0), 0)
+                        // Group by day
+                        const byDay: Record<string, any[]> = {}
+                        meaningful.forEach((e: any) => {
+                          const day = new Date(e.created_at).toISOString().slice(0, 10)
+                          if (!byDay[day]) byDay[day] = []
+                          byDay[day].push(e)
+                        })
+                        const days = Object.keys(byDay).sort().reverse()
+                        return (
+                          <>
+                            <h4 className="text-xs font-semibold text-gray-700 mb-2">
+                              Site activity · {meaningful.length} entries · {totalPhotos} photos
+                              {filteredCount > 0 && <span className="ml-2 text-gray-400 font-normal">({filteredCount} test entries hidden)</span>}
+                            </h4>
+                            <div className="space-y-2">
+                              {days.map(day => {
+                                const dayDate = new Date(day + "T12:00:00")
+                                const entries = byDay[day]
+                                const dayPhotos = entries.reduce((s: number, e: any) => s + (e.photo_urls?.length || 0), 0)
+                                return (
+                                  <div key={day} className="border border-gray-100 rounded-lg overflow-hidden">
+                                    <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-gray-700">
+                                        {dayDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                                      </span>
+                                      <span className="text-[10px] text-gray-500">{entries.length} entries · {dayPhotos} photos</span>
+                                    </div>
+                                    <div className="divide-y divide-gray-50">
+                                      {entries.map((e: any) => (
+                                        <div key={e.id} className="px-3 py-2 flex items-start gap-2.5">
+                                          <div className="text-[10px] text-gray-400 flex-shrink-0 w-10 pt-0.5">
+                                            {new Date(e.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 mb-0.5">
+                                              <span className="text-[11px] font-medium text-gray-700">{e.users?.name || "Unknown"}</span>
+                                              {e.ai_alert_type && e.ai_alert_type !== "none" && (
+                                                <span className={"px-1 py-0 rounded text-[9px] font-semibold uppercase " + (e.ai_alert_type === "blocker" ? "bg-red-100 text-red-700" : e.ai_alert_type === "issue" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600")}>
+                                                  {e.ai_alert_type}
+                                                </span>
+                                              )}
+                                            </div>
+                                            {e.entry_text && !isNoise(e.entry_text) && (
+                                              <div className="text-xs text-gray-700 mb-1">{e.entry_text}</div>
+                                            )}
+                                            {e.ai_summary && e.ai_summary !== e.entry_text && (
+                                              <div className="text-[11px] text-gray-500 italic mb-1">{e.ai_summary}</div>
+                                            )}
+                                            {e.photo_urls && e.photo_urls.length > 0 && (
+                                              <div className="flex flex-wrap gap-1 mt-1">
+                                                {e.photo_urls.map((u: string, i: number) => (
+                                                  <a key={i} href={u} target="_blank" rel="noopener noreferrer">
+                                                    <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-gray-200 hover:opacity-80 cursor-pointer" />
+                                                  </a>
+                                                ))}
+                                              </div>
+                                            )}
+                                            {e.video_url && (
+                                              <a href={e.video_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded text-[10px]">📹 Video</a>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </>
+                        )
+                      })()}
                     </div>
                     <div>
                       <h4 className="text-xs font-semibold text-gray-700 mb-2">QA ({report.qa?.length || 0})</h4>
