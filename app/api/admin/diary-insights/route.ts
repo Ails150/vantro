@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
     const { data: entries, error } = await service
       .from("diary_entries")
-      .select("id, entry_text, ai_alert_type, status, created_at, job_id, user_id, jobs(name, trade), users(name)")
+      .select("id, entry_text, ai_alert_type, status, created_at, job_id, user_id, jobs(name), users(name)")
       .eq("company_id", companyId)
       .gte("created_at", sevenDaysAgo)
       .order("created_at", { ascending: false })
@@ -78,7 +78,6 @@ export async function GET(request: Request) {
       date: e.created_at,
       installer: e.users?.name || "Unknown",
       job: e.jobs?.name || "Unknown",
-      trade: e.jobs?.trade || "Unknown",
       status: e.status || "carrying_on",
       alert_type: e.ai_alert_type || "none",
       text: (e.entry_text || "").slice(0, 200)
@@ -97,7 +96,7 @@ Return JSON in this exact shape:
   "silent_jobs": [{"job": "string", "last_entry": "ISO date", "detail": "string"}],
   "unanswered_blockers": [{"summary": "string", "count": number}],
   "installer_patterns": [{"installer": "string", "pattern": "string", "detail": "string"}],
-  "trade_signals": [{"trade": "string", "signal": "string", "detail": "string"}]
+  "trade_signals": []
 }
 
 Rules:
@@ -106,7 +105,6 @@ Rules:
 - "silent_jobs": jobs with no entry in 36+ hours that had recent activity
 - "unanswered_blockers": summarize the unresolved alerts at a high level
 - "installer_patterns": shifts in entry status (more paused/stopped than typical)
-- "trade_signals": which trades are seeing the most blockers/issues
 - Be terse. One short sentence per detail. No fluff.
 - If nothing notable in a category, return empty array.`
 
