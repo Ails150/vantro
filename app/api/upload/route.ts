@@ -2,6 +2,10 @@ import { NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { verifyInstallerToken } from "@/lib/auth"
 
+export const runtime = "nodejs"
+export const maxDuration = 60
+export const dynamic = "force-dynamic"
+
 const R2 = new S3Client({
   region: "auto",
   endpoint: `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.eu.r2.cloudflarestorage.com`,
