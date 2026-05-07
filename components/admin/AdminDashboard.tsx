@@ -2142,7 +2142,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       )}
                       {a.diary_entries?.video_url && (
                         <div className="mt-2">
-                          <video src={a.diary_entries.video_url} controls preload="metadata" className="max-w-md max-h-64 rounded-lg border border-gray-200 bg-black"/>
+                          <iframe src={a.diary_entries.video_url} allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowFullScreen className="w-full max-w-md aspect-video rounded-lg border border-gray-200 bg-black"/>
                         </div>
                       )}
                     </div>
