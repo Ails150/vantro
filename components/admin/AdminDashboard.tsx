@@ -2043,7 +2043,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     return true
                   })
                   const count = filtered.length
-                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'variation' ? 'Variations' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
+                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
                   return (
                     <button key={f} onClick={() => setAlertFilter(f)} className={"text-xs px-3 py-1.5 rounded-full border " + (alertFilter === f ? "bg-teal-500 text-white border-teal-500 font-semibold" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300")}>
                       {label} {count > 0 && <span className="ml-1 opacity-80">({count})</span>}
