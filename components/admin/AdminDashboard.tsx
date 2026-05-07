@@ -1879,8 +1879,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   placeholder="Search installer, job, or note..."
                   className="flex-1 min-w-[200px] bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal-400"
                 />
-                {(['all','blocker','issue','photos','videos','today','7d','30d'] as const).map(f => {
-                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'photos' ? 'With photos' : f === 'videos' ? 'With videos' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
+                {(['all','blocker','issue','variation','photos','videos','today','7d','30d'] as const).map(f => {
+                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'variation' ? 'Variations' : f === 'photos' ? 'With photos' : f === 'videos' ? 'With videos' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
                   return (
                     <button
                       key={f}
@@ -1899,6 +1899,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               const filtered = diaryEntries.filter((d: any) => {
                 if (diaryFilter === 'blocker' && d.ai_alert_type !== 'blocker') return false
                 if (diaryFilter === 'issue' && d.ai_alert_type !== 'issue') return false
+                if (diaryFilter === 'variation' && !d.ai_variation_detected) return false
                 if (diaryFilter === 'photos' && (!d.photo_urls || d.photo_urls.length === 0)) return false
                 if (diaryFilter === 'videos' && !d.video_url) return false
                 if (diaryFilter === 'today') {
@@ -1930,7 +1931,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 const hasPhotos = d.photo_urls && d.photo_urls.length > 0
                 const hasVideo = !!d.video_url
                 return (
-                  <div key={d.id} className={"px-6 py-5 border-b border-gray-50 last:border-0" + (d.ai_alert_type === 'blocker' ? ' border-l-4 border-l-red-400' : d.ai_alert_type === 'issue' ? ' border-l-4 border-l-amber-400' : '')}>
+                  <div key={d.id} className={"px-6 py-5 border-b border-gray-50 last:border-0" + (d.ai_alert_type === 'blocker' ? ' border-l-4 border-l-red-400' : d.ai_alert_type === 'issue' ? ' border-l-4 border-l-amber-400' : d.ai_variation_detected ? ' border-l-4 border-l-purple-400' : '')}>
                     <div className="flex items-start gap-4">
                       <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold flex-shrink-0">{d.users?.initials || "?"}</div>
                       <div className="flex-1 min-w-0">
@@ -1940,6 +1941,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <span className={"text-xs " + sub}>{new Date(d.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                           {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">BLOCKER</span>}
                           {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
+                          {d.ai_variation_detected && <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full font-bold" title="AI detected this as a possible client variation">VARIATION</span>}
                         </div>
                         {hasText ? (
                           <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{d.entry_text}</p>
@@ -2041,7 +2043,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     return true
                   })
                   const count = filtered.length
-                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
+                  const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'variation' ? 'Variations' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
                   return (
                     <button key={f} onClick={() => setAlertFilter(f)} className={"text-xs px-3 py-1.5 rounded-full border " + (alertFilter === f ? "bg-teal-500 text-white border-teal-500 font-semibold" : "bg-white text-gray-600 border-gray-200 hover:border-gray-300")}>
                       {label} {count > 0 && <span className="ml-1 opacity-80">({count})</span>}
