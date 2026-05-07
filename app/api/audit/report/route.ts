@@ -160,7 +160,7 @@ function fmtDate(s: string | null | undefined): string {
 // ---------------- Templated narrative ----------------
 
 function buildTemplatedNarrative(data: any): string {
-  const { signins, qa, diary, defects, period } = data
+  const { signins, qa, diary, defects, variations, period } = data
   const installerSet = new Set<string>()
   let totalHours = 0, autoClosed = 0, departedEarly = 0
   for (const s of signins) {
@@ -250,6 +250,8 @@ async function buildAINarrative(data: any): Promise<string | null> {
       blockers: data.diary.filter((d: any) => d.ai_alert_type === "blocker").length,
       issues: data.diary.filter((d: any) => d.ai_alert_type === "issue").length,
       diary_summaries: data.diary.slice(0, 10).map((d: any) => d.entry_text).filter(Boolean).slice(0, 5),
+      variations_count: (data.variations || []).length,
+      variation_summaries: (data.variations || []).slice(0, 10).map((v: any) => v.description).filter(Boolean),
       defects_open: data.defects.filter((d: any) => d.status === "open").length,
       defects_resolved: data.defects.filter((d: any) => d.status === "resolved").length,
       defects_critical: data.defects.filter((d: any) => d.severity === "critical").length,
@@ -281,7 +283,7 @@ Write the executive summary now.`
 // ---------------- HTML render ----------------
 
 function renderReport(data: any, narrative: string, narrativeIsAI: boolean): string {
-  const { job, company, period, signins, qa, diary, defects } = data
+  const { job, company, period, signins, qa, diary, defects, variations = [] } = data
   const refId = `VTR-${job.name.replace(/\s+/g, "").toUpperCase().slice(0, 8)}-${Date.now().toString().slice(-8)}`
   const generated = new Date()
   const installerSet = new Set<string>()
@@ -378,6 +380,84 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
           ${g.entries.map(renderDiaryCard).join("")}
         </div>`).join("")
   const diaryShownCount = diaryFiltered.length
+
+  // ----- Variations register (Vantro USP for dispute defence) -----
+  const fmtMoney = (n: any) => {
+    if (n == null || n === '') return '—'
+    const num = Number(n)
+    if (isNaN(num)) return '—'
+    return '£' + num.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+  }
+  const variationStatusChip = (status: string) => {
+    if (status === 'approved') return '<span class="chip chip-ok">Approved</span>'
+    if (status === 'invoiced') return '<span class="chip chip-ok">Invoiced</span>'
+    if (status === 'rejected') return '<span class="chip chip-bad">Rejected</span>'
+    return '<span class="chip chip-warn">Pending</span>'
+  }
+  const aiConfidenceChip = (conf: string | null) => {
+    if (!conf) return ''
+    const cls = conf === 'high' ? 'chip-warn' : 'chip'
+    return `<span class="chip ${cls}">AI ${escapeHtml(conf)} confidence</span>`
+  }
+  const renderVariationCard = (v: any, idx: number) => {
+    const ref = 'VAR-' + String(idx + 1).padStart(3, '0')
+    const time = v.created_at
+      ? new Date(v.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : ''
+    const sd = v.source_diary
+    const sourcePhotos = sd && Array.isArray(sd.photo_urls) ? sd.photo_urls : []
+    const sourceVideo = sd?.video_url || null
+    const sourceText = sd?.entry_text || null
+    const photoHtml = sourcePhotos.map((p: string) => `<img class="thumb" src="${escapeHtml(p)}" alt="">`).join('')
+    const raisedBy = v.users?.name || 'Unknown'
+    const valueLine = v.approved_value
+      ? `Approved value: <strong>${fmtMoney(v.approved_value)}</strong>`
+      : v.estimated_value
+      ? `Estimated value: ${fmtMoney(v.estimated_value)}`
+      : 'Value not set'
+    return `
+      <div class="card ${v.status === 'rejected' ? 'card-bad' : v.status === 'pending' ? 'card-warn' : ''}">
+        <div class="card-head">
+          <div>
+            <div class="card-title"><strong>${ref}</strong> &middot; ${escapeHtml(time)}</div>
+            <div class="muted">Raised by ${escapeHtml(raisedBy)}${v.client_requestor ? ' &middot; Client: ' + escapeHtml(v.client_requestor) : ''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            ${variationStatusChip(v.status || 'pending')}
+            ${v.ai_detected ? aiConfidenceChip(v.ai_confidence) : '<span class="chip">Manually flagged</span>'}
+          </div>
+        </div>
+        <div class="card-body"><strong>${escapeHtml(v.description || '(no description)')}</strong></div>
+        <div class="card-body muted">${valueLine}</div>
+        ${sourceText || sourcePhotos.length > 0 || sourceVideo ? `
+        <div class="ai-box">
+          <div class="ai-label">Source evidence (Diary entry at time of request)</div>
+          ${sourceText ? `<div style="margin-bottom:8px;">${escapeHtml(sourceText)}</div>` : ''}
+          ${renderVideoBlock(sourceVideo, 'Variation evidence video')}
+          ${photoHtml ? `<div class="thumbs">${photoHtml}</div>` : ''}
+        </div>` : ''}
+        ${v.notes ? `<div class="card-body"><em>Notes: ${escapeHtml(v.notes)}</em></div>` : ''}
+      </div>`
+  }
+  const variationsList = (variations || []) as any[]
+  const variationsApproved = variationsList.filter((v: any) => v.status === 'approved' || v.status === 'invoiced').length
+  const variationsPending = variationsList.filter((v: any) => v.status === 'pending').length
+  const variationsRejected = variationsList.filter((v: any) => v.status === 'rejected').length
+  const variationsTotalEstimated = variationsList.reduce((sum: number, v: any) => sum + (Number(v.estimated_value) || 0), 0)
+  const variationsTotalApproved = variationsList.reduce((sum: number, v: any) => sum + (Number(v.approved_value) || 0), 0)
+  const variationsSummary = variationsList.length === 0
+    ? '<p class="empty">No variations recorded for this period.</p>'
+    : `
+      <div class="card">
+        <div class="card-body">
+          <strong>${variationsList.length} variation${variationsList.length === 1 ? '' : 's'} identified.</strong>
+          ${variationsApproved} approved &middot; ${variationsPending} pending &middot; ${variationsRejected} rejected.
+          <br>Total estimated value: <strong>${fmtMoney(variationsTotalEstimated)}</strong>${variationsTotalApproved ? ` &middot; Approved value: <strong>${fmtMoney(variationsTotalApproved)}</strong>` : ''}
+        </div>
+      </div>`
+  const variationCards = variationsList.length === 0
+    ? ''
+    : variationsList.map((v: any, i: number) => renderVariationCard(v, i)).join('')
 
   const defectCards = defects.map((d: any) => {
     const sevClass = d.severity === "critical" ? "bad" : d.severity === "major" ? "warn" : "neutral"

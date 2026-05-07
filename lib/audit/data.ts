@@ -73,6 +73,7 @@ export interface AuditData {
   qa: AnyRow[]
   diary: AnyRow[]
   defects: AnyRow[]
+  variations: AnyRow[]
 }
 
 /**
@@ -167,5 +168,27 @@ export async function fetchAuditData(
     defects.push({ ...d, photo_url: await signOne(service, d.photo_url) })
   }
 
-  return { job, company, period: { from, to }, signins, qa, diary, defects }
+  // Variations: fetched after defects so we have diary in scope for evidence linking
+  let variationsQ = service.from("variations")
+    .select("id, created_at, status, ai_detected, ai_confidence, description, estimated_value, approved_value, client_requestor, raised_by, diary_entry_id, approved_at, invoiced_at, notes, users!variations_raised_by_fkey(id, name)")
+    .eq("job_id", jobId).order("created_at", { ascending: true })
+  if (from) variationsQ = variationsQ.gte("created_at", from)
+  if (to) variationsQ = variationsQ.lte("created_at", to + "T23:59:59Z")
+  const { data: variationsRaw, error: variationsErr } = await variationsQ
+  if (variationsErr) console.error("[audit] variations error:", variationsErr.message)
+
+  // Build a lookup of diary entries by id so each variation can carry its source evidence
+  const diaryById: Record<string, AnyRow> = {}
+  for (const d of diary) {
+    if (d.id) diaryById[d.id] = d
+  }
+  const variations: AnyRow[] = []
+  for (const v of variationsRaw || []) {
+    variations.push({
+      ...v,
+      source_diary: v.diary_entry_id ? diaryById[v.diary_entry_id] || null : null,
+    })
+  }
+
+  return { job, company, period: { from, to }, signins, qa, diary, defects, variations }
 }
