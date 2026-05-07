@@ -41,7 +41,18 @@ export default function DiaryInsights() {
   useEffect(() => { load(false) }, [])
 
   if (loading) {
-    return <div className="px-6 py-4 text-sm text-gray-400">Loading insights...</div>
+    return (
+      <div className="bg-gradient-to-br from-teal-50 to-purple-50 border border-teal-100 rounded-2xl p-5 mb-5 animate-pulse">
+        <div className="mb-4">
+          <div className="h-5 w-24 bg-white/60 rounded mb-2"></div>
+          <div className="h-3 w-48 bg-white/40 rounded"></div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="h-24 bg-white/40 rounded-xl"></div>
+          <div className="h-24 bg-white/40 rounded-xl"></div>
+        </div>
+      </div>
+    )
   }
 
   if (error) {
