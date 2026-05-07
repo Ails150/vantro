@@ -2131,6 +2131,20 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                       <div className="text-sm text-gray-700">{a.message}</div>
+                      {Array.isArray(a.photo_urls) && a.photo_urls.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {a.photo_urls.map((url: string, i: number) => (
+                            <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+                              <img src={url} alt="Site photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:border-teal-300 transition-colors"/>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                      {a.video_url && (
+                        <div className="mt-2">
+                          <video src={a.video_url} controls preload="metadata" className="max-w-md max-h-64 rounded-lg border border-gray-200 bg-black"/>
+                        </div>
+                      )}
                     </div>
                     <button onClick={() => { setResolvingAlert(resolvingAlert === a.id ? null : a.id); setResolutionNote("") }} className="text-sm bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 flex-shrink-0 font-medium">Resolve</button>
                   </div>

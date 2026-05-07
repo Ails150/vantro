@@ -163,6 +163,8 @@ Return ONLY valid JSON, no preamble, no markdown:
           alert_type: finalSeverity,
           message: (entryText && entryText.trim()) ? entryText.trim().slice(0, 200) : (aiSummary || "Diary entry"),
           diary_entry_id: diary.id,
+          photo_urls: safePhotos,
+          video_url: videoUrl || null,
           status: "open",
           urgency,
           is_read: false,
