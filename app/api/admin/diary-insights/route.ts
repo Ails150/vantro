@@ -1,15 +1,9 @@
-import { NextRequest, NextResponse } from "next/server"
-import { createClient } from "@supabase/supabase-js"
-import { verifyAdminToken } from "@/lib/auth"
+import { NextResponse } from "next/server"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -17,34 +11,34 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 const cache = new Map<string, { data: any; expires: number }>()
 const TTL_MS = 60 * 60 * 1000
 
-export async function GET(req: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const auth = await verifyAdminToken(req)
-    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const { companyId } = auth
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    const force = req.nextUrl.searchParams.get("refresh") === "1"
+    const service = await createServiceClient()
+    const { data: userData } = await service
+      .from("users")
+      .select("company_id")
+      .eq("auth_user_id", user.id)
+      .single()
+    if (!userData) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
+    const companyId = userData.company_id
+    const { searchParams } = new URL(request.url)
+    const force = searchParams.get("refresh") === "1"
+
     const cached = cache.get(companyId)
     if (!force && cached && cached.expires > Date.now()) {
       return NextResponse.json({ ...cached.data, cached: true })
     }
 
-    // Pull last 7 days of diary entries with related context
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-    const { data: entries, error } = await supabase
+    const { data: entries, error } = await service
       .from("diary_entries")
-      .select(`
-        id,
-        entry_text,
-        ai_alert_type,
-        status,
-        created_at,
-        job_id,
-        user_id,
-        jobs ( name, trade ),
-        users ( name )
-      `)
+      .select("id, entry_text, ai_alert_type, status, created_at, job_id, user_id, jobs(name, trade), users(name)")
       .eq("company_id", companyId)
       .gte("created_at", sevenDaysAgo)
       .order("created_at", { ascending: false })
@@ -70,8 +64,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(empty)
     }
 
-    // Also pull alerts to check unanswered ones
-    const { data: alerts } = await supabase
+    const { data: alerts } = await service
       .from("alerts")
       .select("id, message, status, resolved_at, diary_entry_id, created_at")
       .eq("company_id", companyId)
@@ -81,7 +74,6 @@ export async function GET(req: NextRequest) {
       (a: any) => a.status !== "resolved" && !a.resolved_at
     ).length
 
-    // Build compact context for Gemini
     const context = entries.map((e: any) => ({
       date: e.created_at,
       installer: e.users?.name || "Unknown",
@@ -111,7 +103,7 @@ Return JSON in this exact shape:
 Rules:
 - Each array: 0-3 items max, only include genuinely notable findings
 - "recurring_themes": material/delivery/access/spec issues mentioned 2+ times
-- "silent_jobs": jobs with no entry in 36+ hours that had recent activity (you only see 7 days of data — flag jobs whose last entry is >36hrs old relative to the most recent entry overall)
+- "silent_jobs": jobs with no entry in 36+ hours that had recent activity
 - "unanswered_blockers": summarize the unresolved alerts at a high level
 - "installer_patterns": shifts in entry status (more paused/stopped than typical)
 - "trade_signals": which trades are seeing the most blockers/issues
