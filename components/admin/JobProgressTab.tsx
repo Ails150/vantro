@@ -208,9 +208,16 @@ export default function JobProgressTab() {
                   <SignalRow label="Checklist" signal="unknown" detail={`${j.checklist_complete} of ${j.checklist_total} items signed off`} />
                 )}
                 {j.open_blockers > 0 && (
-                  <div className="text-xs text-red-600 mt-2">
-                    {j.open_blockers} open blocker{j.open_blockers === 1 ? "" : "s"}
-                  </div>
+                  <button
+                    onClick={() => {
+                      const ev = new CustomEvent("vantro:navigate-tab", { detail: { tab: "alerts", jobId: j.id } })
+                      window.dispatchEvent(ev)
+                    }}
+                    className="text-xs text-red-600 hover:text-red-700 hover:underline mt-2 font-semibold inline-flex items-center gap-1"
+                  >
+                    <span>{j.open_blockers} open blocker{j.open_blockers === 1 ? "" : "s"}</span>
+                    <span aria-hidden>→</span>
+                  </button>
                 )}
               </div>
             )}
