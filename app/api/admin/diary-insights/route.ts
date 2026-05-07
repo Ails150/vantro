@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
     const { data: entries, error } = await service
       .from("diary_entries")
-      .select("id, entry_text, ai_alert_type, status, created_at, job_id, user_id, jobs(name), users(name)")
+      .select("id, entry_text, ai_alert_type, status, created_at, job_id, user_id, jobs(name), users!diary_entries_user_id_fkey(name)")
       .eq("company_id", companyId)
       .gte("created_at", sevenDaysAgo)
       .order("created_at", { ascending: false })
