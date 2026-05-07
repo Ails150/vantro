@@ -39,8 +39,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: signins } = await supabase.from('signins').select('*, users(name, initials)').eq('company_id', companyId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null)
   // Default 7-day window for dashboard - older entries accessible via /api/admin/alerts?all=true or filter UI
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-  const { data: alerts } = await supabase.from('alerts').select('*, jobs(name), users(name, initials)').eq('company_id', companyId).eq('is_read', false).gte('created_at', sevenDaysAgo).order('created_at', { ascending: false }).limit(200)
-  const { data: resolvedAlerts } = await supabase.from('alerts').select('*, jobs(name), users(name)').eq('company_id', companyId).eq('status', 'resolved').gte('resolved_at', sevenDaysAgo).order('resolved_at', { ascending: false }).limit(50)
+  const { data: alerts } = await supabase.from('alerts').select('*, jobs(name), users(name, initials), diary_entries(photo_urls, video_url)').eq('company_id', companyId).eq('is_read', false).gte('created_at', sevenDaysAgo).order('created_at', { ascending: false }).limit(200)
+  const { data: resolvedAlerts } = await supabase.from('alerts').select('*, jobs(name), users(name), diary_entries(photo_urls, video_url)').eq('company_id', companyId).eq('status', 'resolved').gte('resolved_at', sevenDaysAgo).order('resolved_at', { ascending: false }).limit(50)
   const { data: pendingQA } = await supabase.from('qa_approvals').select('*, jobs(name, address), users(name, initials)').eq('company_id', companyId).eq('status', 'pending').order('submitted_at', { ascending: false })
   const { data: teamMembers } = await supabase.from('users').select('*').eq('company_id', companyId)
   const { data: jobAssignments } = await supabase.from('job_assignments').select('*').eq('company_id', companyId)

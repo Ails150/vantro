@@ -2131,18 +2131,18 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                       <div className="text-sm text-gray-700">{a.message}</div>
-                      {Array.isArray(a.photo_urls) && a.photo_urls.length > 0 && (
+                      {Array.isArray(a.diary_entries?.photo_urls) && a.diary_entries.photo_urls.length > 0 && (
                         <div className="flex flex-wrap gap-2 mt-2">
-                          {a.photo_urls.map((url: string, i: number) => (
+                          {a.diary_entries.photo_urls.map((url: string, i: number) => (
                             <a key={i} href={url} target="_blank" rel="noopener noreferrer">
                               <img src={url} alt="Site photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200 hover:border-teal-300 transition-colors"/>
                             </a>
                           ))}
                         </div>
                       )}
-                      {a.video_url && (
+                      {a.diary_entries?.video_url && (
                         <div className="mt-2">
-                          <video src={a.video_url} controls preload="metadata" className="max-w-md max-h-64 rounded-lg border border-gray-200 bg-black"/>
+                          <video src={a.diary_entries.video_url} controls preload="metadata" className="max-w-md max-h-64 rounded-lg border border-gray-200 bg-black"/>
                         </div>
                       )}
                     </div>
