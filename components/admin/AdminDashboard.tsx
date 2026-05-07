@@ -165,7 +165,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [alertFilter, setAlertFilter] = useState<'all'|'blocker'|'issue'|'today'|'7d'|'30d'>('all')
   const [showResolved, setShowResolved] = useState(false)
   const [expandedJobGroups, setExpandedJobGroups] = useState<Set<string>>(new Set())
-  const [diaryFilter, setDiaryFilter] = useState<'all'|'blocker'|'issue'|'photos'|'videos'|'today'|'7d'|'30d'>('all')
+  const [diaryFilter, setDiaryFilter] = useState<'all'|'blocker'|'issue'|'variation'|'photos'|'videos'|'today'|'7d'|'30d'>('all')
   const [diarySearch, setDiarySearch] = useState('')
   const [resolutionNote, setResolutionNote] = useState("")
   const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
