@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
     const { data: entries, error } = await service
       .from("diary_entries")
-      .select("id, entry_text, ai_alert_type, status, created_at, job_id, user_id, jobs(name), users!diary_entries_user_id_fkey(name)")
+      .select("id, entry_text, ai_alert_type, created_at, job_id, user_id, jobs(name), users!diary_entries_user_id_fkey(name)")
       .eq("company_id", companyId)
       .gte("created_at", sevenDaysAgo)
       .order("created_at", { ascending: false })
@@ -78,7 +78,6 @@ export async function GET(request: Request) {
       date: e.created_at,
       installer: e.users?.name || "Unknown",
       job: e.jobs?.name || "Unknown",
-      status: e.status || "carrying_on",
       alert_type: e.ai_alert_type || "none",
       text: (e.entry_text || "").slice(0, 200)
     }))
@@ -104,7 +103,7 @@ Rules:
 - "recurring_themes": material/delivery/access/spec issues mentioned 2+ times
 - "silent_jobs": jobs with no entry in 36+ hours that had recent activity
 - "unanswered_blockers": summarize the unresolved alerts at a high level
-- "installer_patterns": shifts in entry status (more paused/stopped than typical)
+- "installer_patterns": notable shifts (e.g. one installer accounts for most blockers)
 - Be terse. One short sentence per detail. No fluff.
 - If nothing notable in a category, return empty array.`
 
