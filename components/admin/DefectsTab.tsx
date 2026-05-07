@@ -82,6 +82,11 @@ export default function DefectsTab() {
                     <img src={d.photo_url} alt="Defect" className="w-48 h-32 object-cover rounded-xl mt-2 hover:opacity-90 cursor-pointer"/>
                   </a>
                 )}
+                {d.video_url && (
+                  <div className="mt-2">
+                    <video src={d.video_url} controls preload="metadata" className="w-full max-w-md aspect-video rounded-xl border border-gray-200 bg-black"/>
+                  </div>
+                )}
                 {d.resolution_note && <p className={"text-xs mt-2 " + sub}>Resolution: {d.resolution_note}</p>}
                 <p className={"text-xs mt-1 " + sub}>{new Date(d.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
               </div>

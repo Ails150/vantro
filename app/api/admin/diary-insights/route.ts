@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
     if (error) {
       console.error("[diary-insights] Query failed:", error)
-      return NextResponse.json({ error: "Query failed" }, { status: 500 })
+      return NextResponse.json({ error: "Query failed", detail: error.message, hint: error.hint, code: error.code }, { status: 500 })
     }
 
     if (!entries || entries.length === 0) {
