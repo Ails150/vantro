@@ -692,18 +692,17 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
   <h2>Site diary</h2>
   <p class="muted">Daily updates from the team with photos, AI flags, and reply threads.</p>
   ${diaryCards}
+
+  <h2>Variations register</h2>
+  <p class="muted">Client-requested scope changes and dayworks captured during the project. Each variation links back to the original diary entry as evidence.</p>
+  ${variationsSummary}
+  ${variationCards}
+
   <div class="footer">
     <span>Vantro · getvantro.com</span>
     <span>${refId}</span>
   </div>
 </section>
-
-      <section class="page-break">
-        <h2>Variations register</h2>
-        <p class="muted">Client-requested scope changes and dayworks captured during the project. Each variation links back to the original diary entry as evidence.</p>
-        ${variationsSummary}
-        ${variationCards}
-      </section>
 
 <!-- PAGE 5: Defects -->
 <section class="page">
