@@ -84,10 +84,14 @@ Look at everything they sent (text and any photos below). Decide if this is:
 - "issue": a problem that may slow things or needs attention. Examples: delay, defect, missing item, weather concern, partial supply, snag, complaint.
 - "normal": routine progress update with nothing wrong.
 
-Be strict. If a foreman would want to know about it, it is at minimum "issue". Photos can change the verdict on their own — a photo of a flooded floor or unfinished work is a blocker even if the text is bland.
+ALSO decide separately: is this entry describing a VARIATION? A variation is work outside the original contracted scope, typically requested by the client during the job, that should be priced separately and invoiced. Strong variation signals: "client asked", "they want", "they decided", "swap to", "instead of", "additional", "extra", "on top of", "not in spec", "not on drawings", "upgrade to", client name + "requested". Negative signals (NOT variations even if language overlaps): defect rectification, snagging, internal team coordination, missing materials being chased, weather delays.
+
+Be strict on variations. Only flag if the language clearly indicates client-requested scope change.
+
+Photos can change the verdict on their own — a photo of a flooded floor or unfinished work is a blocker even if the text is bland.
 
 Return ONLY valid JSON, no preamble, no markdown:
-{"summary":"<one sentence under 20 words>","severity":"normal|issue|blocker","reason":"<one short sentence why>"}`
+{"summary":"<one sentence under 20 words>","severity":"normal|issue|blocker","reason":"<one short sentence why>","is_variation":<true|false>,"variation_confidence":"<high|medium|low|null>","variation_summary":"<brief description of what changed, or null>"}`
     })
 
     for (const url of safePhotos) {
@@ -102,6 +106,9 @@ Return ONLY valid JSON, no preamble, no markdown:
     let aiSummary = (entryText || "").slice(0, 80) || "Diary entry"
     let aiSeverity: "normal" | "issue" | "blocker" = "normal"
     let aiReason = ""
+    let aiVariationDetected = false
+    let aiVariationConfidence: "high" | "medium" | "low" | null = null
+    let aiVariationSummary: string | null = null
 
     try {
       const completion = await anthropic.messages.create({
@@ -119,6 +126,13 @@ Return ONLY valid JSON, no preamble, no markdown:
         aiSeverity = parsed.severity
       }
       if (parsed.reason) aiReason = String(parsed.reason).trim()
+
+      // Variation detection
+      if (parsed.is_variation === true) {
+        aiVariationDetected = true
+        aiVariationConfidence = ["high","medium","low"].includes(parsed.variation_confidence) ? parsed.variation_confidence : "low"
+        aiVariationSummary = parsed.variation_summary ? String(parsed.variation_summary).trim().slice(0, 300) : aiSummary
+      }
     } catch (aiErr) {
       console.error("[diary] AI classify failed, falling back to tap-only:", aiErr)
     }
@@ -149,9 +163,31 @@ Return ONLY valid JSON, no preamble, no markdown:
       .update({
         ai_alert_type: finalSeverity,
         ai_summary: aiSummary,
-        urgency
+        urgency,
+        ai_variation_detected: aiVariationDetected
       })
       .eq("id", diary.id)
+
+    // If variation detected, create a row in variations register
+    if (aiVariationDetected) {
+      const { error: varError } = await service
+        .from("variations")
+        .insert({
+          company_id: payload.companyId,
+          job_id: jobId,
+          diary_entry_id: diary.id,
+          raised_by: payload.userId,
+          description: aiVariationSummary || aiSummary,
+          ai_detected: true,
+          ai_confidence: aiVariationConfidence,
+          status: "pending"
+        })
+      if (varError) {
+        console.error("[diary] variation insert failed (non-fatal):", varError.message)
+      } else {
+        console.log("[diary] variation auto-created for diary", diary.id, "confidence:", aiVariationConfidence)
+      }
+    }
 
     if (finalSeverity === "blocker" || finalSeverity === "issue") {
       const { error: alertError } = await service
