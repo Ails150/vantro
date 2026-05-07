@@ -5,6 +5,7 @@ import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import AuditTab from './AuditTab'
 import MapTab from './MapTab'
 import DefectsTab from "@/components/admin/DefectsTab"
+import DiaryInsights from "@/components/admin/DiaryInsights"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import ComplianceTab from "@/components/admin/ComplianceTab"
 import SettingsTab from "@/components/admin/SettingsTab"
@@ -1861,6 +1862,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <button onClick={() => router.refresh()} className={"text-xs border border-gray-200 rounded-lg px-3 py-1.5 " + sub + " hover:text-gray-900"}>Refresh</button>
                 </div>
               </div>
+              <DiaryInsights />
               <div className="flex items-center gap-2 flex-wrap">
                 <input
                   value={diarySearch}
