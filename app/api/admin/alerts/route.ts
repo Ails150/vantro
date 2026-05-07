@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const limit = Math.min(Math.max(limitParam, 1), 1000)
 
   let query = service.from("alerts")
-    .select("*, jobs(name), users(name)")
+    .select("*, jobs(name), users(name), diary_entries(id, video_url, photo_urls, entry_text)")
     .eq("company_id", userData.company_id)
     .order("created_at", { ascending: false })
     .limit(limit)
