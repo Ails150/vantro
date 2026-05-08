@@ -53,22 +53,22 @@ export async function processWalkthrough(walkthroughId: string, streamUid: strin
     })
     .eq("id", walkthroughId)
 
-  await service.rpc("increment_walkthrough_attempts", { p_walkthrough_id: walkthroughId }).catch(() => {
-    // Fallback if RPC doesn't exist yet — direct increment
-    return service
+  // Bump attempt counter (direct increment — no RPC needed)
+  try {
+    const { data: prev } = await service
       .from("walkthroughs")
       .select("processing_attempts")
       .eq("id", walkthroughId)
       .single()
-      .then(({ data }) => {
-        if (data) {
-          return service
-            .from("walkthroughs")
-            .update({ processing_attempts: (data.processing_attempts || 0) + 1 })
-            .eq("id", walkthroughId)
-        }
-      })
-  })
+    if (prev) {
+      await service
+        .from("walkthroughs")
+        .update({ processing_attempts: (prev.processing_attempts || 0) + 1 })
+        .eq("id", walkthroughId)
+    }
+  } catch (e: any) {
+    console.warn(`[process ${walkthroughId}] attempt counter bump failed:`, e?.message)
+  }
 
   try {
     // 1. Wait for Cloudflare to encode
