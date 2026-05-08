@@ -6,6 +6,7 @@ import AuditTab from './AuditTab'
 import MapTab from './MapTab'
 import DefectsTab from "@/components/admin/DefectsTab"
 import DiaryInsights from "@/components/admin/DiaryInsights"
+import WalkthroughsTab from "@/components/admin/WalkthroughsTab"
 import JobProgressTab from "@/components/admin/JobProgressTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import ComplianceTab from "@/components/admin/ComplianceTab"
@@ -868,6 +869,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "diary", label: "Diary" },
     { id: "progress", label: "Progress" },
     { id: "defects", label: "Defects" },
+    { id: "walkthroughs", label: "Walkthroughs" },
     { id: "map", label: "Map" },
     { id: "analytics", label: "Analytics" },
     { id: "performance", label: "Performance" },
@@ -2017,6 +2019,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "trades" && <TradesTab />}
         {activeTab === "audit" && <AuditTab jobs={jobs} aiAuditEnabled={!!company?.ai_audit_enabled} aiAuditTrialEndsAt={company?.ai_audit_trial_ends_at} stripeAiAuditSubscriptionItemId={company?.stripe_ai_audit_subscription_item_id} />}
         {activeTab === "map" && <MapTab />}
+        {activeTab === "walkthroughs" && <WalkthroughsTab />}
           {activeTab === "progress" && <JobProgressTab />}
           {activeTab === "defects" && <DefectsTab />}
         {activeTab === "schedule" && <ScheduleTab />}
