@@ -11,13 +11,32 @@ const CF_STREAM_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN
 
 export const maxDuration = 300
 
-// Poll Cloudflare Stream until video is encoded and ready
-async function waitForStreamReady(streamUid: string, maxWaitMs = 180000): Promise<{ ready: boolean; duration: number | null }> {
+// Enable MP4 download on a Cloudflare Stream video
+async function enableMp4Download(streamUid: string): Promise<void> {
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/${streamUid}/downloads`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${CF_STREAM_TOKEN}` }
+      }
+    )
+    const data = await res.json()
+    console.log(`[upload-clip] enableMp4Download response:`, JSON.stringify(data).slice(0, 200))
+  } catch (e: any) {
+    console.warn("[upload-clip] enableMp4Download failed:", e.message)
+  }
+}
+
+// Poll Cloudflare until BOTH the stream is ready AND the MP4 download is available
+async function waitForStreamReady(streamUid: string, maxWaitMs = 240000): Promise<{ ready: boolean; duration: number | null; mp4Url: string | null }> {
   const start = Date.now()
   let lastDuration: number | null = null
+  let mp4Enabled = false
 
   while (Date.now() - start < maxWaitMs) {
     try {
+      // Step 1: Check stream status
       const res = await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/${streamUid}`,
         { headers: { Authorization: `Bearer ${CF_STREAM_TOKEN}` } }
@@ -25,16 +44,35 @@ async function waitForStreamReady(streamUid: string, maxWaitMs = 180000): Promis
       const data = await res.json()
       if (data?.result) {
         lastDuration = data.result.duration ?? lastDuration
+
+        // Once stream is ready, request MP4 download enablement (idempotent)
+        if (data.result.readyToStream === true && !mp4Enabled) {
+          await enableMp4Download(streamUid)
+          mp4Enabled = true
+        }
+
+        // Step 2: If stream is ready, check the MP4 download
         if (data.result.readyToStream === true) {
-          return { ready: true, duration: lastDuration }
+          const mp4Res = await fetch(
+            `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/${streamUid}/downloads`,
+            { headers: { Authorization: `Bearer ${CF_STREAM_TOKEN}` } }
+          )
+          const mp4Data = await mp4Res.json()
+          const mp4Status = mp4Data?.result?.default?.status
+          const mp4Url = mp4Data?.result?.default?.url
+          console.log(`[upload-clip] mp4 status=${mp4Status}, url=${mp4Url ? "present" : "missing"}`)
+
+          if (mp4Status === "ready" && mp4Url) {
+            return { ready: true, duration: lastDuration, mp4Url }
+          }
         }
       }
     } catch (e: any) {
       console.error("[upload-clip] poll error:", e.message)
     }
-    await new Promise(r => setTimeout(r, 4000))
+    await new Promise(r => setTimeout(r, 5000))
   }
-  return { ready: false, duration: lastDuration }
+  return { ready: false, duration: lastDuration, mp4Url: null }
 }
 
 // The actual processing pipeline. Idempotent — safe to retry.
@@ -71,13 +109,13 @@ export async function processWalkthrough(walkthroughId: string, streamUid: strin
   }
 
   try {
-    // 1. Wait for Cloudflare to encode
-    console.log(`[process ${walkthroughId}] waiting for Cloudflare encoding`)
-    const { ready, duration: cfDuration } = await waitForStreamReady(streamUid)
-    if (!ready) {
-      throw new Error("Cloudflare did not finish encoding within timeout")
+    // 1. Wait for Cloudflare to encode (HLS + MP4 download)
+    console.log(`[process ${walkthroughId}] waiting for Cloudflare encoding + MP4`)
+    const { ready, duration: cfDuration, mp4Url } = await waitForStreamReady(streamUid)
+    if (!ready || !mp4Url) {
+      throw new Error("Cloudflare did not finish encoding (or MP4 not ready) within timeout")
     }
-    console.log(`[process ${walkthroughId}] stream ready, duration=${cfDuration}`)
+    console.log(`[process ${walkthroughId}] stream ready, duration=${cfDuration}, mp4=${mp4Url}`)
 
     // 2. Update duration if Cloudflare gave us a value
     if (cfDuration) {
@@ -92,16 +130,15 @@ export async function processWalkthrough(walkthroughId: string, streamUid: strin
         .eq("walkthrough_id", walkthroughId)
     }
 
-    // 3. Transcribe with Gemini
-    console.log(`[process ${walkthroughId}] transcribing`)
-    const downloadUrl = `https://customer-6416opuz33lyk78q.cloudflarestream.com/${streamUid}/downloads/default.mp4`
+    // 3. Transcribe with Gemini using the verified MP4 URL
+    console.log(`[process ${walkthroughId}] transcribing from ${mp4Url}`)
 
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
     const transcriptResult = await model.generateContent([
       {
         fileData: {
           mimeType: "video/mp4",
-          fileUri: downloadUrl
+          fileUri: mp4Url
         }
       },
       "Transcribe the spoken narration in this video. Output only the transcript text. No preamble, no description, no formatting. Use British English. If there is no audible speech, return exactly: NO_AUDIBLE_SPEECH"
