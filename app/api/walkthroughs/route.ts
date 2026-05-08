@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
       duration_seconds, transcript_full, ai_summary, ai_sections, ai_themes,
       ai_sentiment, ai_flags, approval_status, approved_by, approved_at,
       rejected_reason, created_at,
+      processing_status, processing_attempts, processing_started_at, processing_error,
       job:jobs(id, name, address),
       installer:users!installer_id(id, name),
       approver:users!approved_by(id, name),

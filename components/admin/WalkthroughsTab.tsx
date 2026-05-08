@@ -19,6 +19,8 @@ type Walkthrough = {
   ai_sentiment: string | null
   ai_flags: Array<{ type: string; description: string; clip_reference?: number }> | null
   approval_status: "pending" | "approved" | "rejected"
+  processing_status: "pending" | "processing" | "ready" | "failed"
+  processing_error: string | null
   approved_at: string | null
   rejected_reason: string | null
   job: { id: string; name: string; address: string | null } | null
@@ -69,6 +71,16 @@ export default function WalkthroughsTab() {
   useEffect(() => {
     load()
   }, [filter, status])
+
+  // Auto-poll while any walkthrough is still processing
+  useEffect(() => {
+    const hasProcessing = walkthroughs.some(w =>
+      w.processing_status === "processing" || w.processing_status === "pending"
+    )
+    if (!hasProcessing) return
+    const interval = setInterval(() => load(), 8000)
+    return () => clearInterval(interval)
+  }, [walkthroughs])
 
   function toggleExpanded(id: string) {
     setExpanded(prev => {
@@ -206,6 +218,22 @@ export default function WalkthroughsTab() {
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${statusBadge}`}>
                           {w.approval_status.toUpperCase()}
                         </span>
+                        {w.processing_status === "processing" && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full border bg-purple-50 text-purple-700 border-purple-200 inline-flex items-center gap-1">
+                            <span className="inline-block w-2 h-2 rounded-full bg-purple-500 animate-pulse" />
+                            Analysing
+                          </span>
+                        )}
+                        {w.processing_status === "pending" && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full border bg-gray-50 text-gray-700 border-gray-200">
+                            Queued
+                          </span>
+                        )}
+                        {w.processing_status === "failed" && (
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-full border bg-red-50 text-red-700 border-red-200">
+                            ⚠ Processing failed
+                          </span>
+                        )}
                         {w.ai_sentiment && (
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${SENTIMENT_COLOR[w.ai_sentiment] || ""}`}>
                             {w.ai_sentiment}
@@ -282,6 +310,14 @@ export default function WalkthroughsTab() {
                           Cancel
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {w.processing_status === "failed" && w.processing_error && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm">
+                      <span className="font-semibold text-red-900">AI Processing failed:</span>{" "}
+                      <span className="text-red-800">{w.processing_error}</span>
+                      <div className="text-xs text-red-700 mt-1">Auto-retry will run within 5 minutes.</div>
                     </div>
                   )}
 

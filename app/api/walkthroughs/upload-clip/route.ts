@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server"
+import { waitUntil } from "@vercel/functions"
 import { createServiceClient } from "@/lib/supabase/server"
 import { verifyInstallerToken } from "@/lib/auth"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
-export const maxDuration = 120  // Vercel: allow up to 2 min for stream encoding wait + Gemini
-
 const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
 const CF_STREAM_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN
 
+export const maxDuration = 300
+
 // Poll Cloudflare Stream until video is encoded and ready
-async function waitForStreamReady(streamUid: string, maxWaitMs = 90000): Promise<{ ready: boolean; duration: number | null }> {
+async function waitForStreamReady(streamUid: string, maxWaitMs = 180000): Promise<{ ready: boolean; duration: number | null }> {
   const start = Date.now()
   let lastDuration: number | null = null
 
@@ -31,9 +32,141 @@ async function waitForStreamReady(streamUid: string, maxWaitMs = 90000): Promise
     } catch (e: any) {
       console.error("[upload-clip] poll error:", e.message)
     }
-    await new Promise(r => setTimeout(r, 3000))
+    await new Promise(r => setTimeout(r, 4000))
   }
   return { ready: false, duration: lastDuration }
+}
+
+// The actual processing pipeline. Idempotent — safe to retry.
+export async function processWalkthrough(walkthroughId: string, streamUid: string) {
+  const service = await createServiceClient()
+
+  console.log(`[process ${walkthroughId}] starting`)
+
+  // Mark as processing + bump attempt counter
+  await service
+    .from("walkthroughs")
+    .update({
+      processing_status: "processing",
+      processing_started_at: new Date().toISOString(),
+      processing_error: null
+    })
+    .eq("id", walkthroughId)
+
+  await service.rpc("increment_walkthrough_attempts", { p_walkthrough_id: walkthroughId }).catch(() => {
+    // Fallback if RPC doesn't exist yet — direct increment
+    return service
+      .from("walkthroughs")
+      .select("processing_attempts")
+      .eq("id", walkthroughId)
+      .single()
+      .then(({ data }) => {
+        if (data) {
+          return service
+            .from("walkthroughs")
+            .update({ processing_attempts: (data.processing_attempts || 0) + 1 })
+            .eq("id", walkthroughId)
+        }
+      })
+  })
+
+  try {
+    // 1. Wait for Cloudflare to encode
+    console.log(`[process ${walkthroughId}] waiting for Cloudflare encoding`)
+    const { ready, duration: cfDuration } = await waitForStreamReady(streamUid)
+    if (!ready) {
+      throw new Error("Cloudflare did not finish encoding within timeout")
+    }
+    console.log(`[process ${walkthroughId}] stream ready, duration=${cfDuration}`)
+
+    // 2. Update duration if Cloudflare gave us a value
+    if (cfDuration) {
+      await service
+        .from("walkthroughs")
+        .update({ duration_seconds: cfDuration })
+        .eq("id", walkthroughId)
+
+      await service
+        .from("walkthrough_clips")
+        .update({ duration_seconds: cfDuration })
+        .eq("walkthrough_id", walkthroughId)
+    }
+
+    // 3. Transcribe with Gemini
+    console.log(`[process ${walkthroughId}] transcribing`)
+    const downloadUrl = `https://customer-6416opuz33lyk78q.cloudflarestream.com/${streamUid}/downloads/default.mp4`
+
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
+    const transcriptResult = await model.generateContent([
+      {
+        fileData: {
+          mimeType: "video/mp4",
+          fileUri: downloadUrl
+        }
+      },
+      "Transcribe the spoken narration in this video. Output only the transcript text. No preamble, no description, no formatting. Use British English. If there is no audible speech, return exactly: NO_AUDIBLE_SPEECH"
+    ])
+    let transcript = transcriptResult.response.text().trim()
+    if (transcript === "NO_AUDIBLE_SPEECH") transcript = ""
+
+    console.log(`[process ${walkthroughId}] transcript length=${transcript.length}`)
+
+    // 4. Save transcript to clip
+    await service
+      .from("walkthrough_clips")
+      .update({ transcript: transcript || null })
+      .eq("walkthrough_id", walkthroughId)
+
+    // 5. Trigger AI structuring
+    console.log(`[process ${walkthroughId}] structuring with AI`)
+    const baseUrl = process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "https://app.getvantro.com"
+
+    const procRes = await fetch(`${baseUrl}/api/walkthroughs/process`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ walkthroughId })
+    })
+
+    if (!procRes.ok) {
+      const errText = await procRes.text()
+      throw new Error(`AI structuring failed: ${errText}`)
+    }
+
+    // 6. Mark as ready
+    await service
+      .from("walkthroughs")
+      .update({
+        processing_status: "ready",
+        processing_completed_at: new Date().toISOString(),
+        processing_error: null
+      })
+      .eq("id", walkthroughId)
+
+    console.log(`[process ${walkthroughId}] DONE`)
+  } catch (e: any) {
+    console.error(`[process ${walkthroughId}] FAILED:`, e.message)
+
+    // Get current attempt count
+    const { data: w } = await service
+      .from("walkthroughs")
+      .select("processing_attempts")
+      .eq("id", walkthroughId)
+      .single()
+
+    const attempts = w?.processing_attempts || 0
+    const nextStatus = attempts >= 5 ? "failed" : "pending"
+
+    await service
+      .from("walkthroughs")
+      .update({
+        processing_status: nextStatus,
+        processing_error: e.message,
+        processing_completed_at: nextStatus === "failed" ? new Date().toISOString() : null
+      })
+      .eq("id", walkthroughId)
+  }
 }
 
 export async function POST(request: Request) {
@@ -82,15 +215,7 @@ export async function POST(request: Request) {
       }, { status: 429 })
     }
 
-    // Wait for Cloudflare to finish encoding the video
-    console.log("[upload-clip] waiting for Cloudflare to encode...")
-    const { ready, duration: cfDuration } = await waitForStreamReady(streamUid)
-    console.log("[upload-clip] stream ready=", ready, "duration=", cfDuration)
-
-    // Use Cloudflare's reported duration if mobile didn't send one
-    const finalDuration = durationSeconds || cfDuration || null
-
-    // Create walkthrough record
+    // Create walkthrough + clip rows IMMEDIATELY (so nothing is lost)
     const { data: walkthrough, error: wErr } = await service
       .from("walkthroughs")
       .insert({
@@ -100,8 +225,9 @@ export async function POST(request: Request) {
         recorded_at: new Date().toISOString(),
         gps_lat: lat || null,
         gps_lng: lng || null,
-        duration_seconds: finalDuration,
-        approval_status: "pending"
+        duration_seconds: durationSeconds || null,
+        approval_status: "pending",
+        processing_status: "pending"
       })
       .select()
       .single()
@@ -111,46 +237,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to create walkthrough", detail: wErr?.message }, { status: 500 })
     }
 
-    // Transcribe with Gemini using the MP4 download URL (more reliable than HLS for AI)
-    let transcript = ""
-    if (ready) {
-      try {
-        const downloadUrl = `https://customer-6416opuz33lyk78q.cloudflarestream.com/${streamUid}/downloads/default.mp4`
-        const watchUrl = `https://customer-6416opuz33lyk78q.cloudflarestream.com/${streamUid}/manifest/video.m3u8`
-
-        // Try MP4 first, fall back to HLS
-        const fileUri = downloadUrl
-
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
-        const transcriptResult = await model.generateContent([
-          {
-            fileData: {
-              mimeType: "video/mp4",
-              fileUri
-            }
-          },
-          "Transcribe the spoken narration in this video. Output only the transcript text. No preamble, no description, no formatting. Use British English. If there is no audible speech, return exactly the string: NO_AUDIBLE_SPEECH"
-        ])
-        transcript = transcriptResult.response.text().trim()
-        console.log("[upload-clip] transcript length:", transcript.length, "preview:", transcript.slice(0, 100))
-
-        if (transcript === "NO_AUDIBLE_SPEECH") {
-          transcript = ""
-        }
-      } catch (e: any) {
-        console.error("[upload-clip] transcription failed:", e.message)
-      }
-    } else {
-      console.warn("[upload-clip] stream did not become ready in time, skipping transcription")
-    }
-
-    // Create clip record
     const { error: cErr } = await service.from("walkthrough_clips").insert({
       walkthrough_id: walkthrough.id,
       sequence_number: 1,
       stream_video_id: streamUid,
-      duration_seconds: finalDuration,
-      transcript: transcript || null
+      duration_seconds: durationSeconds || null,
+      transcript: null
     })
 
     if (cErr) {
@@ -158,26 +250,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to save clip", detail: cErr.message }, { status: 500 })
     }
 
-    // Trigger AI structuring (synchronous so client knows result)
-    try {
-      const baseUrl = request.headers.get("x-forwarded-proto") + "://" + request.headers.get("host")
-      const procRes = await fetch(baseUrl + "/api/walkthroughs/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walkthroughId: walkthrough.id })
-      })
-      const procData = await procRes.json()
-      console.log("[upload-clip] AI processing result:", procData.success)
-    } catch (e: any) {
-      console.error("[upload-clip] AI trigger error:", e.message)
-    }
+    // FIRE BACKGROUND PROCESSING — function stays alive after response
+    waitUntil(processWalkthrough(walkthrough.id, streamUid))
 
+    // RETURN IMMEDIATELY — installer never waits
     return NextResponse.json({
       success: true,
       walkthrough_id: walkthrough.id,
-      transcript_preview: transcript.slice(0, 200),
-      stream_ready: ready,
-      duration: finalDuration
+      processing_status: "processing",
+      message: "Walk & Talk saved. AI analysis is running in the background."
     })
   } catch (e: any) {
     console.error("[upload-clip] unhandled:", e)
