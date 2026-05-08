@@ -128,9 +128,9 @@ export default function WalkthroughsTab() {
       <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
         <div className="flex items-start justify-between flex-wrap gap-4 mb-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Walkthroughs</h2>
+            <h2 className="text-xl font-bold text-gray-900">Walk & Talks</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Voice-narrated site walkthroughs with AI-structured documentation. Approved walkthroughs appear in client and compliance audit reports.
+              Voice-narrated site walk & talks with AI-structured documentation. Approved walkthroughs appear in client and compliance audit reports.
             </p>
           </div>
         </div>
@@ -180,9 +180,9 @@ export default function WalkthroughsTab() {
       ) : walkthroughs.length === 0 ? (
         <div className="bg-white border border-gray-200 rounded-2xl p-12 text-center text-gray-500">
           <div className="text-4xl mb-2">🎙️</div>
-          <div className="font-semibold text-gray-700">No walkthroughs yet</div>
+          <div className="font-semibold text-gray-700">No walk & talks yet</div>
           <div className="text-sm mt-1">
-            Installers can record voice-narrated walkthroughs from the mobile app.
+            Installers can record voice-narrated walk & talks from the mobile app.
           </div>
         </div>
       ) : (
