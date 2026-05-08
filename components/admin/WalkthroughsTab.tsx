@@ -338,14 +338,30 @@ export default function WalkthroughsTab() {
                         <div className="space-y-2">
                           {w.clips
                             .sort((a, b) => a.sequence_number - b.sequence_number)
-                            .map(c => (
-                              <div key={c.id} className="bg-white p-3 rounded-xl border border-gray-200 text-sm">
-                                <div className="text-xs font-semibold text-gray-500 mb-1">
-                                  Clip {c.sequence_number} · {c.duration_seconds}s
+                            .map(c => {
+                              const isRealStream = c.stream_video_id && !c.stream_video_id.startsWith("apx-test") && !c.stream_video_id.startsWith("test-")
+                              return (
+                              <div key={c.id} className="bg-white rounded-xl border border-gray-200 text-sm overflow-hidden">
+                                {isRealStream && (
+                                  <div className="aspect-video bg-black">
+                                    <iframe
+                                      src={`https://customer-${process.env.NEXT_PUBLIC_CLOUDFLARE_STREAM_SUBDOMAIN || "default"}.cloudflarestream.com/${c.stream_video_id}/iframe`}
+                                      className="w-full h-full"
+                                      allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                                      allowFullScreen
+                                    />
+                                  </div>
+                                )}
+                                <div className="p-3">
+                                  <div className="text-xs font-semibold text-gray-500 mb-1">
+                                    Clip {c.sequence_number} · {c.duration_seconds}s
+                                    {!isRealStream && <span className="ml-2 text-gray-400">(test data — no video)</span>}
+                                  </div>
+                                  <div className="text-gray-700">{c.transcript || "(no transcript)"}</div>
                                 </div>
-                                <div className="text-gray-700">{c.transcript || "(no transcript)"}</div>
                               </div>
-                            ))}
+                              )
+                            })}
                         </div>
                       </div>
                     )}
