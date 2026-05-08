@@ -85,6 +85,7 @@ export async function POST(req: NextRequest) {
         ai_sections: parsed.sections ?? [],
         ai_themes: parsed.themes ?? [],
         ai_sentiment: parsed.sentiment ?? "neutral",
+        ai_flags: parsed.flags ?? [],
       })
       .eq("id", walkthroughId)
 
