@@ -3,6 +3,7 @@ import { waitUntil } from "@vercel/functions"
 import { createServiceClient } from "@/lib/supabase/server"
 import { verifyInstallerToken } from "@/lib/auth"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { WALKTHROUGH_SYSTEM_PROMPT, buildUserMessage } from "@/lib/ai/walkthrough-prompt"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -154,32 +155,83 @@ export async function processWalkthrough(walkthroughId: string, streamUid: strin
       .update({ transcript: transcript || null })
       .eq("walkthrough_id", walkthroughId)
 
-    // 5. Trigger AI structuring
+    // 5. Inline AI structuring (no HTTP self-call)
     console.log(`[process ${walkthroughId}] structuring with AI`)
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "https://app.getvantro.com"
 
-    const procRes = await fetch(`${baseUrl}/api/walkthroughs/process`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ walkthroughId })
+    const { data: walkthrough } = await service
+      .from("walkthroughs")
+      .select(`
+        *,
+        job:jobs(address, name, required_trades),
+        installer:users!installer_id(name),
+        clips:walkthrough_clips(sequence_number, duration_seconds, transcript)
+      `)
+      .eq("id", walkthroughId)
+      .single()
+
+    if (!walkthrough) throw new Error("Walkthrough vanished mid-process")
+
+    const sortedClips = (walkthrough.clips || []).sort((a: any, b: any) => a.sequence_number - b.sequence_number)
+    if (sortedClips.length === 0) throw new Error("No clips found for structuring")
+
+    const tradeType = Array.isArray(walkthrough.job?.required_trades) && walkthrough.job.required_trades.length > 0
+      ? walkthrough.job.required_trades.join(", ")
+      : "general"
+
+    const userMessage = buildUserMessage({
+      jobAddress: walkthrough.job?.address ?? walkthrough.job?.name ?? "Unknown site",
+      tradeType,
+      installerName: walkthrough.installer?.name ?? "Installer",
+      recordedAt: walkthrough.recorded_at,
+      clips: sortedClips.map((c: any) => ({
+        sequence: c.sequence_number,
+        durationSeconds: c.duration_seconds ?? 0,
+        transcript: c.transcript ?? "",
+      })),
     })
 
-    if (!procRes.ok) {
-      const errText = await procRes.text()
-      throw new Error(`AI structuring failed: ${errText}`)
+    const structureModel = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: WALKTHROUGH_SYSTEM_PROMPT,
+      generationConfig: { responseMimeType: "application/json", temperature: 0.3 },
+    })
+
+    const structureResult = await structureModel.generateContent(userMessage)
+    const responseText = structureResult.response.text()
+
+    let parsed: any
+    try {
+      parsed = JSON.parse(responseText)
+    } catch (e) {
+      throw new Error(`AI returned invalid JSON: ${responseText.slice(0, 200)}`)
     }
 
-    // 6. Mark as ready
-    await service
+    const fullTranscript = sortedClips.map((c: any) => c.transcript).filter(Boolean).join(" ")
+
+    // 6. Save structured AI output + mark ready
+    const { error: updateErr } = await service
       .from("walkthroughs")
       .update({
+        transcript_full: fullTranscript,
+        ai_summary: parsed.summary ?? null,
+        ai_sections: parsed.sections ?? [],
+        ai_themes: parsed.themes ?? [],
+        ai_sentiment: parsed.sentiment ?? "neutral",
+        ai_flags: parsed.flags ?? [],
         processing_status: "ready",
         processing_completed_at: new Date().toISOString(),
         processing_error: null
       })
       .eq("id", walkthroughId)
+
+    if (updateErr) throw new Error(`Failed to save AI output: ${updateErr.message}`)
+
+    // 7. Increment voice capture count for billing
+    try {
+      await service.rpc("increment_voice_capture_count", { p_company_id: walkthrough.company_id })
+    } catch (e: any) {
+      console.warn(`[process ${walkthroughId}] count increment failed:`, e?.message)
+    }
 
     console.log(`[process ${walkthroughId}] DONE`)
   } catch (e: any) {
