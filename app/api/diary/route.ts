@@ -263,6 +263,7 @@ export async function GET(request: Request) {
 
     const service = createServiceClient()
 
+    // 1. Fetch normal diary entries
     let query = service
       .from("diary_entries")
       .select("*")
@@ -282,8 +283,78 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Return ascending for client display (oldest first within window)
-    const sorted = (entries || []).slice().reverse()
+    // 2. Fetch walk & talks in the same window — merge into the feed
+    let walkQuery = service
+      .from("walkthroughs")
+      .select(`
+        id,
+        job_id,
+        installer_id,
+        recorded_at,
+        created_at,
+        ai_summary,
+        ai_themes,
+        ai_sentiment,
+        ai_flags,
+        approval_status,
+        processing_status,
+        duration_seconds,
+        clips:walkthrough_clips(stream_video_id, transcript, sequence_number, duration_seconds)
+      `)
+      .eq("company_id", installer.companyId)
+      .eq("job_id", jobId)
+      .order("created_at", { ascending: false })
+      .limit(limit)
+
+    if (since) {
+      walkQuery = walkQuery.gte("created_at", since)
+    }
+
+    const { data: walkthroughs } = await walkQuery
+
+    // 3. Map walkthroughs into diary-entry-shaped objects
+    const sentimentToAlert = (s: string | null): string => {
+      if (!s) return "none"
+      const lower = s.toLowerCase()
+      if (lower === "defect" || lower === "negative" || lower === "blocker") return "blocker"
+      if (lower === "concern" || lower === "warning" || lower === "issue") return "issue"
+      return "none"
+    }
+
+    const walkAsEntries = (walkthroughs || []).map((w: any) => {
+      const clips = (w.clips || []).sort((a: any, b: any) => a.sequence_number - b.sequence_number)
+      const summary = w.ai_summary || "Walk & Talk recorded — analysis in progress."
+      return {
+        id: `wt_${w.id}`,
+        kind: "walktalk",
+        walkthrough_id: w.id,
+        job_id: w.job_id,
+        user_id: w.installer_id,
+        created_at: w.created_at,
+        entry_text: summary,
+        ai_summary: summary,
+        ai_alert_type: sentimentToAlert(w.ai_sentiment),
+        ai_themes: w.ai_themes || [],
+        ai_sentiment: w.ai_sentiment,
+        approval_status: w.approval_status,
+        processing_status: w.processing_status,
+        duration_seconds: w.duration_seconds,
+        clips: clips.map((c: any) => ({
+          stream_video_id: c.stream_video_id,
+          transcript: c.transcript,
+          sequence_number: c.sequence_number,
+          duration_seconds: c.duration_seconds,
+        })),
+        photo_urls: [],
+      }
+    })
+
+    // 4. Merge + sort chronologically (newest first), then reverse for display
+    const merged = [...(entries || []), ...walkAsEntries]
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, limit)
+
+    const sorted = merged.slice().reverse()
 
     return NextResponse.json({
       entries: sorted,
