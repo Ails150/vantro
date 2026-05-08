@@ -381,7 +381,7 @@ export default function WalkthroughsTab() {
                                 {isRealStream && (
                                   <div className="aspect-video bg-black">
                                     <iframe
-                                      src={`https://customer-${process.env.NEXT_PUBLIC_CLOUDFLARE_STREAM_SUBDOMAIN || "default"}.cloudflarestream.com/${c.stream_video_id}/iframe`}
+                                      src={`https://customer-6416opuz33lyk78q.cloudflarestream.com/${c.stream_video_id}/iframe`}
                                       className="w-full h-full"
                                       allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
                                       allowFullScreen
