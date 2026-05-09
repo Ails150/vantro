@@ -467,7 +467,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
       qa: qaThisDay.length,
       defects: defectsThisDay.length,
       blockers: blockersThisDay.length,
-      photos: photosThisDay
+      photos: photosThisDay,
       walkthroughs: walkthroughsThisDay,
 
     }
