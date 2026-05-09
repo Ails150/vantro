@@ -953,7 +953,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
       <div className="flex">
         {/* Left Sidebar */}
-        <div data-marker="sidebar-collapsible-v1" className={"bg-white border-r border-gray-200 min-h-screen transition-all duration-200 relative " + (sidebarCollapsed ? "w-16" : "w-64")}>
+        <div data-marker="sidebar-collapsible-v1" className={"border-r border-gray-200 min-h-screen transition-all duration-200 relative " + (sidebarCollapsed ? "w-16" : "w-64")} style={{ backgroundColor: "#f0fdf9" }}>
           <div className={"space-y-6 " + (sidebarCollapsed ? "px-2 pt-14" : "p-6 pt-14")}>
               <button
                 data-marker="sidebar-toggle-btn"
@@ -983,7 +983,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     onClick={() => switchTab(tab.id)}
                     className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
                       activeTab === tab.id 
-                        ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
+                        ? 'bg-teal-100 text-teal-800 border-l-4 border-teal-500' 
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                     }`}
                   >
@@ -1011,7 +1011,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     onClick={() => switchTab(tab.id)}
                     className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
                       activeTab === tab.id 
-                        ? 'bg-teal-50 text-teal-700 border-l-4 border-teal-400' 
+                        ? 'bg-teal-100 text-teal-800 border-l-4 border-teal-500' 
                         : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                     }`}
                   >
