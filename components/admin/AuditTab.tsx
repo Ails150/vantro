@@ -486,6 +486,103 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 </div>
               )}
 
+              {/* Walk & Talks */}
+              {reportV2.fullEvidence?.walkthroughs && reportV2.fullEvidence.walkthroughs.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="font-bold text-gray-900 mb-1">🎙 Walk &amp; Talks ({reportV2.fullEvidence.walkthroughs.length})</h3>
+                      <p className="text-xs text-gray-500">Voice-narrated site walkthroughs with AI-structured documentation. Approved walkthroughs appear in client and compliance audit reports.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {reportV2.fullEvidence.walkthroughs.map((w: any) => {
+                      const isApproved = w.approval_status === "approved"
+                      const isRejected = w.approval_status === "rejected"
+                      const sentimentColor =
+                        w.sentiment === "defect" || w.sentiment === "negative" ? "text-red-700 bg-red-50" :
+                        w.sentiment === "concern" ? "text-amber-700 bg-amber-50" :
+                        w.sentiment === "confident" ? "text-emerald-700 bg-emerald-50" :
+                        "text-gray-600 bg-gray-50"
+                      const installerName = w.installer?.name || "Installer"
+                      const recorded = new Date(w.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+                      const clipsCount = (w.clips || []).length
+                      return (
+                        <div key={w.id} className={"border rounded-xl p-4 " + (isApproved ? "border-emerald-200 bg-emerald-50/30" : isRejected ? "border-red-200 bg-red-50/30 opacity-60" : "border-gray-200 bg-white")}>
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={"text-xs font-bold px-2 py-0.5 rounded " + (isApproved ? "bg-emerald-100 text-emerald-800" : isRejected ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800")}>
+                                {(w.approval_status || "pending").toUpperCase()}
+                              </span>
+                              {w.sentiment && (
+                                <span className={"text-xs font-semibold px-2 py-0.5 rounded " + sentimentColor}>
+                                  {w.sentiment}
+                                </span>
+                              )}
+                              <span className="text-xs text-gray-500">{installerName} · {recorded} · {clipsCount} clip{clipsCount === 1 ? "" : "s"}</span>
+                            </div>
+                          </div>
+                          {w.summary && <p className="text-sm text-gray-800 mb-2">{w.summary}</p>}
+                          {Array.isArray(w.themes) && w.themes.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {w.themes.slice(0, 8).map((t: string, ti: number) => (
+                                <span key={ti} className="text-[11px] px-2 py-0.5 bg-gray-100 text-gray-700 rounded">#{t}</span>
+                              ))}
+                            </div>
+                          )}
+                          {Array.isArray(w.flags) && w.flags.length > 0 && (
+                            <div className="text-xs text-red-700 mb-2">⚠ Flags: {w.flags.join(", ")}</div>
+                          )}
+                          {Array.isArray(w.sections) && w.sections.length > 0 && (
+                            <div className="mt-2 space-y-2">
+                              {w.sections.map((sec: any, si: number) => (
+                                <div key={si} className="bg-white border border-gray-100 rounded-lg p-3">
+                                  {sec.title && <div className="text-sm font-semibold text-gray-800 mb-1">{sec.title}</div>}
+                                  {Array.isArray(sec.bullets) && (
+                                    <ul className="text-xs text-gray-700 list-disc list-inside space-y-0.5">
+                                      {sec.bullets.map((b: string, bi: number) => <li key={bi}>{b}</li>)}
+                                    </ul>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {Array.isArray(w.clips) && w.clips.length > 0 && (
+                            <details className="mt-3">
+                              <summary className="text-xs text-teal-700 font-semibold cursor-pointer hover:text-teal-800">
+                                View transcript &amp; video ({clipsCount} clip{clipsCount === 1 ? "" : "s"})
+                              </summary>
+                              <div className="mt-2 space-y-3">
+                                {w.clips.map((c: any, ci: number) => (
+                                  <div key={ci} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                                    {c.stream_video_id && !c.stream_video_id.startsWith("test_") && (
+                                      <div className="aspect-video bg-black">
+                                        <iframe
+                                          src={`https://customer-6416opuz33lyk78q.cloudflarestream.com/${c.stream_video_id}/iframe`}
+                                          className="w-full h-full"
+                                          allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+                                          allowFullScreen
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="p-3">
+                                      <div className="text-xs font-semibold text-gray-500 mb-1">
+                                        Clip {c.sequence_number} · {c.duration_seconds || 0}s
+                                      </div>
+                                      <div className="text-xs text-gray-700">{c.transcript || "(no transcript)"}</div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               {/* Deliverables */}
               {reportV2.deliverables && reportV2.deliverables.length > 0 && (
                 <div className={card + " p-6"}>
