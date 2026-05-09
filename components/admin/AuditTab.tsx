@@ -469,11 +469,11 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">Last 14 days</h3>
                   <div className="flex gap-1 overflow-x-auto pb-2">
                     {reportV2.timeline.map((d: any, i: number) => {
-                      const events = (d.signins || 0) + (d.diary || 0) + (d.qa || 0) + (d.defects || 0)
+                      const events = (d.signins || 0) + (d.diary || 0) + (d.qa || 0) + (d.defects || 0) + ((d.walkthroughs || []).length || 0)
                       const intensity = events === 0 ? "bg-gray-100" : events < 3 ? "bg-teal-100" : events < 6 ? "bg-teal-300" : "bg-teal-500"
                       const dateLabel = new Date(d.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })
                       return (
-                        <div key={i} className="flex-1 min-w-[60px] text-center" title={`${dateLabel}: ${d.signins} sign-ins, ${d.diary} diary, ${d.qa} QA, ${d.blockers} blockers, ${d.photos} photos`}>
+                        <div key={i} className="flex-1 min-w-[60px] text-center" title={`${dateLabel}: ${d.signins} sign-ins, ${d.diary} diary, ${(d.walkthroughs||[]).length} walk & talks, ${d.qa} QA, ${d.blockers} blockers, ${d.photos} photos`}>
                           <div className={"h-12 rounded " + intensity + " flex flex-col items-center justify-center text-xs text-white font-medium"}>
                             {d.blockers > 0 && <span className="text-red-600 text-base leading-none">⚠</span>}
                             {events > 0 && <span className={events >= 3 ? "text-white" : "text-teal-800"}>{events}</span>}
