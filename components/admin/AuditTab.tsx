@@ -564,7 +564,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                               <div className="mt-2 space-y-3">
                                 {w.clips.map((c: any, ci: number) => (
                                   <div key={ci} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                                    {c.stream_video_id && !c.stream_video_id.startsWith("test_") && (
+                                    {c.stream_video_id && !c.stream_video_id.includes("test") && (
                                       <div className="aspect-video bg-black">
                                         <iframe
                                           src={`https://customer-6416opuz33lyk78q.cloudflarestream.com/${c.stream_video_id}/iframe`}
