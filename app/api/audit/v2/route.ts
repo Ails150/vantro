@@ -203,6 +203,62 @@ export async function POST(request: Request) {
   const { data: diaryRaw } = await diaryQuery
 
   const diary: AnyRow[] = await Promise.all((diaryRaw || []).map(async (d: AnyRow): Promise<AnyRow> => ({ ...d, photo_urls: await signMany(service, d.photo_urls), video_url: await signOne(service, d.video_url) })))
+
+  // Walk & Talks (voice-narrated walkthroughs with AI structuring)
+  // For audit pack we include only ready+approved walkthroughs by default.
+  // Internal view via ?view=internal can pass through pending too.
+  const view = (body && body.view) || "internal"
+  let walkQuery = service.from("walkthroughs").select(`
+    id,
+    job_id,
+    installer_id,
+    recorded_at,
+    created_at,
+    ai_summary,
+    ai_themes,
+    ai_sentiment,
+    ai_flags,
+    ai_sections,
+    transcript_full,
+    approval_status,
+    processing_status,
+    duration_seconds,
+    clips:walkthrough_clips(stream_video_id, transcript, sequence_number, duration_seconds),
+    installer:users!installer_id(id, name)
+  `).eq("company_id", companyId).eq("job_id", jobId).order("created_at", { ascending: true })
+  if (from) walkQuery = walkQuery.gte("created_at", from)
+  if (to) walkQuery = walkQuery.lte("created_at", to + "T23:59:59Z")
+  const { data: walkthroughsRaw } = await walkQuery
+
+  // For client/external views, only include approved walkthroughs.
+  // Internal view shows all (including pending) so the admin can approve from audit screen.
+  const walkthroughsFiltered = (walkthroughsRaw || []).filter((w: AnyRow) => {
+    if (view === "client" || view === "external") {
+      return w.approval_status === "approved"
+    }
+    return w.processing_status === "ready"
+  })
+
+  const walkthroughs: AnyRow[] = walkthroughsFiltered.map((w: AnyRow) => ({
+    id: w.id,
+    created_at: w.created_at,
+    recorded_at: w.recorded_at,
+    summary: w.ai_summary,
+    themes: w.ai_themes || [],
+    sentiment: w.ai_sentiment,
+    flags: w.ai_flags || [],
+    sections: w.ai_sections || [],
+    transcript: w.transcript_full,
+    approval_status: w.approval_status,
+    duration_seconds: w.duration_seconds,
+    clips: (w.clips || []).sort((a: any, b: any) => a.sequence_number - b.sequence_number).map((c: any) => ({
+      stream_video_id: c.stream_video_id,
+      transcript: c.transcript,
+      sequence_number: c.sequence_number,
+      duration_seconds: c.duration_seconds,
+    })),
+    installer: w.installer || null,
+  }))
   const blockers = diary.filter(d => d.ai_alert_type === "blocker")
   const issues = diary.filter(d => d.ai_alert_type === "issue")
 
@@ -399,6 +455,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     const diaryThisDay = (diaryRaw || []).filter((e: any) => e.created_at >= dayStart && e.created_at < dayEnd)
     const qaThisDay = (qaRaw || []).filter((q: any) => (q.submitted_at || q.created_at) >= dayStart && (q.submitted_at || q.created_at) < dayEnd)
     const defectsThisDay = (defectsRaw || []).filter((df: any) => df.created_at >= dayStart && df.created_at < dayEnd)
+    const walkthroughsThisDay = walkthroughs.filter((w: any) => w.created_at >= dayStart && w.created_at < dayEnd)
     const blockersThisDay = diaryThisDay.filter((e: any) => e.ai_alert_type === "blocker")
     const photosThisDay = diaryThisDay.reduce((sum: number, e: any) => sum + ((e.photo_urls?.length) || 0), 0) +
       qaThisDay.filter((q: any) => q.photo_url).length
@@ -411,7 +468,10 @@ Return only the sentence, no JSON, no quotes, no preamble.`
       defects: defectsThisDay.length,
       blockers: blockersThisDay.length,
       photos: photosThisDay
-    })
+      walkthroughs: walkthroughsThisDay,
+
+    }
+  )
   }
 
   return NextResponse.json({
@@ -426,7 +486,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     signoffs: progressiveSignoffs,
     onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, fullLog: signins },
     issues: { blockers, issues, openDefects, allDefects: defects },
-    fullEvidence: { qa: qaRaw || [], diary, signins },
+    fullEvidence: { qa: qaRaw || [], diary, walkthroughs, signins },
     aiAuditActive,
     execSummary,
     redFlags,
