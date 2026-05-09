@@ -531,7 +531,16 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                             </div>
                           )}
                           {Array.isArray(w.flags) && w.flags.length > 0 && (
-                            <div className="text-xs text-red-700 mb-2">⚠ Flags: {w.flags.join(", ")}</div>
+                            <div className="text-xs text-red-700 mb-2">
+                              <div className="font-semibold mb-1">⚠ Flags ({w.flags.length})</div>
+                              <ul className="list-disc list-inside space-y-0.5">
+                                {w.flags.map((f: any, fi: number) => (
+                                  <li key={fi}>
+                                    {typeof f === "string" ? f : (f?.label || f?.text || f?.message || f?.type || JSON.stringify(f))}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
                           {Array.isArray(w.sections) && w.sections.length > 0 && (
                             <div className="mt-2 space-y-2">
