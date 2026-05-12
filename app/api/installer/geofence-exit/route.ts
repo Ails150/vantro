@@ -97,20 +97,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 })
   }
 
-  // Log the breadcrumb for the exit event
-  await service
-    .from("location_logs")
-    .insert({
-      user_id: installer.userId,
-      company_id: signin.company_id,
-      lat,
-      lng,
-      accuracy_metres: 0,
-      source: "geofence-exit",
-      logged_at: signedOutAt.toISOString(),
-    })
-    .then(() => null)
-    .catch(() => null)
+  // Log the breadcrumb for the exit event (best-effort, non-blocking)
+  try {
+    await service
+      .from("location_logs")
+      .insert({
+        user_id: installer.userId,
+        company_id: signin.company_id,
+        lat,
+        lng,
+        accuracy_metres: 0,
+        source: "geofence-exit",
+        logged_at: signedOutAt.toISOString(),
+      })
+  } catch {}
 
   return NextResponse.json({
     success: true,

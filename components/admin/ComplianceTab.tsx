@@ -57,17 +57,17 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
   useEffect(() => { loadData() }, [period])
 
   const activeSignins = signins.filter(s => !s.signed_out_at)
-  const completedSignins = signins.filter(s => s.signed_out_at && !s.flagged && !s.departed_early && !s.auto_closed)
+  const completedSignins = signins.filter(s => s.signed_out_at && !s.flagged && !s.departed_early && (!s.auto_closed || s.auto_closed_reason === "geofence_exit"))
   const earlyDepartures = signins.filter(s => s.departed_early)
-  const noSignOut = signins.filter(s => s.auto_closed)
+  const noSignOut = signins.filter(s => s.auto_closed && s.auto_closed_reason !== "geofence_exit")
 
   // Filter + search applied to signins
   const filteredSignins = useMemo(() => {
     let out = signins
     if (filter === "on_site") out = out.filter(s => !s.signed_out_at)
     else if (filter === "early") out = out.filter(s => s.departed_early)
-    else if (filter === "no_signout") out = out.filter(s => s.auto_closed)
-    else if (filter === "complete") out = out.filter(s => s.signed_out_at && !s.flagged && !s.departed_early && !s.auto_closed)
+    else if (filter === "no_signout") out = out.filter(s => s.auto_closed && s.auto_closed_reason !== "geofence_exit")
+    else if (filter === "complete") out = out.filter(s => s.signed_out_at && !s.flagged && !s.departed_early && (!s.auto_closed || s.auto_closed_reason === "geofence_exit"))
     if (search.trim()) {
       const q = search.toLowerCase()
       out = out.filter(s => (s.users?.name || "").toLowerCase().includes(q) || (s.jobs?.name || "").toLowerCase().includes(q))
@@ -87,7 +87,7 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
       groups[uid].stats.days += 1
       groups[uid].stats.hours += Number(s.hours_worked || 0)
       if (s.departed_early) groups[uid].stats.early += 1
-      if (s.auto_closed) groups[uid].stats.noSignOut += 1
+      if (s.auto_closed && s.auto_closed_reason !== "geofence_exit") groups[uid].stats.noSignOut += 1
       if (!s.signed_out_at) groups[uid].stats.onSite = true
     }
     Object.values(groups).forEach(g => g.entries.sort((a, b) => new Date(b.signed_in_at).getTime() - new Date(a.signed_in_at).getTime()))
@@ -116,6 +116,7 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
   function complianceBg(score: number) { if (score >= 85) return "bg-teal-400"; if (score >= 60) return "bg-amber-400"; return "bg-red-400" }
 
   function statusBadge(signin: any) {
+    if (signin.auto_closed && signin.auto_closed_reason === "geofence_exit") return { label: `Auto sign-out \u2014 left site (${(signin.hours_worked || 0).toFixed ? Number(signin.hours_worked).toFixed(2) : signin.hours_worked}h)`, bg: "bg-teal-50", border: "border-teal-200", text: "text-teal-700" }
     if (signin.auto_closed) return { label: `No sign-out \u2014 ${signin.hours_worked || 0}h calculated`, bg: "bg-red-50", border: "border-red-200", text: "text-red-600" }
     if (signin.departed_early) return { label: `Left ${Math.floor((signin.early_departure_minutes || 0) / 60)}h ${(signin.early_departure_minutes || 0) % 60}m early`, bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700" }
     if (!signin.signed_out_at) return { label: "On site", bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700" }
@@ -123,6 +124,7 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
   }
 
   function cardBorder(signin: any) {
+    if (signin.auto_closed && signin.auto_closed_reason === "geofence_exit") return "border-teal-300"
     if (signin.auto_closed) return "border-red-300"; if (signin.departed_early) return "border-amber-300"; if (!signin.signed_out_at) return "border-blue-200"; return "border-gray-200"
   }
 
@@ -206,9 +208,9 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs">
                                 <div><span className="text-gray-500">Sign in</span><br/><span className="font-semibold">{formatTime(s.signed_in_at)}</span><br/><span className="text-gray-400">{s.distance_from_site_metres != null ? s.distance_from_site_metres + "m from site" : ""}</span></div>
-                                <div><span className="text-gray-500">Sign out</span><br/>{s.signed_out_at ? (<><span className={"font-semibold " + (s.auto_closed ? "text-red-500" : s.departed_early ? "text-amber-600" : "")}>{s.auto_closed ? "Auto-closed" : formatTime(s.signed_out_at)}</span><br/>{!s.auto_closed && s.sign_out_distance_metres != null && <span className="text-gray-400">{s.sign_out_distance_metres}m from site</span>}</>) : <span className="font-semibold text-blue-500">—</span>}</div>
+                                <div><span className="text-gray-500">Sign out</span><br/>{s.signed_out_at ? (<><span className={"font-semibold " + (s.auto_closed && s.auto_closed_reason === "geofence_exit" ? "text-teal-600" : s.auto_closed ? "text-red-500" : s.departed_early ? "text-amber-600" : "")}>{s.auto_closed && s.auto_closed_reason === "geofence_exit" ? formatTime(s.signed_out_at) : s.auto_closed ? "Auto-closed" : formatTime(s.signed_out_at)}</span><br/>{s.auto_closed && s.auto_closed_reason === "geofence_exit" && <span className="text-teal-600 text-[10px]">Geofence exit</span>}{!s.auto_closed && s.sign_out_distance_metres != null && <span className="text-gray-400">{s.sign_out_distance_metres}m from site</span>}</>) : <span className="font-semibold text-blue-500">—</span>}</div>
                                 <div><span className="text-gray-500">Expected</span><br/><span className="font-semibold">{s.expected_sign_out_time ? s.expected_sign_out_time.slice(0, 5) : "—"}</span></div>
-                                <div><span className="text-gray-500">Hours</span><br/><span className={"font-semibold text-base " + (s.auto_closed ? "text-red-500" : s.departed_early ? "text-amber-600" : "")}>{s.hours_worked != null ? Number(s.hours_worked).toFixed(2) : "—"}</span></div>
+                                <div><span className="text-gray-500">Hours</span><br/><span className={"font-semibold text-base " + (s.auto_closed && s.auto_closed_reason === "geofence_exit" ? "text-teal-600" : s.auto_closed ? "text-red-500" : s.departed_early ? "text-amber-600" : "")}>{s.hours_worked != null ? Number(s.hours_worked).toFixed(2) : "—"}</span></div>
                                 <div><span className="text-gray-500">Trail</span><br/><button onClick={() => loadBreadcrumbs(s.id, s.users?.name || "?")} className="text-teal-600 hover:text-teal-800 text-xs font-semibold underline">View GPS trail</button></div>
                               </div>
                               {s.flag_reason && <div className={"mt-3 pt-3 border-t text-xs " + (s.auto_closed ? "border-red-100 text-red-500" : "border-amber-100 text-amber-600")}>{s.flag_reason}</div>}
