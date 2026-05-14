@@ -578,10 +578,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   async function updateJob(jobId: string) {
     if (!editJobName.trim()) { setFormError("Enter a job name"); return }
-    if (!editJobPlaceSelected) { setFormError("Address must be verified - please pick from the Google Maps dropdown"); return }
+    if (!editJobPlaceSelected && (editJobLat == null || editJobLng == null)) { setFormError("Address must be verified - please pick from the Google Maps dropdown"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, required_trades: multiTradeEnabled ? editJobRequiredTrades : null }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, required_trades: multiTradeEnabled ? (editJobRequiredTrades || []) : [] }).eq("id", jobId)
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
