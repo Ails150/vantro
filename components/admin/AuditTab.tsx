@@ -806,7 +806,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           )}
 
           {/* CLIENT VIEW */}
-          {viewMode === "__deprecated_client" && (
+          {false && (
             <>
               <div className={card + " p-8 bg-gradient-to-br from-teal-50 via-white to-white"}>
                 <h2 className="text-2xl font-bold text-gray-900">{reportV2.job?.name}</h2>
