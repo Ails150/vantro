@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // Bulk import jobs via CSV.
@@ -121,10 +122,7 @@ export async function POST(request: Request) {
       results.push({ row: rowNum, name, address: "", status: "error", message: "Missing address" })
       continue
     }
-    if (gpsRadius && (gpsRadius < 50 || gpsRadius > 5000)) {
-      results.push({ row: rowNum, name, address, status: "error", message: "GPS radius must be 50–5000 metres" })
-      continue
-    }
+    // gps_radius from CSV is ignored (radius is set globally per company)
     if (existingSet.has(name.toLowerCase())) {
       results.push({ row: rowNum, name, address, status: "skipped", message: "Job with this name already exists" })
       continue
@@ -142,15 +140,14 @@ export async function POST(request: Request) {
       name,
       address: postcode ? `${address}, ${postcode}` : address,
       status: "active",
-      gps_radius: gpsRadius,
     }
     if (coords) {
       insertRow.lat = coords.lat
       insertRow.lng = coords.lng
     }
-    if (foremanEmail) {
-      insertRow.foreman_id = foremanMap.get(foremanEmail)
-    }
+    // Note: gps_radius and foreman_id columns do not exist on jobs table.
+    // Geofence radius is set globally (150m). foreman_email is validated above
+    // but assignment must be done via the admin UI after import.
     if (r.start_date) {
       const d = new Date(r.start_date)
       if (!isNaN(d.getTime())) insertRow.start_date = d.toISOString()
