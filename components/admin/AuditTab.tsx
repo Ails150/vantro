@@ -205,6 +205,32 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
     }
   }
 
+  // Iteration: fetch the audit/v2 endpoint twice with two periods
+  async function compareIterPeriods() {
+    if (!selectedJob) { setIterError("Pick a job first."); return }
+    if (!iterFromA || !iterToA || !iterFromB || !iterToB) { setIterError("Fill all four dates."); return }
+    setIterLoading(true); setIterError(""); setIterReportA(null); setIterReportB(null)
+    try {
+      const callApi = async (from: string, to: string) => {
+        const url = `/api/audit/v2?jobId=${selectedJob}&from=${from}&to=${to}`
+        const res = await fetch(url)
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Failed to fetch period")
+        return data
+      }
+      const [a, b] = await Promise.all([
+        callApi(iterFromA, iterToA),
+        callApi(iterFromB, iterToB),
+      ])
+      setIterReportA(a)
+      setIterReportB(b)
+    } catch (err: any) {
+      setIterError(err?.message || "Comparison failed")
+    } finally {
+      setIterLoading(false)
+    }
+  }
+
   const card = "bg-white border border-gray-200 rounded-2xl shadow-sm"
   const inp = "w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
 
@@ -945,20 +971,35 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 </div>
                 <div className="mt-4 flex items-center gap-2 flex-wrap">
                   <button
-                    onClick={() => {}}
+                    onClick={compareIterPeriods}
                     disabled={iterLoading || !iterFromA || !iterToA || !iterFromB || !iterToB}
                     className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
                   >
                     {iterLoading ? "Comparing…" : "Compare periods"}
                   </button>
-                  <span className="text-xs text-gray-400">Compare logic shipping in next commit.</span>
+                  {iterReportA && iterReportB && <span className="text-xs text-gray-500">Comparison loaded. Side-by-side view shipping next.</span>}
                 </div>
                 {iterError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{iterError}</p>}
               </div>
 
-              {(iterReportA || iterReportB) && (
-                <div className={card + " p-6 text-center text-sm text-gray-500"}>
-                  Comparison view shipping in the next commit.
+              {iterReportA && iterReportB && (
+                <div className={card + " p-6"}>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Both periods loaded</h3>
+                  <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="font-semibold text-gray-700 mb-1">Period A · {iterFromA} to {iterToA}</div>
+                      <div className="text-gray-600">Hours: {iterReportA?.health?.metrics?.hoursThisPeriod ?? 0}</div>
+                      <div className="text-gray-600">Installers: {iterReportA?.onSite?.installerCount ?? 0}</div>
+                      <div className="text-gray-600">Defects: {iterReportA?.issues?.allDefects?.length ?? 0}</div>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-3">
+                      <div className="font-semibold text-gray-700 mb-1">Period B · {iterFromB} to {iterToB}</div>
+                      <div className="text-gray-600">Hours: {iterReportB?.health?.metrics?.hoursThisPeriod ?? 0}</div>
+                      <div className="text-gray-600">Installers: {iterReportB?.onSite?.installerCount ?? 0}</div>
+                      <div className="text-gray-600">Defects: {iterReportB?.issues?.allDefects?.length ?? 0}</div>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-gray-400 italic">Full side-by-side comparison with deltas shipping next.</p>
                 </div>
               )}
             </>
