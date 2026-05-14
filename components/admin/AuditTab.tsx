@@ -68,6 +68,11 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   // Filter by installer (applies across all tabs except Iteration)
   const [installerFilter, setInstallerFilter] = useState<string>("")
 
+  // Iteration: AI-generated narrative comparing the two periods
+  const [iterNarrative, setIterNarrative] = useState<string>("")
+  const [iterNarrativeLoading, setIterNarrativeLoading] = useState(false)
+  const [iterNarrativeError, setIterNarrativeError] = useState("")
+
   useEffect(() => {
     if (!reportV2) { setComplianceHash(""); return }
     (async () => {
@@ -212,7 +217,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   async function compareIterPeriods() {
     if (!selectedJob) { setIterError("Pick a job first."); return }
     if (!iterFromA || !iterToA || !iterFromB || !iterToB) { setIterError("Fill all four dates."); return }
-    setIterLoading(true); setIterError(""); setIterReportA(null); setIterReportB(null)
+    setIterLoading(true); setIterError(""); setIterReportA(null); setIterReportB(null); setIterNarrative(""); setIterNarrativeError("")
     try {
       const callApi = async (from: string, to: string) => {
         const res = await fetch("/api/audit/v2", {
@@ -234,6 +239,31 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
       setIterError(err?.message || "Comparison failed")
     } finally {
       setIterLoading(false)
+    }
+  }
+
+  // Iteration: AI narrative comparing the two loaded reports
+  async function generateIterNarrative() {
+    if (!iterReportA || !iterReportB) { setIterNarrativeError("Load both periods first."); return }
+    setIterNarrativeLoading(true); setIterNarrativeError(""); setIterNarrative("")
+    try {
+      const res = await fetch("/api/audit/iteration-narrative", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reportA: iterReportA,
+          reportB: iterReportB,
+          fromA: iterFromA, toA: iterToA,
+          fromB: iterFromB, toB: iterToB,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Narrative generation failed")
+      setIterNarrative(data.narrative || "")
+    } catch (err: any) {
+      setIterNarrativeError(err?.message || "Narrative generation failed")
+    } finally {
+      setIterNarrativeLoading(false)
     }
   }
 
@@ -999,10 +1029,34 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                     {iterLoading ? "Comparing…" : "Compare periods"}
                   </button>
                   {iterReportA && iterReportB && <span className="text-xs text-emerald-600">Comparison loaded.</span>}
+                  {iterReportA && iterReportB && (
+                    <button
+                      onClick={generateIterNarrative}
+                      disabled={iterNarrativeLoading}
+                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+                    >
+                      {iterNarrativeLoading ? "Generating…" : iterNarrative ? "Regenerate AI narrative" : "Generate AI narrative"}
+                    </button>
+                  )}
                 </div>
                 {iterError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{iterError}</p>}
               </div>
 
+              {iterNarrativeError && (
+                <div className={card + " p-4 border-red-200 bg-red-50"}>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">Narrative error</div>
+                  <p className="text-sm text-red-700">{iterNarrativeError}</p>
+                </div>
+              )}
+              {iterNarrative && (
+                <div className={card + " p-6 border-purple-200 bg-purple-50"}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-purple-700">AI iteration narrative</div>
+                    <div className="text-[10px] text-purple-500">Gemini 2.5 Flash</div>
+                  </div>
+                  <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{iterNarrative}</p>
+                </div>
+              )}
               {iterReportA && iterReportB && (() => {
                 const PHOTO_LIMIT = 24
                 const collectPhotos = (r: any) => {
