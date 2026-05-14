@@ -307,6 +307,32 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
             )}
           </div>
 
+          {viewMode === "daily" && (
+            <div className={card + " p-4 flex items-center gap-3 flex-wrap"}>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">Day</span>
+              <input
+                type="date"
+                value={from || new Date().toISOString().slice(0,10)}
+                onChange={(e) => { const d = e.target.value; setFrom(d); setTo(d); }}
+                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm"
+              />
+              <button
+                onClick={() => { const d = new Date().toISOString().slice(0,10); setFrom(d); setTo(d); generate(); }}
+                className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => generate()}
+                disabled={loading}
+                className="px-3 py-1.5 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+              >
+                {loading ? "Loading…" : "Reload for this day"}
+              </button>
+              <span className="text-xs text-gray-500 ml-auto">Showing {from || "today"}</span>
+            </div>
+          )}
+
           {/* INTERNAL VIEW */}
           {(viewMode === "progress" || viewMode === "daily") && (
             <>
