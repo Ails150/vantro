@@ -20,7 +20,7 @@ function getAiAuditView(trialEndsAt?: string | null, subscriptionItemId?: string
   return { kind: "none" as const }
 }
 
-type ViewMode = "internal" | "client" | "compliance"
+type ViewMode = "daily" | "progress" | "iteration" | "compliance"
 
 export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, stripeAiAuditSubscriptionItemId }: Props) {
   if (!aiAuditEnabled) return <UpgradeAIAuditPack />
@@ -39,7 +39,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   const [activeShares, setActiveShares] = useState<any[]>([])
 
   // New v2 UI state
-  const [viewMode, setViewMode] = useState<ViewMode>("internal")
+  const [viewMode, setViewMode] = useState<ViewMode>("daily")
   const [costEnabled, setCostEnabled] = useState(false)
   const [hourlyRate, setHourlyRate] = useState<number>(35)
   const [evidenceOpen, setEvidenceOpen] = useState(false)
@@ -280,8 +280,9 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="inline-flex bg-gray-100 rounded-lg p-0.5">
-                  <button onClick={() => setViewMode("internal")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "internal" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Internal</button>
-                  <button onClick={() => setViewMode("client")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "client" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Client</button>
+                  <button onClick={() => setViewMode("daily")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "daily" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Daily</button>
+                  <button onClick={() => setViewMode("progress")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "progress" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Progress</button>
+                  <button onClick={() => setViewMode("iteration")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "iteration" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Iteration</button>
                   <button onClick={() => setViewMode("compliance")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "compliance" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Compliance</button>
                 </div>
                 <button onClick={refreshAI} disabled={loading} className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium disabled:opacity-50">
@@ -307,7 +308,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           </div>
 
           {/* INTERNAL VIEW */}
-          {viewMode === "internal" && (
+          {(viewMode === "progress" || viewMode === "daily") && (
             <>
               {/* Health Check Hero */}
               {reportV2.health && (
@@ -779,7 +780,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           )}
 
           {/* CLIENT VIEW */}
-          {viewMode === "client" && (
+          {viewMode === "__deprecated_client" && (
             <>
               <div className={card + " p-8 bg-gradient-to-br from-teal-50 via-white to-white"}>
                 <h2 className="text-2xl font-bold text-gray-900">{reportV2.job?.name}</h2>
@@ -871,6 +872,13 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 )
               })()}
             </>
+          )}
+
+          {viewMode === "iteration" && (
+            <div className={card + " p-12 text-center"}>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Iteration view</h3>
+              <p className="text-sm text-gray-500 max-w-md mx-auto">Compare any two date ranges to see what changed — hours, photos, defects, signoffs. Shipping next.</p>
+            </div>
           )}
 
           {/* COMPLIANCE VIEW */}
