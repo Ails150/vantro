@@ -14,33 +14,60 @@ export const maxDuration = 60
 
 function summarisePeriod(report: any) {
   const diary = report?.fullEvidence?.diary || []
-  const defects = report?.issues?.allDefects || []
+  const defectsRaw = report?.fullEvidence?.defects || report?.issues?.allDefects || []
   const openDefects = report?.issues?.openDefects || []
-  const blockers = report?.issues?.blockers || []
+  const blockers = (report?.issues?.blockers || []).concat(diary.filter((d: any) => d.ai_alert_type === 'blocker'))
   const signoffs = report?.signoffs || []
   const signins = report?.onSite?.fullLog || []
   const deliverables = report?.deliverables || []
+  const walkthroughs = report?.fullEvidence?.walkthroughs || []
+  const qa = report?.fullEvidence?.qa || []
 
   return {
     hoursOnSite: report?.health?.metrics?.hoursThisPeriod ?? 0,
     installerCount: report?.onSite?.installerCount ?? 0,
     signinEvents: signins.length,
-    totalDefects: defects.length,
+    totalDefects: defectsRaw.length,
     openDefects: openDefects.length,
-    blockers: blockers.length,
+    blockerCount: blockers.length,
     signoffs: signoffs.length,
     diaryEntries: diary.length,
+    walkthroughCount: walkthroughs.length,
+    qaCount: qa.length,
     deliverableProgress: deliverables.map((d: any) => ({
       name: d.name,
       approved: d.approvedItems ?? 0,
       total: d.totalItems ?? 0,
     })),
-    // Sample the actual diary text - max 20 entries, 200 chars each
-    diarySamples: diary.slice(0, 20).map((d: any) => ({
+    // Real diary content - first 15 entries with text up to 300 chars each
+    diaryContent: diary.slice(0, 15).map((d: any) => ({
       created: d.created_at,
-      text: (d.notes || d.summary || "").substring(0, 200),
-    })).filter((d: any) => d.text),
-    defectFlags: defects.map((d: any) => d.responsibility || d.category || "unspecified"),
+      author: d.users?.name || 'unknown',
+      alert: d.ai_alert_type || null,
+      summary: d.ai_summary || null,
+      text: ((d.entry_text || '') as string).substring(0, 300),
+    })).filter((d: any) => d.text || d.summary),
+    // Defect descriptions, severity, status, resolution notes
+    defectDetails: defectsRaw.slice(0, 20).map((d: any) => ({
+      severity: d.severity,
+      status: d.status,
+      description: ((d.description || '') as string).substring(0, 200),
+      resolution: d.resolution_note ? ((d.resolution_note as string).substring(0, 150)) : null,
+      raisedBy: d.users?.name || null,
+    })),
+    // Walkthrough AI summaries / transcripts
+    walkthroughSummaries: walkthroughs.slice(0, 8).map((w: any) => ({
+      created: w.created_at,
+      summary: w.ai_summary || null,
+      // Pull a snippet of transcript from first clip if any
+      transcriptSnippet: w.clips?.[0]?.transcript ? ((w.clips[0].transcript as string).substring(0, 200)) : null,
+    })).filter((w: any) => w.summary || w.transcriptSnippet),
+    // QA notes that are non-empty
+    qaNotes: qa.slice(0, 15).map((q: any) => ({
+      state: q.state,
+      value: q.value,
+      notes: ((q.notes || '') as string).substring(0, 150),
+    })).filter((q: any) => q.notes),
   }
 }
 
