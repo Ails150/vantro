@@ -65,6 +65,9 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   const [iterLoading, setIterLoading] = useState(false)
   const [iterError, setIterError] = useState("")
 
+  // Filter by installer (applies across all tabs except Iteration)
+  const [installerFilter, setInstallerFilter] = useState<string>("")
+
   useEffect(() => {
     if (!reportV2) { setComplianceHash(""); return }
     (async () => {
@@ -324,6 +327,21 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <button onClick={() => setViewMode("iteration")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "iteration" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Iteration</button>
                   <button onClick={() => setViewMode("compliance")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "compliance" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Compliance</button>
                 </div>
+                {viewMode !== "iteration" && reportV2?.onSite?.fullLog && (() => {
+                  const names = Array.from(new Set((reportV2.onSite.fullLog || []).map((s: any) => s.users?.name).filter(Boolean))) as string[]
+                  if (names.length === 0) return null
+                  return (
+                    <select
+                      value={installerFilter}
+                      onChange={(e) => setInstallerFilter(e.target.value)}
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      title="Filter to a single installer"
+                    >
+                      <option value="">All installers ({names.length})</option>
+                      {names.sort().map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  )
+                })()}
                 <button onClick={refreshAI} disabled={loading} className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium disabled:opacity-50">
                   {loading ? "Refreshing…" : "Refresh AI"}
                 </button>
