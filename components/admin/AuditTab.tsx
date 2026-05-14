@@ -84,7 +84,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   // Persist view mode and cost toggle
   useEffect(() => {
     const v = localStorage.getItem("vantro_audit_view")
-    if (v === "internal" || v === "client" || v === "compliance") setViewMode(v)
+    if (v === "daily" || v === "progress" || v === "iteration" || v === "compliance") setViewMode(v)
     const c = localStorage.getItem("vantro_audit_cost")
     if (c === "1") setCostEnabled(true)
     const r = localStorage.getItem("vantro_audit_rate")
