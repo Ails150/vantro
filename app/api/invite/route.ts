@@ -65,9 +65,10 @@ export async function POST(request: Request) {
         <h2 style="color:#0A1A14;font-size:1.4rem;margin-bottom:12px">Welcome to Vantro</h2>
         <p style="color:#4A6158;line-height:1.6;margin-bottom:8px">Hi ${name || 'there'},</p>
         <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">Your manager has added you as an <strong style="color:#0A1A14">Installer</strong> on Vantro. Use the app to sign in to jobs, log your diary and complete QA checklists on site.</p>
-        <p style="color:#0A1A14;font-weight:700;margin-bottom:8px">Step 1 — Download the app</p>
-        <a href="https://play.google.com/store/apps/details?id=com.getvantro.app" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-bottom:24px">Download Vantro on Google Play →</a>
-        <p style="color:#4A6158;line-height:1.6;margin-bottom:4px">Tap the button above on your Android phone. Download and install Vantro from the Play Store.</p>
+        <p style="color:#0A1A14;font-weight:700;margin-bottom:12px">Step 1 — Download the app</p>
+        <a href="https://apps.apple.com/app/vantro/id6762612407" style="display:inline-block;background:#0A1A14;color:#FFFFFF;padding:14px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-right:8px;margin-bottom:8px">Download on App Store →</a>
+        <a href="https://play.google.com/store/apps/details?id=com.getvantro.app" style="display:inline-block;background:#0A1A14;color:#FFFFFF;padding:14px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-bottom:8px">Get it on Google Play →</a>
+        <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">Tap the button for your phone — iPhone users use the App Store, Android users use Google Play.</p>
         <p style="color:#0A1A14;font-weight:700;margin-top:24px;margin-bottom:8px">Step 2 — Set up your PIN</p>
         
         <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">Open the Vantro app, tap <strong style="color:#0A1A14">New installer? Set up here</strong> at the bottom, enter your email address and choose a 4-digit PIN. You are now ready to sign in to jobs on site.</p>
