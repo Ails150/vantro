@@ -29,14 +29,13 @@ export async function GET(request: Request) {
 
   // Pick jobs strategy based on whether this installer has direct assignments
   let jobs: any[] = []
-  // Strict: installer only sees jobs they are explicitly assigned to.
-  // If zero assignments, they see zero jobs. Admin must assign jobs in scheduler.
   if (assignments?.length) {
     const jobIds = assignments.map((a: any) => a.job_id)
     const { data: assignedJobs } = await service.from('jobs').select('*').in('id', jobIds).eq('status', 'active')
     jobs = assignedJobs || []
   } else {
-    jobs = []
+    const { data: allJobs } = await service.from('jobs').select('*').eq('company_id', me.company_id).eq('status', 'active')
+    jobs = allJobs || []
   }
 
   // Fetch ALL checklists for all jobs in ONE query, then group client-side
