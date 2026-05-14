@@ -71,7 +71,7 @@ export async function POST(request: Request) {
         <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">Tap the button for your phone — iPhone users use the App Store, Android users use Google Play.</p>
         <p style="color:#0A1A14;font-weight:700;margin-top:24px;margin-bottom:8px">Step 2 — Set up your PIN</p>
         
-        <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">Open the Vantro app, tap <strong style="color:#0A1A14">New installer? Set up here</strong> at the bottom, enter your email address and choose a 4-digit PIN. You are now ready to sign in to jobs on site.</p>
+        <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">Open the Vantro app, tap <strong style="color:#0A1A14">New installer? Tap here to set up</strong> at the bottom, enter <strong style="color:#0A1A14">this email address</strong> (the one this invite was sent to) and choose a 4-digit PIN. You are now ready to sign in to jobs on site.</p>
         <p style="color:#888;font-size:12px;margin-top:24px">Need help? Contact your manager or email aileen@applyscale8.com</p>
         <p style="color:#888;font-size:12px">Vantro · getvantro.com</p>
       </div>`
