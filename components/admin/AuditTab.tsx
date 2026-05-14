@@ -421,6 +421,75 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           )}
 
           {/* INTERNAL VIEW */}
+          {viewMode === "progress" && reportV2?.deliverables && reportV2.deliverables.length > 0 && (() => {
+            const dlvs = reportV2.deliverables
+            const totalItems = dlvs.reduce((s: number, d: any) => s + (d.totalItems || 0), 0)
+            const approvedItems = dlvs.reduce((s: number, d: any) => s + (d.approvedItems || 0), 0)
+            const pct = totalItems > 0 ? Math.round((approvedItems / totalItems) * 100) : 0
+            const completedDlvs = dlvs.filter((d: any) => d.status === "completed").length
+            const inProgressDlvs = dlvs.filter((d: any) => d.status === "in_progress").length
+            const notStartedDlvs = dlvs.filter((d: any) => d.status === "not_started").length
+            const hours = reportV2?.onSite?.totalHours ?? reportV2?.health?.metrics?.hoursThisPeriod ?? 0
+            const pctColour = pct >= 80 ? "text-emerald-600" : pct >= 40 ? "text-amber-600" : "text-red-600"
+            const barColour = pct >= 80 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500"
+            return (
+              <div className={card + " p-6 mb-4"}>
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">Job progress at a glance</h3>
+                    <p className="text-xs text-gray-500">Overall completion across all deliverables on this job.</p>
+                  </div>
+                  <div className="text-right">
+                    <div className={"text-4xl font-bold tabular-nums " + pctColour}>{pct}%</div>
+                    <div className="text-[11px] text-gray-500 uppercase tracking-wide">complete</div>
+                  </div>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2 mb-5 overflow-hidden">
+                  <div className={"h-full transition-all " + barColour} style={{ width: pct + "%" }} />
+                </div>
+                <div className="grid grid-cols-4 gap-3 mb-5">
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">Items approved</div>
+                    <div className="text-lg font-semibold text-gray-900 tabular-nums">{approvedItems}/{totalItems}</div>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-3">
+                    <div className="text-[10px] uppercase text-emerald-700 tracking-wide">Deliverables done</div>
+                    <div className="text-lg font-semibold text-emerald-700 tabular-nums">{completedDlvs}</div>
+                  </div>
+                  <div className="bg-amber-50 rounded-lg p-3">
+                    <div className="text-[10px] uppercase text-amber-700 tracking-wide">In progress</div>
+                    <div className="text-lg font-semibold text-amber-700 tabular-nums">{inProgressDlvs}</div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">Not started</div>
+                    <div className="text-lg font-semibold text-gray-900 tabular-nums">{notStartedDlvs}</div>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-600">Deliverable breakdown</div>
+                  {dlvs.map((d: any) => {
+                    const dPct = d.totalItems > 0 ? Math.round((d.approvedItems / d.totalItems) * 100) : 0
+                    const dBar = d.status === "completed" ? "bg-emerald-500" : d.status === "in_progress" ? "bg-amber-500" : "bg-gray-300"
+                    return (
+                      <div key={d.id} className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="text-sm font-medium text-gray-900">{d.name}</div>
+                          <div className="text-xs text-gray-600 tabular-nums">{d.approvedItems}/{d.totalItems} approved · {dPct}%</div>
+                        </div>
+                        <div className="w-full bg-white rounded-full h-1.5 mb-2 overflow-hidden">
+                          <div className={"h-full transition-all " + dBar} style={{ width: dPct + "%" }} />
+                        </div>
+                        {d.aiNarrative && <p className="text-xs text-gray-600 italic leading-relaxed">{d.aiNarrative}</p>}
+                      </div>
+                    )
+                  })}
+                </div>
+                <div className="mt-5 pt-4 border-t border-gray-100 text-xs text-gray-500">
+                  <span className="font-medium text-gray-700">{Number(hours).toFixed(1)}h</span> logged on this job
+                </div>
+              </div>
+            )
+          })()}
           {(viewMode === "progress" || viewMode === "daily") && (
             <>
               {/* Health Check Hero */}
