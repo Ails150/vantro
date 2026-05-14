@@ -980,13 +980,13 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   >
                     {iterLoading ? "Comparing…" : "Compare periods"}
                   </button>
-                  {iterReportA && iterReportB && <span className="text-xs text-gray-500">Comparison loaded. Side-by-side view shipping next.</span>}
+                  {iterReportA && iterReportB && <span className="text-xs text-emerald-600">Comparison loaded.</span>}
                 </div>
                 {iterError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{iterError}</p>}
               </div>
 
               {iterReportA && iterReportB && (() => {
-                const PHOTO_LIMIT = 12
+                const PHOTO_LIMIT = 24
                 const collectPhotos = (r: any) => {
                   const out: { url: string; date: string; source: string }[] = []
                   const diary = r?.fullEvidence?.diary || []
