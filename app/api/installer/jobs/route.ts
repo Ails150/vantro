@@ -12,34 +12,46 @@ export async function GET(request: Request) {
   const tomorrow = new Date(today)
   tomorrow.setDate(tomorrow.getDate() + 1)
 
-  // Run 4 independent queries in parallel: assignments, user+company, today's signins, today's scheduled visits
-  const [assignmentsRes, userRes, signinsRes, todaysVisitsRes] = await Promise.all([
+  const [assignmentsRes, userRes, signinsRes, upcomingVisitsRes] = await Promise.all([
     service.from('job_assignments').select('job_id').eq('user_id', installer.userId),
     service.from('users').select('company_id, companies(background_gps_enabled)').eq('id', installer.userId).single(),
     service.from('signins').select('job_id').eq('user_id', installer.userId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null),
-    service.from('visit_assignments').select('visit_id, job_visits!inner(job_id)').eq('user_id', installer.userId).gte('start_at', today.toISOString()).lt('start_at', tomorrow.toISOString()),
+    service.from('visit_assignments').select('visit_id, start_at, job_visits!inner(job_id)').eq('user_id', installer.userId).gte('start_at', today.toISOString()),
   ])
 
   const assignments = assignmentsRes.data
   const me: any = userRes.data
   const signins = signinsRes.data
-  const todaysJobIds = new Set<string>((todaysVisitsRes.data || []).map((v: any) => v.job_visits?.job_id).filter(Boolean))
+  const upcomingVisits = upcomingVisitsRes.data || []
 
   if (!me?.company_id) return NextResponse.json({ jobs: [] })
 
-  // Pick jobs strategy based on whether this installer has direct assignments
-  let jobs: any[] = []
-  // Strict: installer only sees jobs they are explicitly assigned to.
-  // If zero assignments, they see zero jobs. Admin must assign jobs in scheduler.
-  if (assignments?.length) {
-    const jobIds = assignments.map((a: any) => a.job_id)
-    const { data: assignedJobs } = await service.from('jobs').select('*').in('id', jobIds).eq('status', 'active')
-    jobs = assignedJobs || []
-  } else {
-    jobs = []
+  const todaysJobIds = new Set<string>(
+    upcomingVisits
+      .filter((v: any) => v.start_at && new Date(v.start_at) < tomorrow)
+      .map((v: any) => v.job_visits?.job_id)
+      .filter(Boolean)
+  )
+
+  const accessJobIds = new Set<string>()
+  for (const a of assignments || []) {
+    if (a.job_id) accessJobIds.add(a.job_id)
+  }
+  for (const v of upcomingVisits) {
+    const jid = (v as any).job_visits?.job_id
+    if (jid) accessJobIds.add(jid)
   }
 
-  // Fetch ALL checklists for all jobs in ONE query, then group client-side
+  let jobs: any[] = []
+  if (accessJobIds.size > 0) {
+    const { data: accessibleJobs } = await service
+      .from('jobs')
+      .select('*')
+      .in('id', Array.from(accessJobIds))
+      .eq('status', 'active')
+    jobs = accessibleJobs || []
+  }
+
   let checklistsByJob: Record<string, any[]> = {}
   if (jobs.length) {
     const jobIds = jobs.map((j: any) => j.id)
