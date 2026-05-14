@@ -212,8 +212,11 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
     setIterLoading(true); setIterError(""); setIterReportA(null); setIterReportB(null)
     try {
       const callApi = async (from: string, to: string) => {
-        const url = `/api/audit/v2?jobId=${selectedJob}&from=${from}&to=${to}`
-        const res = await fetch(url)
+        const res = await fetch("/api/audit/v2", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobId: selectedJob, from, to }),
+        })
         const data = await res.json()
         if (!res.ok) throw new Error(data.error || "Failed to fetch period")
         return data
