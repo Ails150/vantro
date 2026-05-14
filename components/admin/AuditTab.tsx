@@ -985,26 +985,70 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 {iterError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{iterError}</p>}
               </div>
 
-              {iterReportA && iterReportB && (
-                <div className={card + " p-6"}>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Both periods loaded</h3>
-                  <div className="grid grid-cols-2 gap-4 text-xs">
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="font-semibold text-gray-700 mb-1">Period A · {iterFromA} to {iterToA}</div>
-                      <div className="text-gray-600">Hours: {iterReportA?.health?.metrics?.hoursThisPeriod ?? 0}</div>
-                      <div className="text-gray-600">Installers: {iterReportA?.onSite?.installerCount ?? 0}</div>
-                      <div className="text-gray-600">Defects: {iterReportA?.issues?.allDefects?.length ?? 0}</div>
+              {iterReportA && iterReportB && (() => {
+                const PHOTO_LIMIT = 12
+                const collectPhotos = (r: any) => {
+                  const out: { url: string; date: string; source: string }[] = []
+                  const diary = r?.fullEvidence?.diary || []
+                  diary.forEach((e: any) => {
+                    if (Array.isArray(e.photo_urls)) {
+                      e.photo_urls.forEach((u: string) => { if (u) out.push({ url: u, date: e.created_at, source: "Diary" }) })
+                    }
+                  })
+                  const defs = r?.issues?.allDefects || []
+                  defs.forEach((d: any) => { if (d.photo_url) out.push({ url: d.photo_url, date: d.created_at, source: "Defect" }) })
+                  out.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  return out
+                }
+                const photosA = collectPhotos(iterReportA)
+                const photosB = collectPhotos(iterReportB)
+                const fmtH = (n: number) => Number(n || 0).toFixed(1) + "h"
+                const renderCol = (label: string, range: string, r: any, photos: { url: string; date: string; source: string }[]) => (
+                  <div>
+                    <div className="mb-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+                      <div className="text-sm text-gray-700">{range}</div>
                     </div>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="font-semibold text-gray-700 mb-1">Period B · {iterFromB} to {iterToB}</div>
-                      <div className="text-gray-600">Hours: {iterReportB?.health?.metrics?.hoursThisPeriod ?? 0}</div>
-                      <div className="text-gray-600">Installers: {iterReportB?.onSite?.installerCount ?? 0}</div>
-                      <div className="text-gray-600">Defects: {iterReportB?.issues?.allDefects?.length ?? 0}</div>
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div className="bg-gray-50 rounded-lg p-2">
+                        <div className="text-[10px] uppercase text-gray-500">Hours</div>
+                        <div className="text-sm font-semibold text-gray-900">{fmtH(r?.health?.metrics?.hoursThisPeriod)}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-2">
+                        <div className="text-[10px] uppercase text-gray-500">Installers</div>
+                        <div className="text-sm font-semibold text-gray-900">{r?.onSite?.installerCount ?? 0}</div>
+                      </div>
+                      <div className="bg-gray-50 rounded-lg p-2">
+                        <div className="text-[10px] uppercase text-gray-500">Open defects</div>
+                        <div className="text-sm font-semibold text-gray-900">{r?.issues?.openDefects?.length ?? 0}</div>
+                      </div>
+                    </div>
+                    <div className="text-[11px] text-gray-500 mb-2">{photos.length} photo{photos.length === 1 ? "" : "s"} {photos.length > PHOTO_LIMIT && <span>· showing most recent {PHOTO_LIMIT}</span>}</div>
+                    {photos.length === 0 ? (
+                      <div className="text-xs text-gray-400 italic bg-gray-50 rounded-lg p-4 text-center">No photos captured in this period.</div>
+                    ) : (
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {photos.slice(0, PHOTO_LIMIT).map((p, i) => (
+                          <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" title={new Date(p.date).toLocaleString("en-GB") + " · " + p.source}>
+                            <img src={p.url} alt="" className="w-full h-20 object-cover rounded border border-gray-200 hover:opacity-80" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+
+                return (
+                  <div className={card + " p-6"}>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-1">Iteration report</h3>
+                    <p className="text-xs text-gray-500 mb-5">Side-by-side view of what happened in each period.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {renderCol("Period A (earlier)", iterFromA + " → " + iterToA, iterReportA, photosA)}
+                      {renderCol("Period B (later)", iterFromB + " → " + iterToB, iterReportB, photosB)}
                     </div>
                   </div>
-                  <p className="mt-3 text-xs text-gray-400 italic">Full side-by-side comparison with deltas shipping next.</p>
-                </div>
-              )}
+                )
+              })()}
             </>
           )}
 
