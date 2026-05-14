@@ -55,6 +55,16 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   // Compliance integrity hash (real SHA-256)
   const [complianceHash, setComplianceHash] = useState<string>("")
 
+  // Iteration tab: two periods to compare
+  const [iterFromA, setIterFromA] = useState("")
+  const [iterToA, setIterToA] = useState("")
+  const [iterFromB, setIterFromB] = useState("")
+  const [iterToB, setIterToB] = useState("")
+  const [iterReportA, setIterReportA] = useState<any>(null)
+  const [iterReportB, setIterReportB] = useState<any>(null)
+  const [iterLoading, setIterLoading] = useState(false)
+  const [iterError, setIterError] = useState("")
+
   useEffect(() => {
     if (!reportV2) { setComplianceHash(""); return }
     (async () => {
@@ -901,10 +911,57 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           )}
 
           {viewMode === "iteration" && (
-            <div className={card + " p-12 text-center"}>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Iteration view</h3>
-              <p className="text-sm text-gray-500 max-w-md mx-auto">Compare any two date ranges to see what changed — hours, photos, defects, signoffs. Shipping next.</p>
-            </div>
+            <>
+              <div className={card + " p-6"}>
+                <h3 className="text-sm font-semibold text-gray-900 mb-1">Compare two periods</h3>
+                <p className="text-xs text-gray-500 mb-4">Pick two date ranges to see what changed between them — hours, photos, defects, signoffs.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-600">Period A (earlier)</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">FROM</label>
+                        <input type="date" value={iterFromA} onChange={(e) => setIterFromA(e.target.value)} className={inp} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">TO</label>
+                        <input type="date" value={iterToA} onChange={(e) => setIterToA(e.target.value)} className={inp} />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-600">Period B (later)</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">FROM</label>
+                        <input type="date" value={iterFromB} onChange={(e) => setIterFromB(e.target.value)} className={inp} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">TO</label>
+                        <input type="date" value={iterToB} onChange={(e) => setIterToB(e.target.value)} className={inp} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => {}}
+                    disabled={iterLoading || !iterFromA || !iterToA || !iterFromB || !iterToB}
+                    className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  >
+                    {iterLoading ? "Comparing…" : "Compare periods"}
+                  </button>
+                  <span className="text-xs text-gray-400">Compare logic shipping in next commit.</span>
+                </div>
+                {iterError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{iterError}</p>}
+              </div>
+
+              {(iterReportA || iterReportB) && (
+                <div className={card + " p-6 text-center text-sm text-gray-500"}>
+                  Comparison view shipping in the next commit.
+                </div>
+              )}
+            </>
           )}
 
           {/* COMPLIANCE VIEW */}
