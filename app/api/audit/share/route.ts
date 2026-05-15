@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import crypto from "crypto"
 
 // /api/audit/share
-//   POST → create a share link, body: { jobId, from?, to? }
-//   GET  → list active shares for a job, query: ?jobId=...
+//   POST â†’ create a share link, body: { jobId, from?, to? }
+//   GET  â†’ list active shares for a job, query: ?jobId=...
 
 const EXPIRY_DAYS = 30
 
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { service, admin } = await getAdmin(user.id)
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 })
   }
 
-  // Generate cryptographically secure token (32 bytes → URL-safe base64)
+  // Generate cryptographically secure token (32 bytes â†’ URL-safe base64)
   const token = crypto.randomBytes(32).toString("base64url")
   const expiresAt = new Date(Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
@@ -76,7 +76,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { service, admin } = await getAdmin(user.id)
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 

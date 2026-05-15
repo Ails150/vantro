@@ -73,7 +73,7 @@ export async function GET(request: Request) {
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -133,7 +133,7 @@ export async function POST(request: Request) {
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 

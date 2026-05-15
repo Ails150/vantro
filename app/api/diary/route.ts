@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js"
+﻿import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { verifyInstallerToken } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
@@ -88,7 +88,7 @@ ALSO decide separately: is this entry describing a VARIATION? A variation is wor
 
 Be strict on variations. Only flag if the language clearly indicates client-requested scope change.
 
-Photos can change the verdict on their own — a photo of a flooded floor or unfinished work is a blocker even if the text is bland.
+Photos can change the verdict on their own â€” a photo of a flooded floor or unfinished work is a blocker even if the text is bland.
 
 Return ONLY valid JSON, no preamble, no markdown:
 {"summary":"<one sentence under 20 words>","severity":"normal|issue|blocker","reason":"<one short sentence why>","is_variation":<true|false>,"variation_confidence":"<high|medium|low|null>","variation_summary":"<brief description of what changed, or null>"}`
@@ -215,7 +215,7 @@ Return ONLY valid JSON, no preamble, no markdown:
           const { data: admins } = await service.from("users")
             .select("push_token")
             .eq("company_id", payload.companyId)
-            .in("role", ["admin", "foreman"])
+            .in("role", ["admin", "foreman", "superadmin"])
           const adminTokens = (admins || []).map((a: any) => a.push_token).filter(Boolean)
           if (adminTokens.length > 0) {
             await fetch("https://exp.host/--/api/v2/push/send", {
@@ -283,7 +283,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // 2. Fetch walk & talks in the same window — merge into the feed
+    // 2. Fetch walk & talks in the same window â€” merge into the feed
     let walkQuery = service
       .from("walkthroughs")
       .select(`
@@ -323,7 +323,7 @@ export async function GET(request: Request) {
 
     const walkAsEntries = (walkthroughs || []).map((w: any) => {
       const clips = (w.clips || []).sort((a: any, b: any) => a.sequence_number - b.sequence_number)
-      const summary = w.ai_summary || "Walk & Talk recorded — analysis in progress."
+      const summary = w.ai_summary || "Walk & Talk recorded â€” analysis in progress."
       return {
         id: `wt_${w.id}`,
         kind: "walktalk",

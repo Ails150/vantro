@@ -1,4 +1,4 @@
-// app/api/admin/visit-assignments/route.ts
+﻿// app/api/admin/visit-assignments/route.ts
 //
 // POST: assign an installer to a job on a specific date.
 // If a visit exists for that job on that date, attach the assignment to it.
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || !["admin", "foreman"].includes(admin.role))
+  if (!admin || !["admin", "foreman", "superadmin"].includes(admin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const body = await request.json()

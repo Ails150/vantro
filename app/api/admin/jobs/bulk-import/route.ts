@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       .from("users")
       .select("id, email")
       .eq("company_id", admin.company_id)
-      .in("role", ["foreman", "admin"])
+      .in("role", ["foreman", "admin", "superadmin"])
       .in("email", foremanEmails)
     foremanMap = new Map((foremen || []).map((f: any) => [(f.email || "").toLowerCase(), f.id]))
   }

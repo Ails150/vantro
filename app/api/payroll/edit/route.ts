@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // Edit a signin's times.
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "signinId and signed_in_at required" }, { status: 400 })
   }
 
-  // Check existing signin — must belong to admin's company AND not be locked
+  // Check existing signin â€” must belong to admin's company AND not be locked
   const { data: existing, error: fetchErr } = await service
     .from("signins")
     .select("id, company_id, payroll_exported_at")

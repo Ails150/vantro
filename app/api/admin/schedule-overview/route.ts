@@ -1,4 +1,4 @@
-// app/api/admin/schedule-overview/route.ts
+﻿// app/api/admin/schedule-overview/route.ts
 //
 // Aggregate KPIs + this-week + next-public-holiday + entitlement summary
 // Drives the Scheduler -> Overview tab in one call.
@@ -36,7 +36,7 @@ export async function GET() {
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || !["admin", "foreman"].includes(admin.role))
+  if (!admin || !["admin", "foreman", "superadmin"].includes(admin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { data: company } = await service
@@ -53,7 +53,7 @@ export async function GET() {
   const weekStartStr = weekStart.toISOString().slice(0, 10)
   const weekEndStr = weekEnd.toISOString().slice(0, 10)
 
-  // Team count — installers + foreman
+  // Team count â€” installers + foreman
   const { count: teamCount } = await service
     .from("users")
     .select("id", { count: "exact", head: true })

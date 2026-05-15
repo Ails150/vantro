@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 export async function POST(request: Request) {
@@ -8,7 +8,7 @@ export async function POST(request: Request) {
 
   const service = await createServiceClient()
   const { data: u } = await service.from("users").select("company_id, role").eq("auth_user_id", user.id).single()
-  if (!u || !["admin", "foreman"].includes(u.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!u || !["admin", "foreman", "superadmin"].includes(u.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { jobId } = await request.json()
   if (!jobId) return NextResponse.json({ error: "Missing jobId" }, { status: 400 })

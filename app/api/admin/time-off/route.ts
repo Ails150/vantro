@@ -1,4 +1,4 @@
-// app/api/admin/time-off/route.ts
+﻿// app/api/admin/time-off/route.ts
 //
 // Admin time-off endpoints
 //   GET  /api/admin/time-off?status=pending|approved|rejected|all&from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -32,7 +32,7 @@ async function requireAdmin() {
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!u || !["admin", "foreman"].includes(u.role))
+  if (!u || !["admin", "foreman", "superadmin"].includes(u.role))
     return { error: "Forbidden", status: 403 as const }
 
   return { service, admin: u }

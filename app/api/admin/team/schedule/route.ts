@@ -1,4 +1,4 @@
-// app/api/admin/team/schedule/route.ts
+﻿// app/api/admin/team/schedule/route.ts
 //
 // Per-installer schedule override.
 // Reads/writes user_shifts rows (one per enabled day of the week).
@@ -27,7 +27,7 @@ type WeeklyPattern = {
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
 type DayKey = (typeof DAY_KEYS)[number]
 
-// GET — read existing user_shifts for an installer, in weekly-pattern shape
+// GET â€” read existing user_shifts for an installer, in weekly-pattern shape
 export async function GET(request: Request) {
   const supabase = await createClient()
   const {
@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     .select("company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || !["admin", "foreman"].includes(admin.role))
+  if (!admin || !["admin", "foreman", "superadmin"].includes(admin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   // Verify the target user belongs to the same company
@@ -82,7 +82,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ userId, weekly_pattern: weekly })
 }
 
-// POST — replace this user's shifts with the supplied weekly pattern
+// POST â€” replace this user's shifts with the supplied weekly pattern
 export async function POST(request: Request) {
   const supabase = await createClient()
   const {
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     .select("company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || !["admin", "foreman"].includes(admin.role))
+  if (!admin || !["admin", "foreman", "superadmin"].includes(admin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   // Verify target user belongs to same company
@@ -148,7 +148,7 @@ export async function POST(request: Request) {
 
   // Replace strategy: delete existing, insert new. Atomic from caller's
   // perspective; if insert fails, the user is left with no override and
-  // falls back to company default — safe failure mode.
+  // falls back to company default â€” safe failure mode.
   const { error: delErr } = await service
     .from("user_shifts")
     .delete()
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: delErr.message }, { status: 400 })
 
   if (newRows.length === 0) {
-    // Cleared all overrides — user now inherits company default
+    // Cleared all overrides â€” user now inherits company default
     return NextResponse.json({ success: true, shifts_created: 0 })
   }
 

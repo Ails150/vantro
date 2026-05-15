@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  if (caller.role !== "admin") {
+  if (!["admin","superadmin"].includes(caller.role)) {
     return NextResponse.json({ error: "Admins only" }, { status: 403 })
   }
 

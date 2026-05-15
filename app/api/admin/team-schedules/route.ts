@@ -1,4 +1,4 @@
-// app/api/admin/team-schedules/route.ts
+﻿// app/api/admin/team-schedules/route.ts
 //
 // List every installer with: their effective schedule (custom vs default)
 // and their entitlement balance for the leave year.
@@ -35,16 +35,16 @@ function summariseShifts(shifts: Array<{ day_of_week: number; start_time: string
   const sat = byDay[6]
   const sun = byDay[0]
   if (allWeekdaysSame && !sat && !sun) {
-    return `Mon–Fri ${byDay[1].start}–${byDay[1].end}`
+    return `Monâ€“Fri ${byDay[1].start}â€“${byDay[1].end}`
   }
   if (allWeekdaysSame && sat && !sun) {
     if (sat.start === byDay[1].start && sat.end === byDay[1].end)
-      return `Mon–Sat ${byDay[1].start}–${byDay[1].end}`
+      return `Monâ€“Sat ${byDay[1].start}â€“${byDay[1].end}`
   }
   const labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
   const parts: string[] = []
   for (let d = 0; d < 7; d++) {
-    if (byDay[d]) parts.push(`${labels[d]} ${byDay[d].start}–${byDay[d].end}`)
+    if (byDay[d]) parts.push(`${labels[d]} ${byDay[d].start}â€“${byDay[d].end}`)
   }
   return parts.join(", ")
 }
@@ -63,7 +63,7 @@ export async function GET() {
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || !["admin", "foreman"].includes(admin.role))
+  if (!admin || !["admin", "foreman", "superadmin"].includes(admin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const today = new Date().toISOString().slice(0, 10)
@@ -94,22 +94,22 @@ export async function GET() {
     const orderedDays = weekdayOrder.filter((d) => enabledDefaults[d])
     if (allSame && orderedDays.join(",") === "mon,tue,wed,thu,fri") {
       const f = enabledDefaults[orderedDays[0]]
-      return `Mon–Fri ${f.start}–${f.end}`
+      return `Monâ€“Fri ${f.start}â€“${f.end}`
     }
     if (allSame && orderedDays.join(",") === "mon,tue,wed,thu,fri,sat") {
       const f = enabledDefaults[orderedDays[0]]
-      return `Mon–Sat ${f.start}–${f.end}`
+      return `Monâ€“Sat ${f.start}â€“${f.end}`
     }
     const labels: Record<string, string> = {
       mon: "Mon", tue: "Tue", wed: "Wed", thu: "Thu",
       fri: "Fri", sat: "Sat", sun: "Sun",
     }
     return orderedDays
-      .map((d) => `${labels[d]} ${enabledDefaults[d].start}–${enabledDefaults[d].end}`)
+      .map((d) => `${labels[d]} ${enabledDefaults[d].start}â€“${enabledDefaults[d].end}`)
       .join(", ")
   })()
 
-  // Users — only real columns (name, initials)
+  // Users â€” only real columns (name, initials)
   const { data: users } = await service
     .from("users")
     .select("id, name, initials, role, is_active")
