@@ -84,7 +84,7 @@ export async function PATCH(
     .select("id, company_id, role, name")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || !["admin", "foreman"].includes(admin.role))
+  if (!admin || !["admin", "foreman", "superadmin"].includes(admin.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { status, rejection_reason } = (await request.json()) as {

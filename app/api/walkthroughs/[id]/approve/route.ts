@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!u || (u.role !== "admin" && u.role !== "foreman")) {
+  if (!u || !["admin","foreman","superadmin"].includes(u.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
