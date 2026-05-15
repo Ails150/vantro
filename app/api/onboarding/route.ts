@@ -4,9 +4,9 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 /**
  * POST /api/onboarding
  *
- * Steps must run in order: company â†’ installers â†’ jobs
+ * Steps must run in order: company → installers → jobs
  * Step N requires step N-1 to have completed successfully.
- * No silent fallbacks â€” if a step's prerequisite is missing, return 412 Precondition Failed.
+ * No silent fallbacks — if a step's prerequisite is missing, return 412 Precondition Failed.
  *
  * Response shape on error:
  *   { error: string, detail?: string, code?: string }
@@ -25,7 +25,6 @@ type Body = {
 
 function generateSlug(name: string): string {
   const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
-  // Append short random suffix to avoid collisions
   const suffix = Math.random().toString(36).slice(2, 6)
   return `${base || 'co'}-${suffix}`
 }
@@ -51,7 +50,7 @@ export async function POST(request: Request) {
 
   const service = await createServiceClient()
 
-  // â”€â”€â”€ STEP 1: COMPANY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── STEP 1: COMPANY ─────────────────────────────────────────────────
   if (step === 'company') {
     const { companyName } = body
     if (!companyName?.trim()) {
@@ -69,7 +68,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, companyId: existingUser.company_id, alreadyExisted: true })
     }
 
-    // Create company â€” DB defaults handle country_code, status, trial_ends_at
     const slug = body.companySlug?.trim() || generateSlug(companyName)
     const defaultSchedule = {
       mon: { enabled: true, start: "08:00", end: "17:00" },
@@ -95,14 +93,14 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Create admin user
+    // Create superadmin user (the company creator is always superadmin)
     const fullName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Admin'
     const { error: userErr } = await service.from('users').insert({
       company_id: company.id,
       email: user.email,
       name: fullName,
       initials: getInitials(fullName),
-      role: 'admin',
+      role: 'superadmin',
       auth_user_id: user.id,
       is_active: true,
     })
@@ -112,7 +110,7 @@ export async function POST(request: Request) {
       await service.from('companies').delete().eq('id', company.id)
       console.error('[onboarding/company] user insert failed, rolled back company:', userErr)
       return NextResponse.json({
-        error: 'Could not create admin user',
+        error: 'Could not create superadmin user',
         detail: userErr.message,
         code: userErr.code,
       }, { status: 400 })
@@ -121,11 +119,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, companyId: company.id })
   }
 
-  // â”€â”€â”€ STEP 2: INSTALLERS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── STEP 2: INSTALLERS ──────────────────────────────────────────────
   if (step === 'installers') {
     const { installers } = body
 
-    // Hard requirement: company must already exist
     const { data: userData, error: lookupErr } = await service
       .from('users')
       .select('company_id')
@@ -156,14 +153,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Each team member needs a name and email' }, { status: 400 })
     }
 
-    const insertData = valid.map(inst => ({
-      company_id: userData.company_id,
-      email: inst.email.trim().toLowerCase(),
-      name: inst.name.trim(),
-      initials: getInitials(inst.name),
-      role: inst.role || 'installer',
-      is_active: true,
-    }))
+    // Defence in depth: never allow superadmin to be assigned via this step.
+    // Only the company creator gets superadmin (set in STEP 1).
+    const insertData = valid.map(inst => {
+      const requestedRole = (inst.role || 'installer').trim()
+      const safeRole = requestedRole === 'superadmin' ? 'installer' : requestedRole
+      return {
+        company_id: userData.company_id,
+        email: inst.email.trim().toLowerCase(),
+        name: inst.name.trim(),
+        initials: getInitials(inst.name),
+        role: safeRole,
+        is_active: true,
+      }
+    })
 
     const { error: insertErr, data: inserted } = await service
       .from('users')
@@ -172,7 +175,6 @@ export async function POST(request: Request) {
 
     if (insertErr) {
       console.error('[onboarding/installers] insert failed:', insertErr)
-      // Helpful message for unique violation (duplicate email)
       const friendly = insertErr.code === '23505'
         ? 'One of those email addresses is already registered'
         : 'Could not add team members'
@@ -186,7 +188,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, addedCount: inserted?.length || 0 })
   }
 
-  // â”€â”€â”€ STEP 3: JOBS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── STEP 3: JOBS ────────────────────────────────────────────────────
   if (step === 'jobs') {
     const { jobs } = body
 
@@ -203,7 +205,6 @@ export async function POST(request: Request) {
       }, { status: 412 })
     }
 
-    // Jobs are optional at onboarding â€” empty array is fine
     if (!jobs?.length) {
       return NextResponse.json({ success: true, addedCount: 0 })
     }
