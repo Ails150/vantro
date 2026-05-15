@@ -919,6 +919,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"/>
             <span className="text-sm text-teal-700 font-semibold">{signins.length} on site</span>
           </div>
+          {typeof window !== "undefined" && new URLSearchParams(window.location.search).get("from") === "setup" && (<a href="/admin/setup" className="flex items-center gap-1.5 bg-amber-50 border border-amber-300 text-amber-800 hover:bg-amber-100 rounded-full px-4 py-1.5 text-sm font-semibold transition-colors mr-2">← Back to setup</a>)}
           <SettingsMenu user={user} userData={userData} company={company} onSiteRulesClick={() => setActiveTab("settings")} />
         </div>
       </div>
