@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import MemberSchedule from "@/components/admin/MemberSchedule"
 import PayrollTab from "@/components/admin/PayrollTab"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
@@ -1034,7 +1034,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             {/* ZONE 1: Action queue */}
             {overviewData.actionItems.length === 0 ? (
               <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold">✓</div>
+                <div className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold">âœ“</div>
                 <div>
                   <div className="font-semibold text-teal-900">All clear</div>
                   <div className="text-sm text-teal-700">Nothing needs your attention right now.</div>
@@ -1060,7 +1060,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           onClick={() => setActiveTab(item.tab)}
                           className="text-xs font-semibold text-teal-700 hover:text-teal-900 flex-shrink-0"
                         >
-                          View →
+                          View â†’
                         </button>
                       </li>
                     )
@@ -1075,7 +1075,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">On site now</h3>
-                  <button onClick={() => setActiveTab("map")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">View map →</button>
+                  <button onClick={() => setActiveTab("map")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">View map â†’</button>
                 </div>
                 {overviewData.onSiteTiles.length === 0 ? (
                   <div className={"text-sm py-6 text-center " + sub}>No active jobs</div>
@@ -1132,7 +1132,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 return tiles.map((t) => {
                   const delta = t.current - t.previous
                   const pct = t.previous > 0 ? Math.round((delta / t.previous) * 100) : 0
-                  const arrow = delta > 0 ? "↗" : delta < 0 ? "↘" : "="
+                  const arrow = delta > 0 ? "â†—" : delta < 0 ? "â†˜" : "="
                   const deltaCls = delta > 0 ? "text-teal-600" : delta < 0 ? "text-red-600" : "text-gray-500"
                   return (
                     <div key={t.label} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
@@ -1210,7 +1210,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                   {jobAddress && (
                     <div className={"absolute right-3 top-3 text-xs font-semibold " + (jobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                      {jobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
+                      {jobPlaceSelected ? "âœ“ GPS verified" : "âœ— Select from dropdown"}
                     </div>
                   )}
                 </div>
@@ -1241,7 +1241,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklists (optional)</label>
                   {checklistTemplates.length === 0 ? (
-                    <p className="text-sm text-gray-400">No checklists yet — <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
+                    <p className="text-sm text-gray-400">No checklists yet â€” <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
                   ) : (
                     <div className="space-y-2 mt-1">
                       {checklistTemplates.map((t: any) => (
@@ -1319,7 +1319,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <div className="relative">
                             <input ref={editAddressRef} value={editJobAddress} onChange={e => { setEditJobAddress(e.target.value); setEditJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                             <div className={"absolute right-3 top-3 text-xs font-semibold " + (editJobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                              {editJobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
+                              {editJobPlaceSelected ? "âœ“ GPS verified" : "âœ— Select from dropdown"}
                             </div>
                           </div>
                           <div>
@@ -1383,7 +1383,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " ✓"}
+                                  {m.name}{isAssigned && " âœ“"}
                                 </button>
                               )
                             })}
@@ -1417,7 +1417,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       onClick={handleOpenBillingPortal}
                       className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                     >
-                      Upgrade plan →
+                      Upgrade plan â†’
                     </button>
                   </div>
                 )
@@ -1531,6 +1531,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
                     <option value="installer">Installer - PIN app access only</option>
                     <option value="foreman">Foreman - PIN app + alert emails</option>
+                    {userData?.role === "superadmin" && (<option value="admin">Admin - full dashboard access (no PIN needed)</option>)}
                   </select>
                 </div>
                 {/* trades_team_patched */}
