@@ -5,7 +5,7 @@ import AdminDashboard from '@/components/admin/AdminDashboard'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string; from?: string }> }) {
   const params = await searchParams
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -24,7 +24,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: company } = await supabase.from('companies').select('*').eq('id', companyId).single()
 
   // Setup wizard redirect: if onboarding not completed, send to setup
-  if (company && !company.onboarding_completed_at) {
+  // EXCEPT when admin came from the wizard intending to use a tab (Jobs, Team)
+  if (company && !company.onboarding_completed_at && params.from !== 'setup') {
     redirect('/admin/setup')
   }
 
