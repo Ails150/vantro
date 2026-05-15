@@ -15,13 +15,19 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     .from('users')
     .select('id, company_id, name, role')
     .eq('auth_user_id', user.id)
-    .in('role', ['admin', 'foreman'])
+    .in('role', ['admin', 'foreman', 'superadmin'])
     .single()
 
   if (userError || !userData || !userData.company_id) redirect('/onboarding')
 
   const companyId = userData.company_id
   const { data: company } = await supabase.from('companies').select('*').eq('id', companyId).single()
+
+  // Setup wizard redirect: if onboarding not completed, send to setup
+  if (company && !company.onboarding_completed_at) {
+    redirect('/admin/setup')
+  }
+
   // Trial/subscription check
   // paywall_overlay_v1
   let trialExpiredAndUnpaid = false
@@ -37,7 +43,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const { data: jobs } = await supabase.from('jobs').select('*, job_checklists(template_id)').eq('company_id', companyId).order('created_at', { ascending: false })
   const today = new Date(); today.setHours(0,0,0,0)
   const { data: signins } = await supabase.from('signins').select('*, users(name, initials)').eq('company_id', companyId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null)
-  // Default 7-day window for dashboard - older entries accessible via /api/admin/alerts?all=true or filter UI
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const { data: alerts } = await supabase.from('alerts').select('*, jobs(name), users(name, initials), diary_entries(photo_urls, video_url)').eq('company_id', companyId).eq('is_read', false).gte('created_at', sevenDaysAgo).order('created_at', { ascending: false }).limit(200)
   const { data: resolvedAlerts } = await supabase.from('alerts').select('*, jobs(name), users(name), diary_entries(photo_urls, video_url)').eq('company_id', companyId).eq('status', 'resolved').gte('resolved_at', sevenDaysAgo).order('resolved_at', { ascending: false }).limit(50)
@@ -65,4 +70,3 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     />
   )
 }
-
