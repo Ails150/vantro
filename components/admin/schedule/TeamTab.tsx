@@ -59,6 +59,8 @@ export default function TeamTab() {
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<TeamRow | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [myRole, setMyRole] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -68,8 +70,16 @@ export default function TeamTab() {
     setLoading(false)
   }
 
+  async function loadMyRole() {
+    try {
+      const res = await fetch("/api/admin/account").then((r) => r.json())
+      if (res?.role) setMyRole(res.role)
+    } catch {}
+  }
+
   useEffect(() => {
     load()
+    loadMyRole()
   }, [])
 
   const visible = rows.filter((r) => {
@@ -82,32 +92,27 @@ export default function TeamTab() {
 
   return (
     <div className="space-y-3">
-      {/* Filter row */}
       <div className="flex items-center justify-between">
         <div className="flex gap-1.5">
-          <FilterChip
-            active={filter === "all"}
-            onClick={() => setFilter("all")}
-            label={`All ${counts.total}`}
-          />
-          <FilterChip
-            active={filter === "default"}
-            onClick={() => setFilter("default")}
-            label={`Default ${counts.default}`}
-          />
-          <FilterChip
-            active={filter === "custom"}
-            onClick={() => setFilter("custom")}
-            label={`Custom ${counts.custom}`}
-          />
+          <FilterChip active={filter === "all"} onClick={() => setFilter("all")} label={`All ${counts.total}`} />
+          <FilterChip active={filter === "default"} onClick={() => setFilter("default")} label={`Default ${counts.default}`} />
+          <FilterChip active={filter === "custom"} onClick={() => setFilter("custom")} label={`Custom ${counts.custom}`} />
         </div>
-        <input
-          type="text"
-          placeholder="Search installer..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-1.5 border border-gray-200 rounded-md text-sm w-56 focus:outline-none focus:border-teal-400"
-        />
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            placeholder="Search installer..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="px-3 py-1.5 border border-gray-200 rounded-md text-sm w-56 focus:outline-none focus:border-teal-400"
+          />
+          <button
+            onClick={() => setAdding(true)}
+            className="px-4 py-1.5 bg-teal-400 hover:bg-teal-500 text-white rounded-md text-sm font-medium"
+          >
+            + Add Member
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -134,46 +139,26 @@ export default function TeamTab() {
               <div
                 className={
                   "w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium " +
-                  (r.schedule_source === "custom"
-                    ? "bg-amber-100 text-amber-800"
-                    : "bg-teal-50 text-teal-800")
+                  (r.schedule_source === "custom" ? "bg-amber-100 text-amber-800" : "bg-teal-50 text-teal-800")
                 }
               >
                 {r.initials}
               </div>
               <div>
                 <div>{r.name}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5 capitalize">
-                  {r.role}
-                </div>
+                <div className="text-[11px] text-gray-500 mt-0.5 capitalize">{r.role}</div>
               </div>
-              <div
-                className={
-                  "text-xs " +
-                  (r.schedule_source === "custom"
-                    ? "text-amber-800"
-                    : "text-gray-500")
-                }
-              >
+              <div className={"text-xs " + (r.schedule_source === "custom" ? "text-amber-800" : "text-gray-500")}>
                 {r.schedule_summary}
               </div>
-              <div
-                className={
-                  "text-xs " +
-                  (r.schedule_source === "custom"
-                    ? "text-amber-800 font-medium"
-                    : "text-gray-500")
-                }
-              >
+              <div className={"text-xs " + (r.schedule_source === "custom" ? "text-amber-800 font-medium" : "text-gray-500")}>
                 {r.schedule_source === "custom" ? "Custom" : "Default"}
               </div>
               <button
                 onClick={() => setEditing(r)}
                 className={
                   "px-3 py-1 rounded-md text-[11px] border " +
-                  (r.schedule_source === "custom"
-                    ? "bg-white border-amber-300 text-amber-800"
-                    : "bg-white border-gray-200")
+                  (r.schedule_source === "custom" ? "bg-white border-amber-300 text-amber-800" : "bg-white border-gray-200")
                 }
               >
                 {r.schedule_source === "custom" ? "Edit" : "Override"}
@@ -183,8 +168,7 @@ export default function TeamTab() {
         </div>
       )}
       <div className="text-xs text-gray-500 px-1">
-        Click "Edit" or "Override" to set a custom pattern. Custom schedules
-        fully replace the default for that installer.
+        Click "Edit" or "Override" to set a custom pattern. Custom schedules fully replace the default for that installer.
       </div>
 
       {editing && (
@@ -197,31 +181,136 @@ export default function TeamTab() {
           }}
         />
       )}
+
+      {adding && (
+        <AddMemberModal
+          isSuperadmin={myRole === "superadmin"}
+          onClose={() => setAdding(false)}
+          onSaved={() => {
+            setAdding(false)
+            load()
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function FilterChip({
-  active,
-  onClick,
-  label,
-}: {
-  active: boolean
-  onClick: () => void
-  label: string
-}) {
+function FilterChip({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
   return (
     <button
       onClick={onClick}
       className={
         "px-3 py-1.5 rounded-md text-xs font-medium border transition-colors " +
-        (active
-          ? "bg-teal-400 text-white border-teal-400"
-          : "bg-white text-gray-600 border-gray-200 hover:border-teal-300")
+        (active ? "bg-teal-400 text-white border-teal-400" : "bg-white text-gray-600 border-gray-200 hover:border-teal-300")
       }
     >
       {label}
     </button>
+  )
+}
+
+function AddMemberModal({
+  isSuperadmin,
+  onClose,
+  onSaved,
+}: {
+  isSuperadmin: boolean
+  onClose: () => void
+  onSaved: () => void
+}) {
+  const [name, setName] = useState("")
+  const [email, setEmail] = useState("")
+  const [role, setRole] = useState("installer")
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    setError(null)
+    if (!name.trim()) {
+      setError("Name required")
+      return
+    }
+    if (!email.trim() || !email.includes("@")) {
+      setError("Valid email required")
+      return
+    }
+    setSaving(true)
+    const res = await fetch("/api/admin/team", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: name.trim(), email: email.trim().toLowerCase(), role }),
+    })
+    setSaving(false)
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}))
+      setError(j.error || "Could not add member")
+      return
+    }
+    onSaved()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-lg w-full max-w-md">
+        <div className="px-5 py-4 border-b border-gray-100">
+          <div className="font-semibold">Add team member</div>
+          <div className="text-xs text-gray-500 mt-0.5">They will receive an invite to set up their account.</div>
+        </div>
+        <div className="px-5 py-4 space-y-3">
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-teal-400"
+              placeholder="Jane Doe"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:border-teal-400"
+              placeholder="jane@company.com"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:border-teal-400"
+            >
+              <option value="installer">Installer</option>
+              <option value="foreman">Foreman</option>
+              {isSuperadmin && <option value="admin">Admin</option>}
+            </select>
+            {!isSuperadmin && (
+              <div className="text-[11px] text-gray-500 mt-1">Only the superadmin can add admins.</div>
+            )}
+          </div>
+        </div>
+        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+          {error && <span className="text-sm text-red-500">{error}</span>}
+          <div className="flex items-center gap-3 ml-auto">
+            <button onClick={onClose} className="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="px-5 py-2 text-sm font-medium bg-teal-400 hover:bg-teal-500 text-white rounded-xl disabled:opacity-50"
+            >
+              {saving ? "Adding..." : "Add member"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -266,11 +355,7 @@ function OverrideModal({
     })
   }
 
-  function updateTime(
-    day: keyof WeeklyPattern,
-    field: "start" | "end",
-    value: string
-  ) {
+  function updateTime(day: keyof WeeklyPattern, field: "start" | "end", value: string) {
     setPattern((prev) => ({
       ...prev,
       [day]: { ...prev[day], [field]: value },
@@ -299,27 +384,14 @@ function OverrideModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl shadow-lg w-full max-w-xl max-h-[90vh] overflow-y-auto"
-      >
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-lg w-full max-w-xl max-h-[90vh] overflow-y-auto">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
             <div className="font-semibold">{row.name}</div>
-            <div className="text-xs text-gray-500 mt-0.5 capitalize">
-              {row.role} · custom schedule
-            </div>
+            <div className="text-xs text-gray-500 mt-0.5 capitalize">{row.role} · custom schedule</div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-700 text-xl leading-none"
-          >
-            ×
-          </button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl leading-none">×</button>
         </div>
         <div className="px-5 py-4 space-y-2">
           {loading ? (
@@ -352,8 +424,7 @@ function OverrideModal({
                   </button>
                   <span
                     className={
-                      "text-sm " +
-                      (day.enabled ? "text-gray-900 font-medium" : "text-gray-400")
+                      "text-sm " + (day.enabled ? "text-gray-900 font-medium" : "text-gray-400")
                     }
                   >
                     {d.label}
@@ -363,18 +434,14 @@ function OverrideModal({
                       <input
                         type="time"
                         value={day.start || "08:00"}
-                        onChange={(e) =>
-                          updateTime(d.key, "start", e.target.value)
-                        }
+                        onChange={(e) => updateTime(d.key, "start", e.target.value)}
                         className="rounded-md px-2 py-1 border border-gray-200 bg-gray-50 focus:outline-none focus:border-teal-400"
                       />
                       <span className="text-gray-400">→</span>
                       <input
                         type="time"
                         value={day.end || "17:00"}
-                        onChange={(e) =>
-                          updateTime(d.key, "end", e.target.value)
-                        }
+                        onChange={(e) => updateTime(d.key, "end", e.target.value)}
                         className="rounded-md px-2 py-1 border border-gray-200 bg-gray-50 focus:outline-none focus:border-teal-400"
                       />
                     </div>
@@ -396,10 +463,7 @@ function OverrideModal({
           </button>
           <div className="flex items-center gap-3">
             {error && <span className="text-sm text-red-500">{error}</span>}
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50"
-            >
+            <button onClick={onClose} className="px-4 py-2 text-sm rounded-xl border border-gray-200 hover:bg-gray-50">
               Cancel
             </button>
             <button
