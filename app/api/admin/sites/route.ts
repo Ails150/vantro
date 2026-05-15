@@ -1,9 +1,9 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // /api/admin/sites
-//   GET  → list sites for the company
-//   POST → create a single site
+//   GET  â†’ list sites for the company
+//   POST â†’ create a single site
 
 async function geocodeAddress(address: string, postcode?: string): Promise<{ lat: number; lng: number } | null> {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { service, admin } = await getAdmin(user.id)
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { service, admin } = await getAdmin(user.id)
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 

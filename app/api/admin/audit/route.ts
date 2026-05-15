@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 export async function GET(request: Request) {
@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const service = await createServiceClient()
   const { data: u } = await service.from("users").select("company_id, role").eq("auth_user_id", user.id).single()
-  if (!u || u.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!u || !["admin","foreman","superadmin"].includes(u.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 200)

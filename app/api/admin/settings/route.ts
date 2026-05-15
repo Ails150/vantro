@@ -1,4 +1,4 @@
-// app/api/admin/settings/route.ts
+﻿// app/api/admin/settings/route.ts
 //
 // Company-level settings.
 // Schedule lives in default_schedule jsonb (managed via Scheduler page).
@@ -35,7 +35,7 @@ export async function GET() {
     .select("company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!u || u.role !== "admin")
+  if (!u || !["admin","foreman","superadmin"].includes(u.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const { data: company } = await service
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     .select("company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!u || u.role !== "admin")
+  if (!u || !["admin","foreman","superadmin"].includes(u.role))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const body = await request.json()

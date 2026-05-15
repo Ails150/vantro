@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server"
+﻿import { NextRequest, NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 export const dynamic = "force-dynamic"
@@ -37,7 +37,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { service, admin } = await getAdmin(user.id)
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
@@ -66,7 +66,7 @@ export async function PATCH(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { service, admin } = await getAdmin(user.id)
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 

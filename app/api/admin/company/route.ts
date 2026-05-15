@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // PATCH /api/admin/company
@@ -16,8 +16,8 @@ export async function PATCH(request: Request) {
     .select("company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || admin.role !== "admin") {
-    return NextResponse.json({ error: "Forbidden — admin only" }, { status: 403 })
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
+    return NextResponse.json({ error: "Forbidden â€” admin only" }, { status: 403 })
   }
 
   const body = await request.json().catch(() => ({}))

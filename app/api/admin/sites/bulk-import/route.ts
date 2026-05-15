@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server"
+﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // Bulk import sites (reusable client/address templates) via CSV.
 //   POST /api/admin/sites/bulk-import
 //   body: { rows: [{ name, address, postcode?, client_name?, notes? }] }
 //
-// Sites are reusable templates — useful for housing developers, repeat clients,
+// Sites are reusable templates â€” useful for housing developers, repeat clients,
 // retail rollouts. When creating a job, you can pick from saved sites.
 
 interface CsvRow {
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || admin.role !== "admin") {
+  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
