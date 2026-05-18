@@ -37,8 +37,32 @@ export type EngineResult = {
   }>
 }
 
-async function sendPushNotification(tokens: string[], title: string, body: string, data?: any) {
+// Hard quiet-hours rule: NO pushes outside 07:00-19:00 local company time.
+// Server-side state (auto-close, flagging, hours calc) still runs; we just
+// don't bother the phone. Installers see the result in-app next morning.
+const QUIET_START_HOUR = 19  // 19:00 onward = quiet
+const QUIET_END_HOUR = 7     // up to 07:00 = quiet
+
+function isQuietHours(localHour: number): boolean {
+  return localHour >= QUIET_START_HOUR || localHour < QUIET_END_HOUR
+}
+
+async function sendPushNotification(
+  tokens: string[],
+  title: string,
+  body: string,
+  data?: any,
+  localHour?: number,
+) {
   if (!tokens || tokens.length === 0) return
+  // Hard floor: use UTC hour as fallback if caller didn't pass localHour.
+  // Single UK customer for now; UK BST = UTC+1, GMT = UTC+0. Worst case
+  // we go quiet one hour early in winter - acceptable for safety.
+  const hourToCheck = typeof localHour === "number" ? localHour : new Date().getUTCHours()
+  if (isQuietHours(hourToCheck)) {
+    console.log("[push] suppressed - quiet hours", { hour: hourToCheck, title, type: data?.type })
+    return
+  }
   const messages = tokens.map(token => ({
     to: token,
     sound: "default",
