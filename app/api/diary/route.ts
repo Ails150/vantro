@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server"
 import { verifyInstallerToken } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
+import { sendDiaryAlertEmail } from "@/lib/email-alerts"
 
 
 const createServiceClient = () => {
@@ -204,6 +205,25 @@ Return ONLY valid JSON, no preamble, no markdown:
           is_read: false,
           created_at: new Date().toISOString()
         })
+
+      // EMAIL_ALERT_HOOK - 19 May 2026 rebuild
+      try {
+        const { data: loggerRow } = await service
+          .from("users")
+          .select("name")
+          .eq("id", payload.userId)
+          .single()
+        await sendDiaryAlertEmail({
+          companyId: payload.companyId,
+          jobId,
+          alertType: finalSeverity as "blocker" | "issue",
+          summary: aiSummary || entryText.slice(0, 200),
+          loggedBy: loggerRow?.name || "Installer",
+          photoUrls: Array.isArray(photoUrls) ? photoUrls : []
+        })
+      } catch (e) {
+        console.error("[diary] email alert failed:", String(e))
+      }
       if (alertError) {
         console.error("[diary] Alert insert failed:", alertError)
       } else {

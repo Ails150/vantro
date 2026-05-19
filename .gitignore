@@ -98,3 +98,10 @@ audit-route.ts
 _backups/
 settings-page.txt
 *-page.txt
+
+# Cleanup scripts (heredoc + Python patches)
+*.py
+
+# Backup files
+*.bak
+*.bak2
