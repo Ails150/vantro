@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server"
 import { verifyInstallerToken } from "@/lib/auth"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
 const CF_STREAM_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN
 const CF_STREAM_SUBDOMAIN = "customer-6416opuz33lyk78q.cloudflarestream.com"
 
 export async function POST(request: Request) {
+  // audit-guard-2026-05-19 - security hardening pass
+  {
+    const _ip = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim()
+    const _ok = await checkRateLimit(`stream-upload-url:ip:${_ip}`, 20, 3600)
+    if (!_ok) {
+      return NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429 })
+    }
+  }
+
   const installer = verifyInstallerToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 

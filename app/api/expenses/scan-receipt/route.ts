@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { verifyInstallerToken } from "@/lib/auth"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
 const VALID_CATEGORIES = ["fuel", "materials", "food", "parking", "tools", "other"]
@@ -51,6 +52,15 @@ function emptyScan(reason: string) {
 }
 
 export async function POST(request: Request) {
+  // audit-guard-2026-05-19 - security hardening pass
+  {
+    const _ip = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim()
+    const _ok = await checkRateLimit(`scan-receipt:ip:${_ip}`, 30, 3600)
+    if (!_ok) {
+      return NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429 })
+    }
+  }
+
   let installer
   try {
     installer = await verifyInstallerToken(request)

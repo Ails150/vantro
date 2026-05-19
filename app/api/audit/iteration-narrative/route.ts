@@ -9,6 +9,8 @@
 
 import { NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { verifyInstallerToken } from "@/lib/auth"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 export const maxDuration = 60
 
@@ -72,6 +74,23 @@ function summarisePeriod(report: any) {
 }
 
 export async function POST(request: Request) {
+  // audit-guard-2026-05-19 - security hardening pass
+  let _installer
+  try {
+    _installer = await verifyInstallerToken(request)
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  if (!_installer) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+  {
+    const _ok = await checkRateLimit(`iteration-narrative:user:${_installer.userId}`, 5, 3600)
+    if (!_ok) {
+      return NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429 })
+    }
+  }
+
   try {
     const body = await request.json()
     const { reportA, reportB, fromA, toA, fromB, toB } = body

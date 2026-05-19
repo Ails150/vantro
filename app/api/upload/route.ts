@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { verifyInstallerToken } from "@/lib/auth"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -16,6 +17,15 @@ const R2 = new S3Client({
 })
 
 export async function POST(request: Request) {
+  // audit-guard-2026-05-19 - security hardening pass
+  {
+    const _ip = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim()
+    const _ok = await checkRateLimit(`upload:ip:${_ip}`, 50, 3600)
+    if (!_ok) {
+      return NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429 })
+    }
+  }
+
   const auth = request.headers.get("authorization")
   if (!auth?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const installer = verifyInstallerToken(request)

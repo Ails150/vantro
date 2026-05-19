@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 type AnyRow = Record<string, any>
 
@@ -67,6 +68,15 @@ interface Deliverable {
 }
 
 export async function POST(request: Request) {
+  // audit-guard-2026-05-19 - security hardening pass
+  {
+    const _ip = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim()
+    const _ok = await checkRateLimit(`audit-v2:ip:${_ip}`, 10, 3600)
+    if (!_ok) {
+      return NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429 })
+    }
+  }
+
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })

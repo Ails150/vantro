@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { verifyInstallerToken } from "@/lib/auth"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { WALKTHROUGH_SYSTEM_PROMPT, buildUserMessage } from "@/lib/ai/walkthrough-prompt"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -259,6 +260,15 @@ export async function processWalkthrough(walkthroughId: string, streamUid: strin
 }
 
 export async function POST(request: Request) {
+  // audit-guard-2026-05-19 - security hardening pass
+  {
+    const _ip = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim()
+    const _ok = await checkRateLimit(`wt-upload-clip:ip:${_ip}`, 30, 3600)
+    if (!_ok) {
+      return NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429 })
+    }
+  }
+
   const installer = verifyInstallerToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 

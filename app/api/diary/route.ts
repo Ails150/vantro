@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { verifyInstallerToken } from "@/lib/auth"
 import Anthropic from "@anthropic-ai/sdk"
 import { sendDiaryAlertEmail } from "@/lib/email-alerts"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 
 const createServiceClient = () => {
@@ -25,6 +26,15 @@ const anthropic = new Anthropic({
 const severityRank: Record<string, number> = { normal: 1, issue: 2, blocker: 3 }
 
 export async function POST(request: Request) {
+  // audit-guard-2026-05-19 - security hardening pass
+  {
+    const _ip = (request.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim()
+    const _ok = await checkRateLimit(`diary-post:ip:${_ip}`, 20, 3600)
+    if (!_ok) {
+      return NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429 })
+    }
+  }
+
   try {
     const { entryText, workStatus, jobId, lat, lng, photoUrls, videoUrl } = await request.json()
     if (!entryText?.trim()) {
