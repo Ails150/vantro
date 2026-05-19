@@ -1,5 +1,6 @@
 ﻿"use client"
 import { useState, useEffect } from "react"
+import { PayrollExpenseRow } from "@/components/admin/PayrollExpenseRow"
 
 interface Props { teamMembers: any[] }
 
@@ -206,6 +207,16 @@ export default function PayrollTab({ teamMembers }: Props) {
                   </div>
                 </div>
               )}
+              {isExpanded && (() => {
+                const r = getRange()
+                if (!r) return null
+                const weekStart = new Date(r.from).toISOString().slice(0, 10)
+                return (
+                  <div className="px-6 pb-5">
+                    <PayrollExpenseRow userId={m.id} userName={m.name} weekStart={weekStart} />
+                  </div>
+                )
+              })()}
             </div>
           )
         })}
