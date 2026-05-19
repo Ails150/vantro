@@ -2,6 +2,7 @@
 import MemberSchedule from "@/components/admin/MemberSchedule"
 import PayrollTab from "@/components/admin/PayrollTab"
 import { EmailAlertPrefs } from "@/components/admin/EmailAlertPrefs"
+import { SubcontractorsSection } from "@/components/admin/SubcontractorsSection"
 import ApprovalsTab from "@/components/admin/ApprovalsTab"
 import AuditTab from './AuditTab'
 import MapTab from './MapTab'
@@ -1634,6 +1635,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
             <div className="mb-5">
               <EmailAlertPrefs />
+            </div>
+            <div className="mb-5">
+              <SubcontractorsSection />
             </div>
             <div className={card}>
               <div className={cardHeader}>
