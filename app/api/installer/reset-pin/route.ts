@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import crypto from 'crypto'
 
 export async function POST(request: Request) {
   const { email } = await request.json()
   if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
+
+  // Rate limit: per-IP and per-email
+  const ip = getClientIp(request)
+  const ipOk = await checkRateLimit(`reset-pin:ip:${ip}`, 10, 3600)
+  const emailOk = await checkRateLimit(`reset-pin:email:${email.trim().toLowerCase()}`, 3, 3600)
+  if (!ipOk || !emailOk) {
+    return NextResponse.json({ success: true }) // silent rate-limit
+  }
 
   const service = await createServiceClient()
   const { data: user } = await service.from('users').select('id, name, email').ilike('email', email.trim()).single()

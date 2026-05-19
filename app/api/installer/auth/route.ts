@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { createInstallerToken } from '@/lib/auth'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 
 export async function POST(request: Request) {
+  // Rate limit: 20 attempts per IP per 10 minutes (allows legit installer retries, blocks brute force)
+  const ip = getClientIp(request)
+  const ok = await checkRateLimit(`installer-auth:ip:${ip}`, 20, 600)
+  if (!ok) {
+    return NextResponse.json({ error: 'Too many attempts. Try again in a few minutes.' }, { status: 429 })
+  }
+
   const body = await request.json()
 
   if (body.checkOnly) {

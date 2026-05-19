@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import Stripe from 'stripe'
 import { TIERS, type TierKey } from '@/lib/billing'
 
@@ -17,6 +18,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
  * Body: { email, password, companyName, yourName, teamSize, plan }
  */
 export async function POST(request: Request) {
+  // Rate limit: 3 signups per IP per hour, prevents Stripe/Supabase pollution
+  const ip = getClientIp(request)
+  const ok = await checkRateLimit(`signup:ip:${ip}`, 3, 3600)
+  if (!ok) {
+    return NextResponse.json({ error: 'Too many signup attempts. Try again later.' }, { status: 429 })
+  }
+
   let body: any
   try {
     body = await request.json()
