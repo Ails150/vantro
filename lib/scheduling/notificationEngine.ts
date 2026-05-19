@@ -37,32 +37,8 @@ export type EngineResult = {
   }>
 }
 
-// Hard quiet-hours rule: NO pushes outside 07:00-19:00 local company time.
-// Server-side state (auto-close, flagging, hours calc) still runs; we just
-// don't bother the phone. Installers see the result in-app next morning.
-const QUIET_START_HOUR = 19  // 19:00 onward = quiet
-const QUIET_END_HOUR = 7     // up to 07:00 = quiet
-
-function isQuietHours(localHour: number): boolean {
-  return localHour >= QUIET_START_HOUR || localHour < QUIET_END_HOUR
-}
-
-async function sendPushNotification(
-  tokens: string[],
-  title: string,
-  body: string,
-  data?: any,
-  localHour?: number,
-) {
+async function sendPushNotification(tokens: string[], title: string, body: string, data?: any) {
   if (!tokens || tokens.length === 0) return
-  // Hard floor: use UTC hour as fallback if caller didn't pass localHour.
-  // Single UK customer for now; UK BST = UTC+1, GMT = UTC+0. Worst case
-  // we go quiet one hour early in winter - acceptable for safety.
-  const hourToCheck = typeof localHour === "number" ? localHour : new Date().getUTCHours()
-  if (isQuietHours(hourToCheck)) {
-    console.log("[push] suppressed - quiet hours", { hour: hourToCheck, title, type: data?.type })
-    return
-  }
   const messages = tokens.map(token => ({
     to: token,
     sound: "default",
@@ -275,69 +251,6 @@ export async function runNotificationEngine(
       }
     }
 
-    // - GPS PING REQUESTS (every 15 min for 3 hours before sign-out) -
-    // For each open signin where now is within the 3-hour pre-signout window,
-    // and the last ping was >= 15 min ago (or never), send a silent push to
-    // the installer's phone asking it to log current GPS. Mobile app handles
-    // the push by calling getCurrentPositionAsync and POSTing to /api/location.
-    //
-    // This gives admins a deliberate "are they on site at end of shift" trail
-    // instead of relying on phone-driven background ticks that Android often
-    // kills for battery optimization.
-    const PING_WINDOW_HOURS = 3
-    const PING_INTERVAL_MINUTES = 15
-
-    const { data: pingCandidates } = await service
-      .from("signins")
-      .select("id, user_id, job_id, signed_in_at, expected_sign_out_time, last_gps_ping_at, jobs(name), users(name, push_token)")
-      .eq("company_id", company.id)
-      .is("signed_out_at", null)
-      .not("expected_sign_out_time", "is", null)
-      .limit(200)
-
-    for (const signin of pingCandidates || []) {
-      const user = signin.users as any
-      const job = signin.jobs as any
-      if (!user?.push_token) continue
-
-      // Compute the same window the mobile app uses
-      const scheduledSignOutAt = combineDateAndLocalTime(
-        signin.signed_in_at,
-        signin.expected_sign_out_time,
-        tz,
-      )
-      const windowStart = new Date(scheduledSignOutAt.getTime() - PING_WINDOW_HOURS * 3600000)
-
-      // Only fire during the window
-      if (now < windowStart || now > scheduledSignOutAt) continue
-
-      // Throttle: 15 min minimum between pings per signin
-      if (signin.last_gps_ping_at) {
-        const lastPing = new Date(signin.last_gps_ping_at)
-        const minutesSinceLast = (now.getTime() - lastPing.getTime()) / 60000
-        if (minutesSinceLast < PING_INTERVAL_MINUTES) continue
-      }
-
-      if (!dryRun) {
-        await sendPushNotification(
-          [user.push_token],
-          "",  // silent push: no title
-          "",  // silent push: no body
-          {
-            type: "gps_ping_request",
-            signinId: signin.id,
-            jobId: signin.job_id,
-            silent: true,
-          },
-        )
-        await service
-          .from("signins")
-          .update({ last_gps_ping_at: now.toISOString() })
-          .eq("id", signin.id)
-        result.reminders_sent++
-      }
-    }
-
     // - SIGN-OUT REMINDERS + AUTO-CLOSE -
     const { data: activeSignins } = await service
       .from("signins")
@@ -382,27 +295,6 @@ export async function runNotificationEngine(
           )
           await service.from("signins").update({ reminder_sent_at: now.toISOString() }).eq("id", signin.id)
           result.reminders_sent++
-        }
-      }
-
-      // ADMIN ALERT: 30+ min past, once
-      if (minutesPastSignOut >= 30 && !signin.admin_reminder_sent_at) {
-        if (!dryRun) {
-          const { data: admins } = await service.from("users")
-            .select("push_token")
-            .eq("company_id", company.id)
-            .in("role", ["admin", "foreman"])
-          const adminTokens = (admins || []).map((a: any) => a.push_token).filter(Boolean)
-          if (adminTokens.length > 0) {
-            await sendPushNotification(
-              adminTokens,
-              "Installer past sign-out",
-              `${user?.name} has not signed out of ${job?.name} - scheduled ${signin.expected_sign_out_time}`,
-              { type: "admin_past_signout", signinId: signin.id },
-            )
-          }
-          await service.from("signins").update({ admin_reminder_sent_at: now.toISOString() }).eq("id", signin.id)
-          result.admin_alerts++
         }
       }
 
@@ -458,27 +350,6 @@ export async function runNotificationEngine(
             flag_reason: `No sign-out received. Closed at ${closeReason === "auto_last_onsite" ? "the last GPS point on-site (actual time worked)" : "the scheduled sign-out time (no GPS data available)"}. Please review hours.`,
           }).eq("id", signin.id)
 
-          if (user?.push_token) {
-            await sendPushNotification(
-              [user.push_token],
-              "Shift auto-closed",
-              `Your shift at ${job?.name} was auto-closed. Please speak to your manager if incorrect.`,
-              { type: "auto_cutoff", jobId: signin.job_id },
-            )
-          }
-          const { data: admins } = await service.from("users")
-            .select("push_token")
-            .eq("company_id", company.id)
-            .in("role", ["admin", "foreman"])
-          const adminTokens = (admins || []).map((a: any) => a.push_token).filter(Boolean)
-          if (adminTokens.length > 0) {
-            await sendPushNotification(
-              adminTokens,
-              "Auto-closed shift needs review",
-              `${user?.name} didn't sign out of ${job?.name}. Closed at ${closeAt.toISOString()}.`,
-              { type: "admin_auto_cutoff", signinId: signin.id },
-            )
-          }
           result.auto_closed++
         }
       }
