@@ -35,6 +35,10 @@ interface Props {
 
 export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid }: Props) {
   const [activeTab, setActiveTab] = useState(defaultTab)
+  // optimistic-assign-2026-05-20 - mirror jobAssignments prop in local state so pill toggles instantly
+  const [localAssignments, setLocalAssignments] = useState<any[]>(jobAssignments)
+  // Sync from server when prop updates (router.refresh, page nav, etc)
+  useEffect(() => { setLocalAssignments(jobAssignments) }, [jobAssignments])
   useEffect(() => {
     const handler = (e: any) => {
       if (e?.detail?.tab) setActiveTab(e.detail.tab)
@@ -247,11 +251,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       is_active: m.is_active,
       trades: Array.isArray(m.trades) ? m.trades : [],
     })),
-    jobAssignments.map((a: any) => ({
+    localAssignments.map((a: any) => ({
       job_id: a.job_id,
       user_id: a.user_id,
     }))
-  ), [jobs, teamMembers, jobAssignments])
+  ), [jobs, teamMembers, localAssignments])
 
   // alerts: operational issues only (exclude "unspecified" - those are setup tasks, not ops)
   const staffingAlerts = useMemo(
@@ -371,7 +375,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     const activeJobs = jobs.filter((j: any) => j.status === "active")
     const onSiteTiles = activeJobs.map((j: any) => {
       const onSiteCount = onSiteByJobId[j.id] || 0
-      const assignedCount = jobAssignments.filter((a: any) => a.job_id === j.id).length
+      const assignedCount = localAssignments.filter((a: any) => a.job_id === j.id).length
       return { jobId: j.id, jobName: j.name, onSiteCount, assignedCount }
     })
 
@@ -440,7 +444,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       jobsCompletedThisWeek,
       jobsCompletedLastWeek,
     }
-  }, [jobs, signins, alerts, resolvedAlerts, pendingQA, jobAssignments, staffingAlerts, staffingResults])
+  }, [jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults])
 
   const supabase = createClient()
 
@@ -791,9 +795,30 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   }
 
   async function toggleAssignment(jobId: string, userId: string) {
-    const existing = jobAssignments.find((a) => a.job_id === jobId && a.user_id === userId)
-    if (existing) { await supabase.from("job_assignments").delete().eq("id", existing.id) }
-    else { await supabase.from("job_assignments").insert({ job_id: jobId, user_id: userId, company_id: userData.company_id }) }
+    // optimistic-assign-2026-05-20 - update UI immediately, then sync DB, then refresh from server
+    const existing = localAssignments.find((a: any) => a.job_id === jobId && a.user_id === userId)
+    if (existing) {
+      setLocalAssignments((prev: any[]) => prev.filter((a: any) => a.id !== existing.id))
+      const { error } = await supabase.from("job_assignments").delete().eq("id", existing.id)
+      if (error) {
+        setLocalAssignments((prev: any[]) => [...prev, existing])
+        console.error("[toggleAssignment] delete failed:", error.message)
+        return
+      }
+    } else {
+      const tempId = `temp-${Date.now()}`
+      const optimisticRow = { id: tempId, job_id: jobId, user_id: userId, company_id: userData.company_id }
+      setLocalAssignments((prev: any[]) => [...prev, optimisticRow])
+      const { data, error } = await supabase.from("job_assignments").insert({ job_id: jobId, user_id: userId, company_id: userData.company_id }).select().single()
+      if (error) {
+        setLocalAssignments((prev: any[]) => prev.filter((a: any) => a.id !== tempId))
+        console.error("[toggleAssignment] insert failed:", error.message)
+        return
+      }
+      if (data) {
+        setLocalAssignments((prev: any[]) => prev.map((a: any) => a.id === tempId ? data : a))
+      }
+    }
     router.refresh()
   }
 
@@ -850,7 +875,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   const installers = teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman")
   const getAssigned = (jobId: string) => {
-    const ids = jobAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
+    const ids = localAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
     return teamMembers.filter((m: any) => ids.includes(m.id))
   }
 
@@ -1380,7 +1405,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           {installers.length === 0 ? <p className={"text-sm " + sub}>No installers yet</p>
                           : <div className="flex flex-wrap gap-2">
                             {installers.map((m: any) => {
-                              const isAssigned = jobAssignments.some((a) => a.job_id === j.id && a.user_id === m.id)
+                              const isAssigned = localAssignments.some((a: any) => a.job_id === j.id && a.user_id === m.id)
                               return (
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
