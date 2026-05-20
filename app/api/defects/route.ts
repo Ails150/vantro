@@ -1,4 +1,5 @@
 import { verifyInstallerToken } from '@/lib/auth'
+import { sendDiaryAlertEmail } from '@/lib/email-alerts'
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 
@@ -104,6 +105,20 @@ export async function POST(request: Request) {
               channelId: 'vantro',
             }))),
           }).catch(() => {})
+        }
+
+        // defect-email-2026-05-20 - email admin/foreman who have email_alert_prefs enabled
+        try {
+          await sendDiaryAlertEmail({
+            companyId,
+            jobId,
+            alertType: sev === 'critical' ? 'blocker' : 'issue',
+            summary: description,
+            loggedBy: installer?.name || 'Installer',
+            photoUrls: photoUrl ? [photoUrl] : [],
+          })
+        } catch (emailErr) {
+          console.error('[defects] email failed (non-fatal)', emailErr)
         }
       } catch (alertErr) {
         console.error('[defects] alert/push failed (non-fatal)', alertErr)
