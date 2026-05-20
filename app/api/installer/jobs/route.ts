@@ -14,7 +14,7 @@ export async function GET(request: Request) {
 
   const [assignmentsRes, userRes, signinsRes, upcomingVisitsRes] = await Promise.all([
     service.from('job_assignments').select('job_id').eq('user_id', installer.userId),
-    service.from('users').select('company_id, companies(background_gps_enabled)').eq('id', installer.userId).single(),
+    service.from('users').select('company_id, companies!users_company_id_fkey(background_gps_enabled)').eq('id', installer.userId).single(),
     service.from('signins').select('job_id').eq('user_id', installer.userId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null),
     service.from('visit_assignments').select('visit_id, start_at, job_visits!inner(job_id)').eq('user_id', installer.userId).gte('start_at', today.toISOString()),
   ])
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   const signins = signinsRes.data
   const upcomingVisits = upcomingVisitsRes.data || []
 
-  if (!me?.company_id) return NextResponse.json({ jobs: [], _debug: { reason: 'no_company_id', meIsNull: !me, userError: userRes.error?.message, assignmentsCount: assignmentsRes.data?.length, assignmentsError: assignmentsRes.error?.message, userId: installer.userId } })
+  if (!me?.company_id) return NextResponse.json({ jobs: [] })
 
   const todaysJobIds = new Set<string>(
     upcomingVisits
