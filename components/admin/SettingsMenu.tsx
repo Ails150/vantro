@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
 import AccountModal from "./AccountModal"
 import CompanyModal from "./CompanyModal"
+import ComplianceModal from "./ComplianceModal"
 
 interface Props {
   user: any
@@ -17,6 +18,7 @@ export default function SettingsMenu({ user, userData, company, onSiteRulesClick
   const [open, setOpen] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showCompany, setShowCompany] = useState(false)
+  const [showCompliance, setShowCompliance] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -80,6 +82,13 @@ export default function SettingsMenu({ user, userData, company, onSiteRulesClick
             Company
           </button>
 
+          <button onClick={go(() => setShowCompliance(true))} className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 text-gray-700">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 12l2 2 4-4"/><path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c2.39 0 4.68.94 6.36 2.64"/>
+            </svg>
+            Compliance
+          </button>
+
           <a href="/admin/settings" className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 text-gray-700">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
@@ -107,6 +116,7 @@ export default function SettingsMenu({ user, userData, company, onSiteRulesClick
 
       <AccountModal open={showAccount} onClose={() => setShowAccount(false)} user={user} userData={userData} company={company} />
       <CompanyModal open={showCompany} onClose={() => setShowCompany(false)} company={company} />
+      <ComplianceModal open={showCompliance} onClose={() => setShowCompliance(false)} />
     </div>
   )
 }
