@@ -19,6 +19,13 @@ export async function GET(request: Request) {
     service.from('visit_assignments').select('visit_id, start_at, job_visits!inner(job_id)').eq('user_id', installer.userId).gte('start_at', today.toISOString()),
   ])
 
+  // installer-jobs-debug-2026-05-20
+  if (assignmentsRes.error) console.error('[installer/jobs] assignments error:', assignmentsRes.error)
+  if (userRes.error) console.error('[installer/jobs] user error:', userRes.error)
+  if (signinsRes.error) console.error('[installer/jobs] signins error:', signinsRes.error)
+  if (upcomingVisitsRes.error) console.error('[installer/jobs] visits error:', upcomingVisitsRes.error)
+  console.log('[installer/jobs] installer=', installer.userId, 'assignments=', assignmentsRes.data?.length, 'visits=', upcomingVisitsRes.data?.length)
+
   const assignments = assignmentsRes.data
   const me: any = userRes.data
   const signins = signinsRes.data
