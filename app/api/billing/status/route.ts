@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { TIERS } from '@/lib/billing'
@@ -25,7 +25,7 @@ export async function GET() {
 
   const { data: company } = await service
     .from('companies')
-    .select('id, name, plan, installer_limit, subscription_status, trial_ends_at, stripe_subscription_id, stripe_customer_id')
+    .select('id, name, plan, installer_limit, subscription_status, trial_ends_at, stripe_subscription_id, stripe_customer_id, dpa_accepted_at, dpa_accepted_by_name, dpa_version')
     .eq('id', userData.company_id)
     .single()
   if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
@@ -62,7 +62,7 @@ export async function GET() {
   const currentTier = company.plan ? (TIERS as any)[company.plan] : null
 
   return NextResponse.json({
-    company: { id: company.id, name: company.name },
+    company: { id: company.id, name: company.name, dpa_accepted_at: company.dpa_accepted_at, dpa_accepted_by_name: company.dpa_accepted_by_name, dpa_version: company.dpa_version },
     plan: {
       key: company.plan,
       name: currentTier?.name || 'No plan',
