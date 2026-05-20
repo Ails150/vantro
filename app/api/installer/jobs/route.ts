@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   const signins = signinsRes.data
   const upcomingVisits = upcomingVisitsRes.data || []
 
-  if (!me?.company_id) return NextResponse.json({ jobs: [] })
+  if (!me?.company_id) return NextResponse.json({ jobs: [], _debug: { reason: 'no_company_id', meIsNull: !me, userError: userRes.error?.message, assignmentsCount: assignmentsRes.data?.length, assignmentsError: assignmentsRes.error?.message, userId: installer.userId } })
 
   const todaysJobIds = new Set<string>(
     upcomingVisits
