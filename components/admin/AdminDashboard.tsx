@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 import MemberSchedule from "@/components/admin/MemberSchedule"
 import PayrollTab from "@/components/admin/PayrollTab"
 import { EmailAlertPrefs } from "@/components/admin/EmailAlertPrefs"
@@ -1061,7 +1061,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             {/* ZONE 1: Action queue */}
             {overviewData.actionItems.length === 0 ? (
               <div className="bg-teal-50 border border-teal-200 rounded-2xl p-5 flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold">âœ“</div>
+                <div className="w-10 h-10 rounded-full bg-teal-500 text-white flex items-center justify-center font-bold">✓</div>
                 <div>
                   <div className="font-semibold text-teal-900">All clear</div>
                   <div className="text-sm text-teal-700">Nothing needs your attention right now.</div>
@@ -1237,7 +1237,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                   {jobAddress && (
                     <div className={"absolute right-3 top-3 text-xs font-semibold " + (jobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                      {jobPlaceSelected ? "âœ“ GPS verified" : "âœ— Select from dropdown"}
+                      {jobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
                     </div>
                   )}
                 </div>
@@ -1346,7 +1346,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <div className="relative">
                             <input ref={editAddressRef} value={editJobAddress} onChange={e => { setEditJobAddress(e.target.value); setEditJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                             <div className={"absolute right-3 top-3 text-xs font-semibold " + (editJobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                              {editJobPlaceSelected ? "âœ“ GPS verified" : "âœ— Select from dropdown"}
+                              {editJobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
                             </div>
                           </div>
                           <div>
@@ -1410,7 +1410,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                 <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
                                   className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
                                   <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " âœ“"}
+                                  {m.name}{isAssigned && " ✓"}
                                 </button>
                               )
                             })}
