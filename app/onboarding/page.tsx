@@ -30,12 +30,12 @@ function OnboardingInner() {
         .maybeSingle()
 
       if (!data?.company_id) {
-        // No company yet â€” webhook hasn't fired. Bounce to success page to wait.
+        // No company yet — webhook hasn't fired. Bounce to success page to wait.
         router.push('/signup/success')
         return
       }
 
-      // Check if they've already added installers â€” if so, send to dashboard
+      // Check if they've already added installers — if so, send to dashboard
       const { count } = await supabase
         .from('users')
         .select('id', { count: 'exact', head: true })
@@ -155,7 +155,7 @@ function OnboardingInner() {
                 disabled={loading}
                 className="mt-6 w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-40 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors"
               >
-                {loading ? 'Savingâ€¦' : 'Continue'}
+                {loading ? 'Saving…' : 'Continue'}
               </button>
             </div>
           )}

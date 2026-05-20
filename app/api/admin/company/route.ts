@@ -17,7 +17,7 @@ export async function PATCH(request: Request) {
     .eq("auth_user_id", user.id)
     .single()
   if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
-    return NextResponse.json({ error: "Forbidden â€” admin only" }, { status: 403 })
+    return NextResponse.json({ error: "Forbidden — admin only" }, { status: 403 })
   }
 
   const body = await request.json().catch(() => ({}))

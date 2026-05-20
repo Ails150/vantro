@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "signinId and signed_in_at required" }, { status: 400 })
   }
 
-  // Check existing signin â€” must belong to admin's company AND not be locked
+  // Check existing signin — must belong to admin's company AND not be locked
   const { data: existing, error: fetchErr } = await service
     .from("signins")
     .select("id, company_id, payroll_exported_at")

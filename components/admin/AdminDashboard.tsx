@@ -1243,7 +1243,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Checklists (optional)</label>
                   {checklistTemplates.length === 0 ? (
-                    <p className="text-sm text-gray-400">No checklists yet â€” <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
+                    <p className="text-sm text-gray-400">No checklists yet — <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
                   ) : (
                     <div className="space-y-2 mt-1">
                       {checklistTemplates.map((t: any) => (

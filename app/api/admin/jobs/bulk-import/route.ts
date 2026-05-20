@@ -39,7 +39,7 @@ async function geocodeAddress(address: string, postcode?: string): Promise<{ lat
       return data.results[0].geometry.location
     }
   } catch {
-    /* swallow geocode failures â€” address is still saved */
+    /* swallow geocode failures — address is still saved */
   }
   return null
 }
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
       continue
     }
 
-    // Geocode (best effort â€” don't fail row if geocoding fails)
+    // Geocode (best effort — don't fail row if geocoding fails)
     const coords = await geocodeAddress(address, postcode)
 
     const insertRow: any = {

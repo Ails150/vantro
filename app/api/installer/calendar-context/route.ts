@@ -112,7 +112,7 @@ export async function GET(request: Request) {
     .reduce((sum, e) => sum + countDays(e.start_date, e.end_date, !!e.is_half_day), 0)
 
   // Team context: count of approved teammates per day in window
-  // (anonymised â€” just a count, no names)
+  // (anonymised — just a count, no names)
   const { data: teamApproved } = await service
     .from("time_off_entries")
     .select("start_date, end_date")

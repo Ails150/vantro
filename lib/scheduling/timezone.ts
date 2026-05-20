@@ -58,7 +58,7 @@ export function nowInTimezone(tz: string | null | undefined, when: Date = new Da
   const dd = get("day")
   let hour = parseInt(get("hour"), 10)
   const minute = parseInt(get("minute"), 10)
-  // Intl can return "24" for midnight in some locales â€” normalise.
+  // Intl can return "24" for midnight in some locales — normalise.
   if (hour === 24) hour = 0
 
   const dateStr = `${yyyy}-${mm}-${dd}`

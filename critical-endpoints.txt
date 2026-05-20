@@ -1,0 +1,702 @@
+
+
+===== admin\reset-password =====
+import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import crypto from 'crypto'
+
+export async function POST(request: Request) {
+  const { email } = await request.json()
+  if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
+
+  const service = await createServiceClient()
+  const { data: user } = await service.from('users')
+    .select('id, name, email, role')
+    .ilike('email', email.trim())
+    .single()
+
+  // Silent success for security (do not reveal whether email exists)
+  if (!user) return NextResponse.json({ success: true })
+
+  // Only admin/foreman roles can use password reset (installers use PIN reset)
+  if (user.role === 'installer') return NextResponse.json({ success: true })
+
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour
+
+  const { error: updateErr } = await service.from('users')
+    .update({ password_reset_token: token, password_reset_expires: expires })
+    .eq('id', user.id)
+
+  if (updateErr) {
+    console.error('[admin/reset-password] token save failed', updateErr)
+    return NextResponse.json({ error: 'Could not start reset' }, { status: 500 })
+  }
+
+  const resetUrl = `https://app.getvantro.com/reset-password?token=${token}`
+
+  if (process.env.RESEND_API_KEY) {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'Vantro <noreply@getvantro.com>',
+        to: email.trim(),
+        subject: 'Reset your Vantro password',
+        html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:40px auto">
+          <div style="text-align:center;margin-bottom:24px">
+            <div style="width:48px;height:48px;background:#00d4a0;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:#0f1923">V</div>
+          </div>
+          <h2 style="color:#0f1923;text-align:center">Reset your password</h2>
+          <p style="color:#444">Hi ${user.name || 'there'},</p>
+          <p style="color:#444">Click the button below to set a new password for your Vantro account. This link expires in 1 hour.</p>
+          <div style="text-align:center;margin:24px 0">
+            <a href="${resetUrl}" style="background:#00d4a0;color:#0f1923;font-weight:700;padding:12px 28px;border-radius:10px;text-decoration:none;display:inline-block">Set new password</a>
+          </div>
+          <p style="color:#888;font-size:12px">If the button does not work, copy and paste this URL into your browser:<br><span style="word-break:break-all">${resetUrl}</span></p>
+          <p style="color:#888;font-size:12px">If you did not request this, ignore this email. Your password will not change.</p>
+        </div>`
+      })
+    })
+
+    if (!res.ok) {
+      const body = await res.text()
+      console.error('[admin/reset-password] Resend failed', res.status, body)
+      return NextResponse.json({ error: 'Email could not be sent. Please try again or contact support.' }, { status: 500 })
+    }
+  } else {
+    console.error('[admin/reset-password] RESEND_API_KEY not set')
+    return NextResponse.json({ error: 'Email service not configured' }, { status: 500 })
+  }
+
+  return NextResponse.json({ success: true })
+}
+
+===== client =====
+import { NextResponse } from "next/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import bcrypt from "bcryptjs"
+import jwt from "jsonwebtoken"
+
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback'
+
+export async function POST(request: Request) {
+  const { action, email, password, token } = await request.json()
+  const service = await createServiceClient()
+
+  // LOGIN
+  if (action === 'login') {
+    const { data: client } = await service.from('client_users').select('*').eq('email', email.toLowerCase()).single()
+    if (!client) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+    if (!client.password_hash) return NextResponse.json({ error: 'Please set your password via the invite link' }, { status: 401 })
+    const valid = await bcrypt.compare(password, client.password_hash)
+    if (!valid) return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+    await service.from('client_users').update({ last_login_at: new Date().toISOString() }).eq('id', client.id)
+    const jwtToken = jwt.sign({ clientId: client.id, jobId: client.job_id, companyId: client.company_id, type: 'client' }, JWT_SECRET, { expiresIn: '7d' })
+    return NextResponse.json({ token: jwtToken, name: client.name, jobId: client.job_id })
+  }
+
+  // SET PASSWORD FROM INVITE
+  if (action === 'set_password') {
+    const { data: client } = await service.from('client_users').select('*').eq('invite_token', token).single()
+    if (!client) return NextResponse.json({ error: 'Invalid or expired invite link' }, { status: 400 })
+    const hash = await bcrypt.hash(password, 10)
+    await service.from('client_users').update({ password_hash: hash, invite_token: null }).eq('id', client.id)
+    const jwtToken = jwt.sign({ clientId: client.id, jobId: client.job_id, companyId: client.company_id, type: 'client' }, JWT_SECRET, { expiresIn: '7d' })
+    return NextResponse.json({ token: jwtToken, name: client.name, jobId: client.job_id })
+  }
+
+  return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+}
+
+===== client\portal =====
+import { NextResponse } from "next/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import jwt from "jsonwebtoken"
+
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback'
+
+export async function GET(request: Request) {
+  const auth = request.headers.get('authorization')
+  if (!auth?.startsWith('Bearer ')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const payload = jwt.verify(auth.replace('Bearer ', ''), JWT_SECRET) as any
+    if (payload.type !== 'client') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const service = await createServiceClient()
+    const { jobId, companyId } = payload
+
+    const [{ data: job }, { data: diary }, { data: signins }, { data: qa }] = await Promise.all([
+      service.from('jobs').select('id, name, address, status').eq('id', jobId).single(),
+      service.from('diary_entries').select('id, entry_text, ai_alert_type, ai_summary, photo_urls, created_at, users(name)').eq('job_id', jobId).order('created_at', { ascending: false }).limit(50),
+      service.from('signins').select('signed_in_at, signed_out_at, users(name)').eq('job_id', jobId).order('signed_in_at', { ascending: false }).limit(50),
+      service.from('checklist_responses').select('created_at, result, checklist_items(label), users(name)').eq('job_id', jobId).order('created_at', { ascending: false }).limit(100)
+    ])
+
+    return NextResponse.json({ job, diary: diary || [], signins: signins || [], qa: qa || [] })
+  } catch (e) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+}
+
+===== installer\auth =====
+import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { createInstallerToken } from '@/lib/auth'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
+import bcrypt from 'bcryptjs'
+
+export async function POST(request: Request) {
+  // Rate limit: 20 attempts per IP per 10 minutes (allows legit installer retries, blocks brute force)
+  const ip = getClientIp(request)
+  const ok = await checkRateLimit(`installer-auth:ip:${ip}`, 20, 600)
+  if (!ok) {
+    return NextResponse.json({ error: 'Too many attempts. Try again in a few minutes.' }, { status: 429 })
+  }
+
+  const body = await request.json()
+
+  if (body.checkOnly) {
+    const service = await createServiceClient()
+    const { data: user } = await service.from('users').select('id, pin_hash').ilike('email', body.email).single()
+    if (!user) return NextResponse.json({ exists: false })
+    return NextResponse.json({ exists: true, hasPin: !!user.pin_hash })
+  }
+
+  const { pin } = body
+  if (!pin || pin.length !== 4) return NextResponse.json({ error: 'Invalid PIN' }, { status: 400 })
+
+  const service = await createServiceClient()
+  const { data: users } = await service.from('users').select('id, name, company_id, pin_hash, pin_attempts, pin_locked_until, role, gps_tracking_acknowledged').eq('is_active', true).not('pin_hash', 'is', null)
+  if (!users) return NextResponse.json({ error: 'Incorrect PIN' }, { status: 401 })
+
+  let matchedUser = null
+  for (const user of users) {
+    if (user.pin_locked_until && new Date(user.pin_locked_until) > new Date()) continue
+    if (user.pin_hash && await bcrypt.compare(pin, user.pin_hash)) { matchedUser = user; break }
+  }
+
+  if (!matchedUser) {
+    return NextResponse.json({ error: 'Incorrect PIN. Please try again.' }, { status: 401 })
+  }
+
+  await service.from('users').update({ pin_attempts: 0, pin_locked_until: null }).eq('id', matchedUser.id)
+
+  const token = createInstallerToken(matchedUser.id, matchedUser.company_id)
+
+  return NextResponse.json({
+    token,
+    userId: matchedUser.id,
+    name: matchedUser.name,
+    companyId: matchedUser.company_id,
+    role: matchedUser.role,
+    gpsAcknowledged: matchedUser.gps_tracking_acknowledged || false,
+  })
+}
+
+===== installer\reset-pin =====
+import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
+import crypto from 'crypto'
+
+export async function POST(request: Request) {
+  const { email } = await request.json()
+  if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
+
+  // Rate limit: per-IP and per-email
+  const ip = getClientIp(request)
+  const ipOk = await checkRateLimit(`reset-pin:ip:${ip}`, 10, 3600)
+  const emailOk = await checkRateLimit(`reset-pin:email:${email.trim().toLowerCase()}`, 3, 3600)
+  if (!ipOk || !emailOk) {
+    return NextResponse.json({ success: true }) // silent rate-limit
+  }
+
+  const service = await createServiceClient()
+  const { data: user } = await service.from('users').select('id, name, email').ilike('email', email.trim()).single()
+  if (!user) return NextResponse.json({ success: true }) // silent fail for security
+
+  const token = crypto.randomBytes(32).toString('hex')
+  const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour
+
+  await service.from('users').update({ pin_reset_token: token, pin_reset_expires: expires }).eq('id', user.id)
+
+  const resetUrl = `https://app.getvantro.com/installer/reset-pin?token=${token}`
+
+  if (process.env.RESEND_API_KEY) {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Vantro <noreply@getvantro.com>',
+        to: email.trim(),
+        subject: 'Reset your Vantro PIN',
+        html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:40px auto">
+          <div style="text-align:center;margin-bottom:24px">
+            <div style="width:48px;height:48px;background:#00d4a0;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:22px;color:#0f1923">V</div>
+          </div>
+          <h2 style="color:#0f1923;text-align:center">Reset your PIN</h2>
+          <p style="color:#444">Hi ${user.name},</p>
+          <p style="color:#444">Click the button below to set a new PIN for your Vantro account. This link expires in 1 hour.</p>
+          <div style="text-align:center;margin:24px 0">
+            <a href="${resetUrl}" style="background:#00d4a0;color:#0f1923;font-weight:700;padding:12px 28px;border-radius:10px;text-decoration:none;display:inline-block">Set new PIN →</a>
+          </div>
+          <p style="color:#888;font-size:12px">If you did not request this, ignore this email. Your PIN will not change.</p>
+        </div>`
+      })
+    }).catch(() => {})
+  }
+
+  return NextResponse.json({ success: true })
+}
+
+===== installer\reset-pin\confirm =====
+import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import bcrypt from 'bcryptjs'
+
+export async function POST(request: Request) {
+  const { token, pin } = await request.json()
+  if (!token || !pin || pin.length !== 4) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+
+  const service = await createServiceClient()
+  const { data: user } = await service.from('users').select('id, pin_reset_expires').eq('pin_reset_token', token).single()
+  if (!user) return NextResponse.json({ error: 'Invalid or expired reset link' }, { status: 400 })
+  if (new Date(user.pin_reset_expires) < new Date()) return NextResponse.json({ error: 'Reset link has expired. Please request a new one.' }, { status: 400 })
+
+  const hash = await bcrypt.hash(pin, 10)
+  await service.from('users').update({ pin_hash: hash, pin_reset_token: null, pin_reset_expires: null, pin_attempts: 0, pin_locked_until: null }).eq('id', user.id)
+
+  return NextResponse.json({ success: true })
+}
+
+===== installer\setup-pin =====
+import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import bcrypt from 'bcryptjs'
+
+export async function POST(request: Request) {
+  const { pin, token } = await request.json()
+  if (!pin || pin.length !== 4) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+  if (!/^\d{4}$/.test(pin)) return NextResponse.json({ error: 'PIN must be 4 digits' }, { status: 400 })
+  if (!token) return NextResponse.json({ error: 'Reset token required' }, { status: 400 })
+
+  const service = await createServiceClient()
+  // Look up user by token only - token is unique and uniquely identifies the user
+  const { data: user } = await service
+    .from('users')
+    .select('id, pin_reset_token, pin_reset_expires')
+    .eq('pin_reset_token', token)
+    .single()
+
+  if (!user) return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+  if (!user.pin_reset_expires || new Date(user.pin_reset_expires) < new Date()) {
+    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+  }
+
+  const pin_hash = await bcrypt.hash(pin, 10)
+  const { error } = await service.from('users').update({
+    pin_hash,
+    pin_reset_token: null,
+    pin_reset_expires: null,
+  }).eq('id', user.id)
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  return NextResponse.json({ success: true })
+}
+
+
+===== signup\initiate =====
+import { NextResponse } from 'next/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
+import Stripe from 'stripe'
+import { TIERS, type TierKey } from '@/lib/billing'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+
+/**
+ * POST /api/signup/initiate
+ *
+ * Creates Supabase auth user (unconfirmed) + returns Stripe Checkout URL.
+ * Company + admin user record in our DB are NOT created yet — that happens
+ * via the Stripe webhook on checkout.session.completed.
+ *
+ * This means: if the user abandons checkout, no orphan company exists in our DB.
+ *
+ * Body: { email, password, companyName, yourName, teamSize, plan }
+ */
+export async function POST(request: Request) {
+  // Rate limit: 3 signups per IP per hour, prevents Stripe/Supabase pollution
+  const ip = getClientIp(request)
+  const ok = await checkRateLimit(`signup:ip:${ip}`, 3, 3600)
+  if (!ok) {
+    return NextResponse.json({ error: 'Too many signup attempts. Try again later.' }, { status: 429 })
+  }
+
+  let body: any
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  const { email, password, companyName, yourName, teamSize, plan } = body
+
+  // Validation
+  if (!email || !password) {
+    return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
+  }
+  if (password.length < 8) {
+    return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+  }
+  if (!companyName?.trim()) {
+    return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
+  }
+  if (!yourName?.trim()) {
+    return NextResponse.json({ error: 'Your name is required' }, { status: 400 })
+  }
+  if (!teamSize || teamSize < 1 || teamSize > 100) {
+    return NextResponse.json({ error: 'Team size must be between 1 and 100' }, { status: 400 })
+  }
+  if (!TIERS[plan as TierKey]) {
+    return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+  }
+
+  const tier = TIERS[plan as TierKey]
+  const service = await createServiceClient()
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.getvantro.com'
+
+  // Step 1: Create Supabase auth user (or detect existing)
+  // Using admin API so we can auto-confirm and skip the email loop
+  // (Email confirmation can happen post-Stripe if you want — for now we keep things simple)
+  const { data: authData, error: authError } = await service.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true, // Auto-confirm; we'll trust Stripe's verification of the email
+    user_metadata: {
+      full_name: yourName.trim(),
+      company_name: companyName.trim(),
+      pending_plan: plan,
+      pending_team_size: teamSize,
+    },
+  })
+
+  if (authError) {
+    // Common case: email already exists
+    if (authError.message?.toLowerCase().includes('already')) {
+      return NextResponse.json({
+        error: 'An account with this email already exists',
+        detail: 'Please sign in or use a different email',
+      }, { status: 409 })
+    }
+    console.error('[signup/initiate] auth user creation failed:', authError)
+    return NextResponse.json({
+      error: 'Could not create account',
+      detail: authError.message,
+    }, { status: 500 })
+  }
+
+  const authUserId = authData.user.id
+
+  // Step 2: Create Stripe customer immediately so we can attach metadata
+  const customer = await stripe.customers.create({
+    email: email.toLowerCase().trim(),
+    name: companyName.trim(),
+    metadata: {
+      auth_user_id: authUserId,
+      company_name: companyName.trim(),
+      admin_name: yourName.trim(),
+      plan,
+      team_size: String(teamSize),
+    },
+  })
+
+  // Step 3: Create Stripe Checkout session with 30-day trial
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      customer: customer.id,
+      line_items: [{ price: tier.priceId, quantity: 1 }],
+      subscription_data: {
+        trial_period_days: 30,
+        trial_settings: {
+          end_behavior: {
+            missing_payment_method: 'cancel',
+          },
+        },
+        metadata: {
+          auth_user_id: authUserId,
+          company_name: companyName.trim(),
+          admin_name: yourName.trim(),
+          admin_email: email.toLowerCase().trim(),
+          plan,
+          installer_limit: String(tier.installerLimit),
+          team_size: String(teamSize),
+        },
+      },
+      payment_method_collection: 'always', // force card even on trial
+      success_url: `${appUrl}/signup/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/signup?cancelled=true`,
+      metadata: {
+        auth_user_id: authUserId,
+        company_name: companyName.trim(),
+        plan,
+      },
+    })
+
+    return NextResponse.json({
+      checkoutUrl: session.url,
+      sessionId: session.id,
+    })
+  } catch (err: any) {
+    // If checkout fails, roll back auth user so they can retry cleanly
+    await service.auth.admin.deleteUser(authUserId).catch(() => {})
+    console.error('[signup/initiate] Stripe checkout failed:', err)
+    return NextResponse.json({
+      error: 'Could not start payment',
+      detail: err?.message || String(err),
+    }, { status: 500 })
+  }
+}
+
+
+===== walkthroughs\process =====
+import { NextRequest, NextResponse } from "next/server"
+import { GoogleGenerativeAI } from "@google/generative-ai"
+import { createServiceClient } from "@/lib/supabase/server"
+import { WALKTHROUGH_SYSTEM_PROMPT, buildUserMessage } from "@/lib/ai/walkthrough-prompt"
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+
+export async function POST(req: NextRequest) {
+  try {
+    const { walkthroughId } = await req.json()
+    if (!walkthroughId) {
+      return NextResponse.json({ error: "walkthroughId required" }, { status: 400 })
+    }
+
+    const service = await createServiceClient()
+
+    const { data: walkthrough, error: fetchErr } = await service
+      .from("walkthroughs")
+      .select(`
+        *,
+        job:jobs(address, name, required_trades),
+        installer:users!installer_id(name),
+        clips:walkthrough_clips(sequence_number, duration_seconds, transcript)
+      `)
+      .eq("id", walkthroughId)
+      .single()
+
+    if (fetchErr || !walkthrough) {
+      return NextResponse.json({ error: "Walkthrough not found", detail: fetchErr?.message }, { status: 404 })
+    }
+
+    const sortedClips = (walkthrough.clips || [])
+      .sort((a: any, b: any) => a.sequence_number - b.sequence_number)
+
+    if (sortedClips.length === 0) {
+      return NextResponse.json({ error: "No clips found for this walkthrough" }, { status: 400 })
+    }
+
+    const tradeType = Array.isArray(walkthrough.job?.required_trades) && walkthrough.job.required_trades.length > 0
+      ? walkthrough.job.required_trades.join(", ")
+      : "general"
+
+    const userMessage = buildUserMessage({
+      jobAddress: walkthrough.job?.address ?? walkthrough.job?.name ?? "Unknown site",
+      tradeType,
+      installerName: walkthrough.installer?.name ?? "Installer",
+      recordedAt: walkthrough.recorded_at,
+      clips: sortedClips.map((c: any) => ({
+        sequence: c.sequence_number,
+        durationSeconds: c.duration_seconds ?? 0,
+        transcript: c.transcript ?? "",
+      })),
+    })
+
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+      systemInstruction: WALKTHROUGH_SYSTEM_PROMPT,
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.3,
+      },
+    })
+
+    const result = await model.generateContent(userMessage)
+    const responseText = result.response.text()
+
+    let parsed: any
+    try {
+      parsed = JSON.parse(responseText)
+    } catch (e) {
+      console.error("[walkthrough/process] Gemini returned invalid JSON:", responseText)
+      return NextResponse.json({ error: "AI returned invalid JSON", raw: responseText }, { status: 500 })
+    }
+
+    const fullTranscript = sortedClips
+      .map((c: any) => c.transcript)
+      .filter(Boolean)
+      .join(" ")
+
+    const { error: updateErr } = await service
+      .from("walkthroughs")
+      .update({
+        transcript_full: fullTranscript,
+        ai_summary: parsed.summary ?? null,
+        ai_sections: parsed.sections ?? [],
+        ai_themes: parsed.themes ?? [],
+        ai_sentiment: parsed.sentiment ?? "neutral",
+        ai_flags: parsed.flags ?? [],
+      })
+      .eq("id", walkthroughId)
+
+    if (updateErr) {
+      console.error("[walkthrough/process] Update failed:", updateErr.message)
+      return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    }
+
+    await service.rpc("increment_voice_capture_count", {
+      p_company_id: walkthrough.company_id,
+    })
+
+    return NextResponse.json({
+      success: true,
+      walkthrough_id: walkthroughId,
+      ai: parsed,
+    })
+  } catch (e: any) {
+    console.error("[walkthrough/process] Unhandled error:", e)
+    return NextResponse.json({ error: e.message ?? "Unknown error" }, { status: 500 })
+  }
+}
+
+
+===== audit\iteration-narrative =====
+// app/api/audit/iteration-narrative/route.ts
+// Generates an AI-written narrative comparing two periods of a job's audit data.
+// Used by the Iteration tab to explain *why* things changed between Period A and B.
+//
+// Input: { reportA, reportB, fromA, toA, fromB, toB }
+//   where reportA/reportB are the full responses from /api/audit/v2
+//
+// Output: { narrative: string }
+
+import { NextResponse } from "next/server"
+import { GoogleGenerativeAI } from "@google/generative-ai"
+
+export const maxDuration = 60
+
+function summarisePeriod(report: any) {
+  const diary = report?.fullEvidence?.diary || []
+  const defectsRaw = report?.fullEvidence?.defects || report?.issues?.allDefects || []
+  const openDefects = report?.issues?.openDefects || []
+  const blockers = (report?.issues?.blockers || []).concat(diary.filter((d: any) => d.ai_alert_type === 'blocker'))
+  const signoffs = report?.signoffs || []
+  const signins = report?.onSite?.fullLog || []
+  const deliverables = report?.deliverables || []
+  const walkthroughs = report?.fullEvidence?.walkthroughs || []
+  const qa = report?.fullEvidence?.qa || []
+
+  return {
+    hoursOnSite: report?.health?.metrics?.hoursThisPeriod ?? 0,
+    installerCount: report?.onSite?.installerCount ?? 0,
+    signinEvents: signins.length,
+    totalDefects: defectsRaw.length,
+    openDefects: openDefects.length,
+    blockerCount: blockers.length,
+    signoffs: signoffs.length,
+    diaryEntries: diary.length,
+    walkthroughCount: walkthroughs.length,
+    qaCount: qa.length,
+    deliverableProgress: deliverables.map((d: any) => ({
+      name: d.name,
+      approved: d.approvedItems ?? 0,
+      total: d.totalItems ?? 0,
+    })),
+    // Real diary content - first 15 entries with text up to 300 chars each
+    diaryContent: diary.slice(0, 15).map((d: any) => ({
+      created: d.created_at,
+      author: d.users?.name || 'unknown',
+      alert: d.ai_alert_type || null,
+      summary: d.ai_summary || null,
+      text: ((d.entry_text || '') as string).substring(0, 300),
+    })).filter((d: any) => d.text || d.summary),
+    // Defect descriptions, severity, status, resolution notes
+    defectDetails: defectsRaw.slice(0, 20).map((d: any) => ({
+      severity: d.severity,
+      status: d.status,
+      description: ((d.description || '') as string).substring(0, 200),
+      resolution: d.resolution_note ? ((d.resolution_note as string).substring(0, 150)) : null,
+      raisedBy: d.users?.name || null,
+    })),
+    // Walkthrough AI summaries / transcripts
+    walkthroughSummaries: walkthroughs.slice(0, 8).map((w: any) => ({
+      created: w.created_at,
+      summary: w.ai_summary || null,
+      // Pull a snippet of transcript from first clip if any
+      transcriptSnippet: w.clips?.[0]?.transcript ? ((w.clips[0].transcript as string).substring(0, 200)) : null,
+    })).filter((w: any) => w.summary || w.transcriptSnippet),
+    // QA notes that are non-empty
+    qaNotes: qa.slice(0, 15).map((q: any) => ({
+      state: q.state,
+      value: q.value,
+      notes: ((q.notes || '') as string).substring(0, 150),
+    })).filter((q: any) => q.notes),
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json()
+    const { reportA, reportB, fromA, toA, fromB, toB } = body
+
+    if (!reportA || !reportB) {
+      return NextResponse.json({ error: "Both reportA and reportB required" }, { status: 400 })
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      return NextResponse.json({ error: "AI not configured" }, { status: 500 })
+    }
+
+    const summaryA = summarisePeriod(reportA)
+    const summaryB = summarisePeriod(reportB)
+
+    const prompt = `You are a senior project manager writing a brief, factual iteration report comparing two periods of work on a construction/installation project.
+
+PERIOD A: ${fromA} to ${toA}
+${JSON.stringify(summaryA, null, 2)}
+
+PERIOD B: ${fromB} to ${toB}
+${JSON.stringify(summaryB, null, 2)}
+
+Write a single paragraph (4-7 sentences max) comparing the two periods. Focus on:
+1. WHAT changed (deliverable progress, hours, defects, sign-offs)
+2. WHY it likely changed - look at diary text, defect responsibility, blocker count
+   - If defects are flagged as client_responsibility or scope_change, attribute slowdown to client side
+   - If diary mentions waiting, parts, approvals - call that out
+   - If hours dropped but deliverables held, the team got more efficient
+   - If hours held but deliverables dropped, something external blocked them
+3. The headline takeaway - is this period healthy, concerning, or recovering?
+
+Be specific with numbers but interpret them. Don't just list metrics.
+Don't use headers, bullets or markdown. Plain prose only.
+Write in UK English, professional but readable - imagine this is going to a paying client.`
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
+    const result = await model.generateContent(prompt)
+    const narrative = result.response.text().trim()
+
+    return NextResponse.json({ narrative })
+  } catch (err: any) {
+    console.error("[iteration-narrative] failed:", err)
+    return NextResponse.json({ error: err?.message || "Generation failed" }, { status: 500 })
+  }
+}

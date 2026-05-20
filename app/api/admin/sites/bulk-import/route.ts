@@ -5,7 +5,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 //   POST /api/admin/sites/bulk-import
 //   body: { rows: [{ name, address, postcode?, client_name?, notes? }] }
 //
-// Sites are reusable templates â€” useful for housing developers, repeat clients,
+// Sites are reusable templates — useful for housing developers, repeat clients,
 // retail rollouts. When creating a job, you can pick from saved sites.
 
 interface CsvRow {

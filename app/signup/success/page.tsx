@@ -25,13 +25,13 @@ function SuccessInner() {
           // Check if user is signed in (the webhook should also have provisioned them)
           const { data: { user } } = await supabase.auth.getUser()
           if (!user) {
-            // Not signed in yet â€” try to sign them in via the session
-            // Webhook may still be processing â€” wait
+            // Not signed in yet — try to sign them in via the session
+            // Webhook may still be processing — wait
             await new Promise(r => setTimeout(r, 1000))
             continue
           }
 
-          // User exists â€” check for company
+          // User exists — check for company
           const { data } = await supabase
             .from('users')
             .select('company_id')
@@ -40,7 +40,7 @@ function SuccessInner() {
 
           if (data?.company_id) {
             setStatus('ready')
-            // Onboarding now skips company step â€” go straight to team
+            // Onboarding now skips company step — go straight to team
             setTimeout(() => router.push('/onboarding?step=team'), 800)
             return
           }
@@ -80,7 +80,7 @@ function SuccessInner() {
           {status === 'waiting' && (
             <>
               <div className="w-12 h-12 mx-auto mb-5 border-2 border-[#00d4a0] border-t-transparent rounded-full animate-spin"/>
-              <h1 className="text-xl font-semibold text-white mb-2">Setting up your accountâ€¦</h1>
+              <h1 className="text-xl font-semibold text-white mb-2">Setting up your account…</h1>
               <p className="text-[#4d6478] text-sm">Payment confirmed. Provisioning your dashboard.</p>
               {attempts > 10 && (
                 <p className="text-[#4d6478] text-xs mt-4">
@@ -98,7 +98,7 @@ function SuccessInner() {
                 </svg>
               </div>
               <h1 className="text-xl font-semibold text-white mb-2">All set!</h1>
-              <p className="text-[#4d6478] text-sm">Taking you to set up your teamâ€¦</p>
+              <p className="text-[#4d6478] text-sm">Taking you to set up your team…</p>
             </>
           )}
 
