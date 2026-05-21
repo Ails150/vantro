@@ -105,3 +105,6 @@ settings-page.txt
 # Backup files
 *.bak
 *.bak2
+
+# Auto-backups from edit scripts
+*.backup-*
