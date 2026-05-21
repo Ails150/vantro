@@ -152,6 +152,14 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [jobRequiredTrades, setJobRequiredTrades] = useState<string[]>([])
   const [editJobRequiredTrades, setEditJobRequiredTrades] = useState<string[]>([])
   const [memberTrades, setMemberTrades] = useState<string[]>([])
+  const [memberSubcontractorId, setMemberSubcontractorId] = useState<string>("")
+  const [portalSubs, setPortalSubs] = useState<Array<{id:string;name:string}>>([])
+  useEffect(() => {
+    fetch("/api/admin/subcontractors").then(r => r.json()).then(d => {
+      const list = (d.subcontractors || []).filter((s: any) => s.portal_enabled && s.active).map((s: any) => ({ id: s.id, name: s.name }))
+      setPortalSubs(list)
+    }).catch(() => {})
+  }, [])
   const [itemTrade, setItemTrade] = useState<string>("")
 
   // Fetch multi-trade state once on mount
@@ -881,6 +889,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   const setupTabs: Array<{ id: string; label: string; badge?: number }> = [
     { id: "team", label: "Team" },
+    { id: "subcontractors", label: "Subcontractors" },
     { id: "trades", label: "Trades" },
     { id: "jobs", label: "Jobs" },
     { id: "checklists", label: "Checklist Templates" },
@@ -1661,9 +1670,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             <div className="mb-5">
               <EmailAlertPrefs />
             </div>
-            <div className="mb-5">
-              <SubcontractorsSection />
-            </div>
             <div className={card}>
               <div className={cardHeader}>
                 <span className="font-semibold">Team members</span>
@@ -2051,6 +2057,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         )}
         {activeTab === "sites" && <SitesTab />}
         {activeTab === "trades" && <TradesTab />}
+        {activeTab === "subcontractors" && <SubcontractorsSection />}
         {activeTab === "audit" && <AuditTab jobs={jobs} aiAuditEnabled={!!company?.ai_audit_enabled} aiAuditTrialEndsAt={company?.ai_audit_trial_ends_at} stripeAiAuditSubscriptionItemId={company?.stripe_ai_audit_subscription_item_id} />}
         {activeTab === "map" && <MapTab />}
         {activeTab === "walkthroughs" && <WalkthroughsTab />}
