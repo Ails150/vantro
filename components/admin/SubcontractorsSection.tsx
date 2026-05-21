@@ -17,6 +17,15 @@ interface Subcontractor {
   active: boolean
   active_assignment_count: number
   created_at: string
+  insurance_provider: string | null
+  insurance_policy_no: string | null
+  insurance_expiry: string | null
+  liability_cover_amount: number | null
+  vat_number: string | null
+  utr_number: string | null
+  cis_registered: boolean
+  rams_on_file: boolean
+  portal_enabled: boolean
 }
 
 const RATE_TYPE_OPTIONS: { value: RateType; label: string }[] = [
@@ -34,6 +43,7 @@ export function SubcontractorsSection() {
   const [editing, setEditing] = useState<Subcontractor | null>(null)
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState("")
+  const [showCompliance, setShowCompliance] = useState(false)
 
   const [form, setForm] = useState({
     name: "",
@@ -45,6 +55,15 @@ export function SubcontractorsSection() {
     rate_amount: "",
     notes: "",
     active: true,
+    insurance_provider: "",
+    insurance_policy_no: "",
+    insurance_expiry: "",
+    liability_cover_amount: "",
+    vat_number: "",
+    utr_number: "",
+    cis_registered: false,
+    rams_on_file: false,
+    portal_enabled: false,
   })
 
   async function load() {
@@ -74,8 +93,18 @@ export function SubcontractorsSection() {
       rate_amount: "",
       notes: "",
       active: true,
+      insurance_provider: "",
+      insurance_policy_no: "",
+      insurance_expiry: "",
+      liability_cover_amount: "",
+      vat_number: "",
+      utr_number: "",
+      cis_registered: false,
+      rams_on_file: false,
+      portal_enabled: false,
     })
     setFormError("")
+    setShowCompliance(false)
   }
 
   function openAdd() {
@@ -95,9 +124,20 @@ export function SubcontractorsSection() {
       rate_amount: sub.rate_amount?.toString() || "",
       notes: sub.notes || "",
       active: sub.active,
+      insurance_provider: sub.insurance_provider || "",
+      insurance_policy_no: sub.insurance_policy_no || "",
+      insurance_expiry: sub.insurance_expiry || "",
+      liability_cover_amount: sub.liability_cover_amount?.toString() || "",
+      vat_number: sub.vat_number || "",
+      utr_number: sub.utr_number || "",
+      cis_registered: !!sub.cis_registered,
+      rams_on_file: !!sub.rams_on_file,
+      portal_enabled: !!sub.portal_enabled,
     })
     setEditing(sub)
     setFormError("")
+    const hasCompliance = !!(sub.insurance_provider || sub.insurance_policy_no || sub.insurance_expiry || sub.liability_cover_amount || sub.vat_number || sub.utr_number || sub.cis_registered || sub.rams_on_file)
+    setShowCompliance(hasCompliance)
     setShowAdd(true)
   }
 
@@ -113,6 +153,8 @@ export function SubcontractorsSection() {
       ...form,
       name: form.name.trim(),
       rate_amount: form.rate_amount ? parseFloat(form.rate_amount) : null,
+      liability_cover_amount: form.liability_cover_amount ? parseFloat(form.liability_cover_amount) : null,
+      insurance_expiry: form.insurance_expiry || null,
     }
 
     try {
@@ -194,6 +236,9 @@ export function SubcontractorsSection() {
               <div className="flex-1 min-w-0">
                 <div className="font-semibold flex items-center gap-2">
                   {sub.name}
+                  {sub.portal_enabled && (
+                    <span className="text-[10px] font-bold uppercase tracking-wide bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full">Portal</span>
+                  )}
                   {!sub.active && (
                     <span className="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">Inactive</span>
                   )}
@@ -334,6 +379,120 @@ export function SubcontractorsSection() {
                   rows={3}
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400 resize-none"
                 />
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.portal_enabled}
+                    onChange={e => setForm({ ...form, portal_enabled: e.target.checked })}
+                    className="w-4 h-4 rounded accent-teal-500"
+                  />
+                  <div>
+                    <div className="text-sm font-semibold text-gray-800">Crew portal access</div>
+                    <div className="text-xs text-gray-500">Their installers can sign into the Vantro mobile app under this subcontractor</div>
+                  </div>
+                </label>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowCompliance(v => !v)}
+                  className="flex items-center justify-between w-full text-sm font-semibold text-gray-700 hover:text-gray-900"
+                >
+                  <span>Compliance &amp; insurance <span className="text-xs font-normal text-gray-400">(optional)</span></span>
+                  <span className="text-gray-400">{showCompliance ? "−" : "+"}</span>
+                </button>
+
+                {showCompliance && (
+                  <div className="mt-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700 uppercase block mb-1">Insurance provider</label>
+                        <input
+                          type="text"
+                          value={form.insurance_provider}
+                          onChange={e => setForm({ ...form, insurance_provider: e.target.value })}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700 uppercase block mb-1">Policy no.</label>
+                        <input
+                          type="text"
+                          value={form.insurance_policy_no}
+                          onChange={e => setForm({ ...form, insurance_policy_no: e.target.value })}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700 uppercase block mb-1">Insurance expiry</label>
+                        <input
+                          type="date"
+                          value={form.insurance_expiry}
+                          onChange={e => setForm({ ...form, insurance_expiry: e.target.value })}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700 uppercase block mb-1">Liability cover (£)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={form.liability_cover_amount}
+                          onChange={e => setForm({ ...form, liability_cover_amount: e.target.value })}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400"
+                          placeholder="1000000"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700 uppercase block mb-1">VAT number</label>
+                        <input
+                          type="text"
+                          value={form.vat_number}
+                          onChange={e => setForm({ ...form, vat_number: e.target.value })}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-semibold text-gray-700 uppercase block mb-1">UTR</label>
+                        <input
+                          type="text"
+                          value={form.utr_number}
+                          onChange={e => setForm({ ...form, utr_number: e.target.value })}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-teal-400"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-4 pt-1">
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={form.cis_registered}
+                          onChange={e => setForm({ ...form, cis_registered: e.target.checked })}
+                          className="w-4 h-4 rounded accent-teal-500"
+                        />
+                        CIS registered
+                      </label>
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={form.rams_on_file}
+                          onChange={e => setForm({ ...form, rams_on_file: e.target.checked })}
+                          className="w-4 h-4 rounded accent-teal-500"
+                        />
+                        RAMS on file
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {formError && (

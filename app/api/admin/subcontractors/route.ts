@@ -1,17 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
-/**
- * GET /api/admin/subcontractors
- *   Returns all subcontractors on admin's company, with active/inactive status
- *   and count of open assignments.
- *
- * POST /api/admin/subcontractors
- *   Create a new subcontractor.
- *   Body: { name, contact_name?, contact_phone?, contact_email?, address?,
- *           rate_type, rate_amount?, notes?, active? }
- */
-
 const RATE_TYPES = new Set(["hourly", "daily", "weekly", "monthly", "per_job"])
 
 async function getCallingAdmin() {
@@ -43,7 +32,6 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Hydrate open assignment counts (one query, group in JS)
   const subIds = (subs || []).map((s: any) => s.id)
   let assignments: any[] = []
   if (subIds.length > 0) {
@@ -83,6 +71,15 @@ export async function POST(request: Request) {
     rate_amount,
     notes,
     active,
+    insurance_provider,
+    insurance_policy_no,
+    insurance_expiry,
+    liability_cover_amount,
+    vat_number,
+    utr_number,
+    cis_registered,
+    rams_on_file,
+    portal_enabled,
   } = body
 
   if (!name || typeof name !== "string" || !name.trim()) {
@@ -100,6 +97,14 @@ export async function POST(request: Request) {
     }
   }
 
+  let liabilityNum: number | null = null
+  if (liability_cover_amount !== undefined && liability_cover_amount !== null && liability_cover_amount !== "") {
+    liabilityNum = parseFloat(liability_cover_amount)
+    if (isNaN(liabilityNum) || liabilityNum < 0) {
+      return NextResponse.json({ error: "Invalid liability_cover_amount" }, { status: 400 })
+    }
+  }
+
   const service = await createServiceClient()
   const { data, error } = await service
     .from("subcontractors")
@@ -114,6 +119,15 @@ export async function POST(request: Request) {
       rate_amount: rateAmountNum,
       notes: notes || null,
       active: active !== false,
+      insurance_provider: insurance_provider || null,
+      insurance_policy_no: insurance_policy_no || null,
+      insurance_expiry: insurance_expiry || null,
+      liability_cover_amount: liabilityNum,
+      vat_number: vat_number || null,
+      utr_number: utr_number || null,
+      cis_registered: !!cis_registered,
+      rams_on_file: !!rams_on_file,
+      portal_enabled: !!portal_enabled,
       created_by: admin.id,
     })
     .select()

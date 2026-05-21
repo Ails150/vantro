@@ -1,15 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
-/**
- * GET    /api/admin/subcontractors/[id] - fetch one
- * PATCH  /api/admin/subcontractors/[id] - update fields
- * DELETE /api/admin/subcontractors/[id] - soft delete (set active=false)
- *
- * Hard delete intentionally not exposed; subcontractors have historical
- * data attached (assignments, signins via crew leads) so soft delete only.
- */
-
 const RATE_TYPES = new Set(["hourly", "daily", "weekly", "monthly", "per_job"])
 
 async function getCallingAdmin() {
@@ -95,10 +86,23 @@ export async function PATCH(request: Request, { params }: Params) {
       update.rate_amount = num
     }
   }
-  for (const k of ["contact_name", "contact_phone", "contact_email", "address", "notes"]) {
+  if (body.liability_cover_amount !== undefined) {
+    if (body.liability_cover_amount === null || body.liability_cover_amount === "") {
+      update.liability_cover_amount = null
+    } else {
+      const num = parseFloat(body.liability_cover_amount)
+      if (isNaN(num) || num < 0) {
+        return NextResponse.json({ error: "Invalid liability_cover_amount" }, { status: 400 })
+      }
+      update.liability_cover_amount = num
+    }
+  }
+  for (const k of ["contact_name", "contact_phone", "contact_email", "address", "notes", "insurance_provider", "insurance_policy_no", "insurance_expiry", "vat_number", "utr_number"]) {
     if (body[k] !== undefined) update[k] = body[k] || null
   }
-  if (body.active !== undefined) update.active = !!body.active
+  for (const k of ["active", "cis_registered", "rams_on_file", "portal_enabled"]) {
+    if (body[k] !== undefined) update[k] = !!body[k]
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 })
@@ -137,7 +141,6 @@ export async function DELETE(_: Request, { params }: Params) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  // Soft delete - set active=false. Hard delete would lose history.
   const { error } = await service
     .from("subcontractors")
     .update({ active: false })
