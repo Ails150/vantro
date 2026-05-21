@@ -19,11 +19,11 @@ interface ComplianceData {
 }
 
 const DOCS = [
-  { file: "Vantro_Privacy_Policy.docx", title: "Privacy Policy", desc: "Our full privacy policy under UK GDPR." },
-  { file: "Vantro_Data_Processing_Agreement.docx", title: "Data Processing Agreement", desc: "DPA naming you as Controller and Vantro as Processor." },
-  { file: "Vantro_GPS_Tracking_Explainer.docx", title: "GPS Tracking Explainer", desc: "For installers. Plain English on how tracking works." },
-  { file: "Vantro_Installer_HowTo_Guide.docx", title: "Installer How-To Guide", desc: "One-page practical walkthrough." },
-  { file: "Vantro_GDPR_QuickRef_for_Andy.docx", title: "GDPR Quick-Reference", desc: "Talking points for managers briefing the team." },
+  { file: "Vantro_Privacy_Policy.pdf", title: "Privacy Policy", desc: "Our full privacy policy under UK GDPR." },
+  { file: "Vantro_Data_Processing_Agreement.pdf", title: "Data Processing Agreement", desc: "DPA naming you as Controller and Vantro as Processor." },
+  { file: "Vantro_GPS_Tracking_Explainer.pdf", title: "GPS Tracking Explainer", desc: "For installers. Plain English on how tracking works." },
+  { file: "Vantro_Installer_HowTo_Guide.pdf", title: "Installer How-To Guide", desc: "One-page practical walkthrough." },
+  { file: "Vantro_GDPR_QuickRef_for_Andy.pdf", title: "GDPR Quick-Reference", desc: "Talking points for managers briefing the team." },
 ]
 
 const SUB_PROCESSORS: Array<[string, string, string]> = [
@@ -149,9 +149,7 @@ export default function ComplianceModal({ open, onClose }: Props) {
                 {DOCS.map((doc) => (
                   <a
                     key={doc.file}
-                    href={"/legal/" + doc.file}
-                    download
-                    className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl hover:border-teal-300 hover:bg-teal-50/30 transition-colors"
+                    href={"/legal/" + doc.file} target="_blank" rel="noopener" className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl hover:border-teal-300 hover:bg-teal-50/30 transition-colors"
                   >
                     <div className="text-teal-600 text-base mt-0.5">⤓</div>
                     <div className="flex-1 min-w-0">
