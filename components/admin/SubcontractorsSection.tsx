@@ -319,6 +319,11 @@ function SubDetail({ sub, onBack, onEdit }: { sub: Subcontractor; onBack: () => 
   const [crewEmail, setCrewEmail] = useState("")
   const [crewSaving, setCrewSaving] = useState(false)
   const [crewError, setCrewError] = useState("")
+  const [showCsvImport, setShowCsvImport] = useState(false)
+  const [csvRows, setCsvRows] = useState<Array<{name: string; email: string}>>([])
+  const [csvImporting, setCsvImporting] = useState(false)
+  const [csvResult, setCsvResult] = useState<{added: number; failed: Array<{email: string; reason: string}>} | null>(null)
+  const [csvError, setCsvError] = useState("")
 
   async function loadCrew() {
     setLoadingCrew(true)
@@ -347,6 +352,64 @@ function SubDetail({ sub, onBack, onEdit }: { sub: Subcontractor; onBack: () => 
       await loadCrew()
     } catch (e) { setCrewError("Network error") }
     setCrewSaving(false)
+  }
+
+  function handleCsvFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCsvError("")
+    setCsvResult(null)
+    const reader = new FileReader()
+    reader.onload = ev => {
+      try {
+        const text = String(ev.target?.result || "")
+        const lines = text.split(/\r?\n/).filter(l => l.trim())
+        if (lines.length < 2) { setCsvError("File needs a header row + at least one data row"); return }
+        // Detect header
+        const header = lines[0].toLowerCase().split(",").map(h => h.trim())
+        const nameIdx = header.findIndex(h => h === "name" || h === "full name")
+        const emailIdx = header.findIndex(h => h === "email" || h === "email address")
+        if (nameIdx === -1 || emailIdx === -1) { setCsvError("CSV needs columns named 'name' and 'email'"); return }
+
+        const rows: Array<{name: string; email: string}> = []
+        for (let i = 1; i < lines.length; i++) {
+          const cols = lines[i].split(",").map(c => c.trim())
+          const name = cols[nameIdx] || ""
+          const email = cols[emailIdx] || ""
+          if (name && email) rows.push({ name, email: email.toLowerCase() })
+        }
+        if (rows.length === 0) { setCsvError("No valid rows found in CSV"); return }
+        setCsvRows(rows)
+      } catch (err) {
+        setCsvError("Could not read file")
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  async function runCsvImport() {
+    if (csvRows.length === 0) return
+    setCsvImporting(true); setCsvError("")
+    try {
+      const res = await fetch(`/api/admin/subcontractors/${sub.id}/crew/bulk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: csvRows }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCsvError(data.error || "Import failed"); setCsvImporting(false); return }
+      setCsvResult({ added: data.added || 0, failed: data.failed || [] })
+      setCsvRows([])
+      await loadCrew()
+    } catch (e) { setCsvError("Network error") }
+    setCsvImporting(false)
+  }
+
+  function closeCsvImport() {
+    setShowCsvImport(false)
+    setCsvRows([])
+    setCsvResult(null)
+    setCsvError("")
   }
 
   return (
@@ -392,7 +455,10 @@ function SubDetail({ sub, onBack, onEdit }: { sub: Subcontractor; onBack: () => 
             <span className="text-sm text-gray-500 ml-2">{crew.length} {crew.length === 1 ? "person" : "people"}</span>
           </div>
           {sub.portal_enabled ? (
-            <button onClick={() => { setShowAddCrew(true); setCrewError("") }} className="px-4 py-2 bg-teal-400 hover:bg-teal-500 text-white text-sm font-semibold rounded-xl">+ Add crew member</button>
+            <div className="flex gap-2">
+              <button onClick={() => { setShowCsvImport(true); setCsvError("") }} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl">Import CSV</button>
+              <button onClick={() => { setShowAddCrew(true); setCrewError("") }} className="px-4 py-2 bg-teal-400 hover:bg-teal-500 text-white text-sm font-semibold rounded-xl">+ Add crew member</button>
+            </div>
           ) : (
             <span className="text-xs text-gray-400">Enable Crew portal access to add members</span>
           )}
@@ -409,6 +475,61 @@ function SubDetail({ sub, onBack, onEdit }: { sub: Subcontractor; onBack: () => 
               <button onClick={addCrewMember} disabled={crewSaving} className="px-4 py-2 bg-teal-400 hover:bg-teal-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50">{crewSaving ? "Saving..." : "Save and send invite"}</button>
               <button onClick={() => { setShowAddCrew(false); setCrewName(""); setCrewEmail(""); setCrewError("") }} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl">Cancel</button>
             </div>
+          </div>
+        )}
+
+        {showCsvImport && (
+          <div className="p-6 bg-blue-50/50 border-b border-gray-100 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Import crew for {sub.name}</h3>
+              <button onClick={closeCsvImport} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            {!csvResult && csvRows.length === 0 && (
+              <>
+                <p className="text-xs text-gray-600">CSV file with two columns: <code className="bg-gray-100 px-1 rounded">name</code> and <code className="bg-gray-100 px-1 rounded">email</code>. First row must be the header.</p>
+                <input type="file" accept=".csv,text/csv" onChange={handleCsvFile} className="block w-full text-sm text-gray-700 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100"/>
+                <p className="text-xs text-gray-400">Each person will receive an email invite with app download links and a PIN setup link.</p>
+              </>
+            )}
+            {csvRows.length > 0 && !csvResult && (
+              <>
+                <p className="text-sm">Found <strong>{csvRows.length}</strong> people to invite as crew for {sub.name}.</p>
+                <div className="max-h-40 overflow-y-auto bg-white rounded-lg border border-gray-200 text-xs">
+                  {csvRows.slice(0, 50).map((r, i) => (
+                    <div key={i} className="flex justify-between px-3 py-1 border-b border-gray-50 last:border-0">
+                      <span>{r.name}</span>
+                      <span className="text-gray-500">{r.email}</span>
+                    </div>
+                  ))}
+                  {csvRows.length > 50 && <div className="px-3 py-1 text-gray-400 italic">… and {csvRows.length - 50} more</div>}
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={runCsvImport} disabled={csvImporting} className="px-4 py-2 bg-teal-400 hover:bg-teal-500 text-white text-sm font-semibold rounded-xl disabled:opacity-50">{csvImporting ? "Importing..." : `Import ${csvRows.length} crew & send invites`}</button>
+                  <button onClick={() => setCsvRows([])} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl">Pick different file</button>
+                </div>
+              </>
+            )}
+            {csvResult && (
+              <>
+                <div className="text-sm">
+                  <p className="text-emerald-700 font-semibold">{csvResult.added} crew member{csvResult.added !== 1 ? "s" : ""} added successfully.</p>
+                  {csvResult.failed.length > 0 && (
+                    <>
+                      <p className="text-red-700 font-semibold mt-2">{csvResult.failed.length} failed:</p>
+                      <div className="bg-white rounded-lg border border-red-100 mt-1 max-h-32 overflow-y-auto text-xs">
+                        {csvResult.failed.map((f, i) => (
+                          <div key={i} className="px-3 py-1 border-b border-gray-50 last:border-0">
+                            <span className="text-gray-700">{f.email}</span> — <span className="text-red-600">{f.reason}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+                <button onClick={closeCsvImport} className="px-4 py-2 bg-teal-400 hover:bg-teal-500 text-white text-sm font-semibold rounded-xl">Done</button>
+              </>
+            )}
+            {csvError && <p className="text-sm text-red-600">{csvError}</p>}
           </div>
         )}
 

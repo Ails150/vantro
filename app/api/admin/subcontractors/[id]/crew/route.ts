@@ -55,7 +55,7 @@ export async function POST(request: Request, { params }: Params) {
   const { data: existing } = await service.from("users").select("id").eq("email", email).maybeSingle()
   if (existing) return NextResponse.json({ error: "That email is already registered" }, { status: 400 })
 
-  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+  const initials = name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
 
   const { data: inserted, error } = await service.from("users").insert({
     company_id: admin.company_id,
