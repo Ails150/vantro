@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   if (!pin || pin.length !== 4) return NextResponse.json({ error: 'Invalid PIN' }, { status: 400 })
 
   const service = await createServiceClient()
-  const { data: users } = await service.from('users').select('id, name, company_id, pin_hash, pin_attempts, pin_locked_until, role, gps_tracking_acknowledged').eq('is_active', true).not('pin_hash', 'is', null)
+  const { data: users } = await service.from('users').select('id, name, company_id, subcontractor_id, pin_hash, pin_attempts, pin_locked_until, role, gps_tracking_acknowledged').eq('is_active', true).not('pin_hash', 'is', null)
   if (!users) return NextResponse.json({ error: 'Incorrect PIN' }, { status: 401 })
 
   let matchedUser = null
@@ -40,13 +40,14 @@ export async function POST(request: Request) {
 
   await service.from('users').update({ pin_attempts: 0, pin_locked_until: null }).eq('id', matchedUser.id)
 
-  const token = createInstallerToken(matchedUser.id, matchedUser.company_id)
+  const token = createInstallerToken(matchedUser.id, matchedUser.company_id, matchedUser.subcontractor_id || null)
 
   return NextResponse.json({
     token,
     userId: matchedUser.id,
     name: matchedUser.name,
     companyId: matchedUser.company_id,
+    subcontractorId: matchedUser.subcontractor_id || null,
     role: matchedUser.role,
     gpsAcknowledged: matchedUser.gps_tracking_acknowledged || false,
   })
