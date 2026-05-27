@@ -9,7 +9,7 @@
 
 import { NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { verifyInstallerToken } from "@/lib/auth"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 export const maxDuration = 60
@@ -74,18 +74,17 @@ function summarisePeriod(report: any) {
 }
 
 export async function POST(request: Request) {
-  // audit-guard-2026-05-19 - security hardening pass
-  let _installer
-  try {
-    _installer = await verifyInstallerToken(request)
-  } catch {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
-  if (!_installer) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  }
+  // audit-guard-2026-05-21 - admin auth (was installer, wrong for admin-only feature)
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  const service = await createServiceClient()
+  const { data: appUser } = await service.from("users").select("id, company_id, role").eq("auth_user_id", user.id).single()
+  if (!appUser) return NextResponse.json({ error: "User not found" }, { status: 403 })
+
   {
-    const _ok = await checkRateLimit(`iteration-narrative:user:${_installer.userId}`, 5, 3600)
+    const _ok = await checkRateLimit(`iteration-narrative:user:${appUser.id}`, 5, 3600)
     if (!_ok) {
       return NextResponse.json({ error: "Too many requests. Slow down." }, { status: 429 })
     }
