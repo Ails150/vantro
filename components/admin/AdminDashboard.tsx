@@ -237,7 +237,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           } catch {}
         }
         prevAlertCount.current = newAlerts.length
-        setLiveAlerts(newAlerts)
+        // Guard: never overwrite with an empty poll result (endpoint filter/auth drift would blank the tab)
+        if (newAlerts.length > 0) setLiveAlerts(newAlerts)
       }
     }, 30000)
     return () => clearInterval(interval)
