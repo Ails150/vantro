@@ -207,7 +207,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   useEffect(() => {
     const interval = setInterval(async () => {
-      const res = await fetch("/api/admin/alerts")
+      const res = await fetch("/api/admin/alerts?all=true")
       if (res.ok) {
         const data = await res.json()
         const newAlerts = data.alerts || []
