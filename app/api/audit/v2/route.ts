@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { createHash } from "crypto"
 
 type AnyRow = Record<string, any>
 
@@ -283,7 +284,39 @@ export async function POST(request: Request) {
   let execSummary: string | null = null
   let redFlags: any[] = []
 
-  if (aiAuditActive && process.env.GEMINI_API_KEY) {
+  // ===== AI CACHE (skip Gemini when the job data has not changed) =====
+  const regenerate = !!body.regenerate
+  const _maxTs = (arr: any[], f: string) => (arr || []).reduce((m: string, x: any) => (x && x[f] && x[f] > m ? x[f] : m), "")
+  const fingerprint = createHash("sha256").update(JSON.stringify({
+    status: job.status,
+    dlv: deliverables.map(d => [d.id, d.totalItems, d.completedItems, d.approvedItems, d.status]),
+    counts: [ (qaRaw || []).length, (diaryRaw || []).length, (defectsRaw || []).length, (signinsRaw || []).length ],
+    flags: [ blockers.length, issues.length, openDefects.length, progressiveSignoffs.length ],
+    finalSignoff: finalSignoff ? finalSignoff.at : null,
+    last: [ _maxTs(qaRaw, "created_at"), _maxTs(diaryRaw, "created_at"), _maxTs(defectsRaw, "created_at"), _maxTs(signinsRaw, "signed_in_at") ],
+  })).digest("hex")
+  const cacheKey = `${jobId}:${from || ""}:${to || ""}:${view}`
+
+  let cacheHit = false
+  if (aiAuditActive && !regenerate) {
+    try {
+      const { data: cached } = await service.from("audit_ai_cache")
+        .select("fingerprint, exec_summary, red_flags, deliverable_narratives")
+        .eq("job_id", jobId).eq("cache_key", cacheKey).maybeSingle()
+      if (cached && cached.fingerprint === fingerprint) {
+        execSummary = cached.exec_summary || null
+        redFlags = cached.red_flags || []
+        const narr = cached.deliverable_narratives || {}
+        for (const dlv of deliverables) { if (narr[dlv.id]) dlv.aiNarrative = narr[dlv.id] }
+        cacheHit = true
+        console.log("[audit/v2] AI cache HIT - skipped Gemini")
+      }
+    } catch (e: any) {
+      console.error("[audit/v2] cache read failed (will regenerate):", e?.message)
+    }
+  }
+
+  if (aiAuditActive && process.env.GEMINI_API_KEY && !cacheHit) {
     console.log("[audit/v2] Starting AI generation, key length:", process.env.GEMINI_API_KEY?.length)
     try {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
@@ -348,6 +381,24 @@ Return only the sentence, no JSON, no quotes, no preamble.`
       for (const nr of narrativeResults) {
         const dlv = deliverables.find(d => d.id === nr.id)
         if (dlv) dlv.aiNarrative = nr.narrative
+      }
+
+      // Save to cache so re-opening / re-actioning an unchanged job costs nothing
+      try {
+        const narrToSave: Record<string, any> = {}
+        for (const dlv of deliverables) { if (dlv.aiNarrative) narrToSave[dlv.id] = dlv.aiNarrative }
+        await service.from("audit_ai_cache").upsert({
+          job_id: jobId,
+          company_id: companyId,
+          cache_key: cacheKey,
+          fingerprint,
+          exec_summary: execSummary,
+          red_flags: redFlags,
+          deliverable_narratives: narrToSave,
+          generated_at: new Date().toISOString(),
+        }, { onConflict: "job_id,cache_key" })
+      } catch (e: any) {
+        console.error("[audit/v2] cache write failed (non-fatal):", e?.message)
       }
     } catch (err: any) {
       console.error("[audit/v2] AI generation failed:", err?.message, err?.stack)
