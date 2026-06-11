@@ -601,9 +601,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
     if (error) { setFormError(error.message); setSaving(false); return }
-    await supabase.from("job_checklists").delete().eq("job_id", jobId)
+    const { error: delErr } = await supabase.from("job_checklists").delete().eq("job_id", jobId)
+    if (delErr) { setFormError("Couldn't update checklists: " + delErr.message); setSaving(false); return }
     if (editJobTemplateIds.length > 0) {
-      await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid })))
+      const { error: insErr } = await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid })))
+      if (insErr) { setFormError("Couldn't save checklists: " + insErr.message); setSaving(false); return }
     }
     setEditingJobId(null); setSaving(false); setEditJobRequiredTrades([])
     window.location.reload()
