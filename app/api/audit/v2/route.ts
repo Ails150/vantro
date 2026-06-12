@@ -176,7 +176,7 @@ export async function POST(request: Request) {
   // Compute deliverable stats + status
   for (const dlv of Object.values(deliverablesMap)) {
     dlv.totalItems = dlv.items.length
-    dlv.completedItems = dlv.items.filter(i => ["approved", "submitted", "pass", "fail", "na"].includes(i.state)).length
+    dlv.completedItems = dlv.items.filter(i => i.state === "approved" || i.state === "submitted" || i.state === "pass" || i.state === "fail" || i.state === "na").length
     dlv.approvedItems = dlv.items.filter(i => i.state === "approved").length
     if (dlv.approvedItems === dlv.totalItems && dlv.totalItems > 0) dlv.status = "completed"
     else if (dlv.completedItems > 0) dlv.status = "in_progress"
@@ -286,7 +286,7 @@ export async function POST(request: Request) {
 
   // ===== AI CACHE (skip Gemini when the job data has not changed) =====
   const regenerate = !!body.regenerate
-  const _maxTs = (arr: any[], f: string) => (arr || []).reduce((m: string, x: any) => (x && x[f] && x[f] > m ? x[f] : m), "")
+  const _maxTs = (arr: any[] | null, f: string) => (arr || []).reduce((m: string, x: any) => (x && x[f] && x[f] > m ? x[f] : m), "")
   const fingerprint = createHash("sha256").update(JSON.stringify({
     status: job.status,
     dlv: deliverables.map(d => [d.id, d.totalItems, d.completedItems, d.approvedItems, d.status]),
