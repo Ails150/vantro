@@ -47,21 +47,24 @@ export async function POST(request: Request) {
   const { data: existing } = await service.from('qa_submissions').select('id')
     .eq('job_id', jobId).eq('user_id', installer.userId).eq('checklist_item_id', itemId).maybeSingle()
 
-  if (existing) {
-    await service.from('qa_submissions').update({
-      state, notes, template_id: templateId,
-      photo_url: photoUrl || null, photo_path: photoPath || null,
-      video_url: videoUrl || null, video_path: videoPath || null,
-      submitted_at: new Date().toISOString()
-    }).eq('id', existing.id)
-  } else {
-    await service.from('qa_submissions').insert({
-      job_id: jobId, user_id: installer.userId, company_id: job.company_id,
-      checklist_item_id: itemId, template_id: templateId,
-      state, notes,
-      photo_url: photoUrl || null, photo_path: photoPath || null,
-      video_url: videoUrl || null, video_path: videoPath || null
-    })
+  const { error } = existing
+    ? await service.from('qa_submissions').update({
+        state, notes, template_id: templateId,
+        photo_url: photoUrl || null, photo_path: photoPath || null,
+        video_url: videoUrl || null, video_path: videoPath || null,
+        submitted_at: new Date().toISOString()
+      }).eq('id', existing.id)
+    : await service.from('qa_submissions').insert({
+        job_id: jobId, user_id: installer.userId, company_id: job.company_id,
+        checklist_item_id: itemId, template_id: templateId,
+        state, notes,
+        photo_url: photoUrl || null, photo_path: photoPath || null,
+        video_url: videoUrl || null, video_path: videoPath || null
+      })
+
+  if (error) {
+    console.error('[api/qa POST] save failed:', error)
+    return NextResponse.json({ error: error.message }, { status: 400 })
   }
 
   return NextResponse.json({ success: true })

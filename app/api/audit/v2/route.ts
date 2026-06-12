@@ -176,7 +176,7 @@ export async function POST(request: Request) {
   // Compute deliverable stats + status
   for (const dlv of Object.values(deliverablesMap)) {
     dlv.totalItems = dlv.items.length
-    dlv.completedItems = dlv.items.filter(i => i.state === "approved" || i.state === "submitted").length
+    dlv.completedItems = dlv.items.filter(i => ["approved", "submitted", "pass", "fail", "na"].includes(i.state)).length
     dlv.approvedItems = dlv.items.filter(i => i.state === "approved").length
     if (dlv.approvedItems === dlv.totalItems && dlv.totalItems > 0) dlv.status = "completed"
     else if (dlv.completedItems > 0) dlv.status = "in_progress"

@@ -31,6 +31,9 @@ export default function InstallerJobsPage() {
   const [qaUploading, setQaUploading] = useState<Record<string, boolean>>({})
   const [qaVideos, setQaVideos] = useState<Record<string, File|null>>({})
   const [qaVideoPreview, setQaVideoPreview] = useState<Record<string, string>>({})
+  const [qaExpanded, setQaExpanded] = useState<Record<string, boolean>>({})
+  const [qaNaMode, setQaNaMode] = useState<Record<string, boolean>>({})
+  const [qaNaReason, setQaNaReason] = useState<Record<string, string>>({})
   const [signInTime, setSignInTime] = useState<Date|null>(null)
   const [lastActivity, setLastActivity] = useState<Date>(new Date())
   const [elapsed, setElapsed] = useState("")
@@ -256,6 +259,24 @@ export default function InstallerJobsPage() {
     })
   }
 
+  async function submitQANa(itemId: string) {
+    const reason = (qaNaReason[itemId] || '').trim()
+    if (!reason || !activeJob) return
+    const token = localStorage.getItem('vantro_installer_token')
+    await fetch('/api/qa', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ jobId: activeJob.id, itemId, state: 'na', notes: reason })
+    })
+    setQaSubmissions(prev => {
+      const existing = prev.find((s: any) => s.checklist_item_id === itemId)
+      if (existing) return prev.map((s: any) => s.checklist_item_id === itemId ? { ...s, state: 'na', notes: reason } : s)
+      return [...prev, { checklist_item_id: itemId, state: 'na', notes: reason }]
+    })
+    setQaNaMode(m => ({ ...m, [itemId]: false }))
+    setQaExpanded(e => ({ ...e, [itemId]: false }))
+  }
+
   async function uploadPhoto(itemId: string, file: File) {
     setQaUploading(prev => ({...prev, [itemId]: true}))
     const preview = URL.createObjectURL(file)
@@ -358,10 +379,10 @@ export default function InstallerJobsPage() {
       )}
 
       {activeJob && (gpsStatus === 'confirmed' || activeJob.signed_in) && (
-        <div className="flex gap-0 border-b border-white/5 px-4 mt-4">
+        <div className="flex border-b border-white/5 px-4 mt-4">
           {['jobs','diary','qa'].map(t => (
             <button key={t} onClick={() => setView(t as any)}
-              className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize ${view === t ? 'border-[#00d4a0] text-[#00d4a0]' : 'border-transparent text-[#4d6478]'}`}>
+              className={`flex-1 px-2 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize text-center ${view === t ? 'border-[#00d4a0] text-[#00d4a0]' : 'border-transparent text-[#4d6478]'}`}>
               {t === 'qa' ? 'QA' : t}
             </button>
           ))}
@@ -472,7 +493,14 @@ export default function InstallerJobsPage() {
           </div>
         )}
 
-        {view === 'qa' && activeJob && (
+        {view === 'qa' && activeJob && (() => {
+          const isDone = (it: any) => { const s = qaSubmissions.find((x: any) => x.checklist_item_id === it.id)?.state; return !!s && s !== 'pending' }
+          const total = qaItems.length
+          const completed = qaItems.filter(isDone).length
+          const remaining = total - completed
+          const allDone = total > 0 && remaining === 0
+          const pct = total ? Math.round((completed / total) * 100) : 0
+          return (
           <div>
             <div className="flex items-center gap-2 mb-4">
               <button onClick={() => setView('jobs')} className="text-[#4d6478]">
@@ -488,67 +516,132 @@ export default function InstallerJobsPage() {
                 <div className="text-[#4d6478] text-xs mt-1">Ask your manager to add one.</div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {qaItems.map((item: any) => {
-                  const sub = qaSubmissions.find((s: any) => s.checklist_item_id === item.id)
-                  const state = sub?.state || 'pending'
-                  return (
-                    <div key={item.id} className="bg-[#1a2635] border border-white/5 rounded-xl p-4">
-                      <div className="flex items-start justify-between gap-3 mb-3">
-                        <div className="flex-1">
-                          <div className="text-sm font-medium">{item.label}</div>
-                          <div className="flex gap-2 mt-1 flex-wrap">
-                            {item.is_mandatory && <span className="text-xs text-red-400">Mandatory</span>}
-                            {item.requires_photo && <span className="text-xs text-blue-400">Photo required</span>}
-                            {item.item_type !== 'tick' && <span className="text-xs text-[#4d6478] capitalize">{item.item_type.replace('_', ' ')}</span>}
+              <>
+                <div className="sticky top-0 z-20 -mx-4 px-4 py-3 bg-[#0f1923] border-b border-white/5">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">{completed} of {total} complete</span>
+                    <span className="text-xs text-[#4d6478]">{pct}%</span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div className="h-full bg-[#00d4a0] transition-all" style={{ width: pct + '%' }}/>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-3 pb-28">
+                  {qaItems.map((item: any) => {
+                    const sub = qaSubmissions.find((s: any) => s.checklist_item_id === item.id)
+                    const state = sub?.state || 'pending'
+                    const open = qaExpanded[item.id] ?? (state === 'pending')
+                    const locked = state === 'approved'
+                    const chip = state === 'approved'
+                      ? { t: 'Approved', c: 'bg-[#00d4a0]/15 text-[#00d4a0]' }
+                      : state === 'rejected'
+                      ? { t: 'Rejected', c: 'bg-red-400/10 text-red-400' }
+                      : state === 'na'
+                      ? { t: 'N/A', c: 'bg-amber-400/10 text-amber-400' }
+                      : (state === 'pass' || state === 'submitted')
+                        ? { t: state === 'pass' ? 'Pass' : 'Done', c: 'bg-[#00d4a0]/10 text-[#00d4a0]' }
+                        : state === 'fail'
+                          ? { t: 'Fail', c: 'bg-red-400/10 text-red-400' }
+                          : { t: 'Pending', c: 'bg-white/5 text-[#4d6478]' }
+                    return (
+                      <div key={item.id} className="bg-[#1a2635] border border-white/5 rounded-xl overflow-hidden">
+                        <button onClick={() => setQaExpanded(e => ({ ...e, [item.id]: !open }))}
+                          className="w-full flex items-start justify-between gap-3 p-4 text-left">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium">{item.label}</div>
+                            {!open && item.is_mandatory && state === 'pending' && <div className="text-xs text-red-400 mt-1">Mandatory</div>}
                           </div>
-                        </div>
-                        <span className={"text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 " + (state === 'pass' || state === 'submitted' ? 'bg-[#00d4a0]/10 text-[#00d4a0]' : state === 'fail' ? 'bg-red-400/10 text-red-400' : 'bg-white/5 text-[#4d6478]')}>
-                          {state === 'submitted' ? 'Done' : state === 'pass' ? 'Pass' : state === 'fail' ? 'Fail' : 'Pending'}
-                        </span>
+                          <span className={"text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 " + chip.c}>{chip.t}</span>
+                        </button>
+
+                        {open && (
+                          <div className="px-4 pb-4 space-y-2">
+                            <div className="flex gap-2 flex-wrap">
+                              {item.is_mandatory && <span className="text-xs text-red-400">Mandatory</span>}
+                              {item.requires_photo && <span className="text-xs text-blue-400">Photo required</span>}
+                              {item.item_type !== 'tick' && <span className="text-xs text-[#4d6478] capitalize">{item.item_type.replace('_', ' ')}</span>}
+                            </div>
+
+                            {locked ? (
+                              <div className="flex items-center gap-2 text-xs text-[#00d4a0] bg-[#00d4a0]/5 border border-[#00d4a0]/15 rounded-lg px-3 py-2">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="flex-shrink-0"><rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.5"/><path d="M8 11V7a4 4 0 018 0v4" stroke="currentColor" strokeWidth="1.5"/></svg>
+                                Approved by admin — locked
+                              </div>
+                            ) : (<>
+                            {item.item_type === 'tick' && (
+                              <button onClick={() => submitQAItem(item.id, 'submitted')} className="w-full bg-[#00d4a0]/10 text-[#00d4a0] border border-[#00d4a0]/20 rounded-lg py-2 text-sm font-medium">Mark complete</button>
+                            )}
+                            {item.item_type === 'pass_fail' && (
+                              <div className="flex gap-2">
+                                <button onClick={() => submitQAItem(item.id, 'pass')} className="flex-1 bg-[#00d4a0]/10 text-[#00d4a0] border border-[#00d4a0]/20 rounded-lg py-2 text-sm font-medium">Pass</button>
+                                <button onClick={() => submitQAItem(item.id, 'fail')} className="flex-1 bg-red-400/10 text-red-400 border border-red-400/20 rounded-lg py-2 text-sm font-medium">Fail</button>
+                              </div>
+                            )}
+                            {item.item_type === 'measurement' && (
+                              <div className="flex gap-2">
+                                <input value={qaNote[item.id] || ''} onChange={e => setQaNote(n => ({...n, [item.id]: e.target.value}))} placeholder="Enter measurement" className="flex-1 bg-[#243040] border border-white/5 rounded-lg px-3 py-2 text-sm text-white placeholder-[#4d6478] focus:outline-none"/>
+                                <button onClick={() => submitQAItem(item.id, 'submitted')} className="bg-[#00d4a0] text-[#0f1923] rounded-lg px-4 py-2 text-sm font-semibold">Submit</button>
+                              </div>
+                            )}
+                            {(item.item_type === 'photo' || item.requires_photo || item.requires_video) && (
+                              <div className="space-y-2">
+                                {qaPhotoPreview[item.id] && <img src={qaPhotoPreview[item.id]} alt="Preview" className="w-full h-40 object-cover rounded-lg"/>}
+                                <label className="w-full flex items-center justify-center gap-2 bg-[#243040] border border-white/5 rounded-lg py-3 text-sm text-[#00d4a0] cursor-pointer">
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="currentColor" strokeWidth="1.5"/><circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="1.5"/></svg>
+                                  {qaPhotos[item.id] ? 'Change photo' : 'Take photo / Upload'}
+                                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => e.target.files?.[0] && uploadPhoto(item.id, e.target.files[0])}/>
+                                </label>
+                                <button onClick={() => submitQAItemWithPhoto(item.id, 'submitted')} disabled={!qaPhotos[item.id] || qaUploading[item.id]}
+                                  className="w-full bg-[#00d4a0] disabled:opacity-40 text-[#0f1923] rounded-lg py-2 text-sm font-semibold">
+                                  {qaUploading[item.id] ? 'Uploading...' : 'Submit with photo'}
+                                </button>
+                              </div>
+                            )}
+                            {item.fail_note_required && state === 'fail' && (
+                              <div className="flex gap-2">
+                                <input value={qaNote[item.id] || ''} onChange={e => setQaNote(n => ({...n, [item.id]: e.target.value}))} placeholder="Note required on fail" className="flex-1 bg-[#243040] border border-white/5 rounded-lg px-3 py-2 text-sm text-white placeholder-[#4d6478] focus:outline-none"/>
+                                <button onClick={() => submitQAItemWithPhoto(item.id, 'fail')} className="bg-red-500 text-white rounded-lg px-4 py-2 text-sm font-semibold">Submit</button>
+                              </div>
+                            )}
+
+                            {!qaNaMode[item.id] ? (
+                              <button onClick={() => setQaNaMode(m => ({ ...m, [item.id]: true }))}
+                                className="w-full bg-white/5 text-[#8fa3b8] border border-white/10 rounded-lg py-2 text-xs font-medium">
+                                Mark not applicable (N/A)
+                              </button>
+                            ) : (
+                              <div className="space-y-2 bg-[#243040] border border-white/5 rounded-lg p-2">
+                                <input value={qaNaReason[item.id] || ''} onChange={e => setQaNaReason(r => ({ ...r, [item.id]: e.target.value }))}
+                                  placeholder="Reason required for N/A" className="w-full bg-[#1a2635] border border-white/5 rounded-lg px-3 py-2 text-sm text-white placeholder-[#4d6478] focus:outline-none"/>
+                                <div className="flex gap-2">
+                                  <button onClick={() => setQaNaMode(m => ({ ...m, [item.id]: false }))} className="flex-1 text-xs text-[#4d6478] py-2">Cancel</button>
+                                  <button onClick={() => submitQANa(item.id)} disabled={!(qaNaReason[item.id] || '').trim()}
+                                    className="flex-1 bg-amber-400/10 text-amber-400 border border-amber-400/20 disabled:opacity-40 rounded-lg py-2 text-xs font-semibold">Save N/A</button>
+                                </div>
+                              </div>
+                            )}
+                            </>)}
+
+                            {state === 'na' && sub?.notes && <div className="text-xs text-amber-400/80">N/A: {sub.notes}</div>}
+                          </div>
+                        )}
                       </div>
-                      {item.item_type === 'tick' && state === 'pending' && (
-                        <button onClick={() => submitQAItem(item.id, 'submitted')} className="w-full bg-[#00d4a0]/10 text-[#00d4a0] border border-[#00d4a0]/20 rounded-lg py-2 text-sm font-medium">Mark complete</button>
-                      )}
-                      {item.item_type === 'pass_fail' && state === 'pending' && (
-                        <div className="flex gap-2">
-                          <button onClick={() => submitQAItem(item.id, 'pass')} className="flex-1 bg-[#00d4a0]/10 text-[#00d4a0] border border-[#00d4a0]/20 rounded-lg py-2 text-sm font-medium">Pass</button>
-                          <button onClick={() => submitQAItem(item.id, 'fail')} className="flex-1 bg-red-400/10 text-red-400 border border-red-400/20 rounded-lg py-2 text-sm font-medium">Fail</button>
-                        </div>
-                      )}
-                      {item.item_type === 'measurement' && state === 'pending' && (
-                        <div className="flex gap-2">
-                          <input value={qaNote[item.id] || ''} onChange={e => setQaNote(n => ({...n, [item.id]: e.target.value}))} placeholder="Enter measurement" className="flex-1 bg-[#243040] border border-white/5 rounded-lg px-3 py-2 text-sm text-white placeholder-[#4d6478] focus:outline-none"/>
-                          <button onClick={() => submitQAItem(item.id, 'submitted')} className="bg-[#00d4a0] text-[#0f1923] rounded-lg px-4 py-2 text-sm font-semibold">Submit</button>
-                        </div>
-                      )}
-                      {(item.item_type === 'photo' || item.requires_photo || item.requires_video) && state === 'pending' && (
-                        <div className="mt-2 space-y-2">
-                          {qaPhotoPreview[item.id] && <img src={qaPhotoPreview[item.id]} alt="Preview" className="w-full h-40 object-cover rounded-lg"/>}
-                          <label className="w-full flex items-center justify-center gap-2 bg-[#243040] border border-white/5 rounded-lg py-3 text-sm text-[#00d4a0] cursor-pointer">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="currentColor" strokeWidth="1.5"/><circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="1.5"/></svg>
-                            {qaPhotos[item.id] ? 'Change photo' : 'Take photo / Upload'}
-                            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => e.target.files?.[0] && uploadPhoto(item.id, e.target.files[0])}/>
-                          </label>
-                          <button onClick={() => submitQAItemWithPhoto(item.id, 'submitted')} disabled={!qaPhotos[item.id] || qaUploading[item.id]}
-                            className="w-full bg-[#00d4a0] disabled:opacity-40 text-[#0f1923] rounded-lg py-2 text-sm font-semibold">
-                            {qaUploading[item.id] ? 'Uploading...' : 'Submit with photo'}
-                          </button>
-                        </div>
-                      )}
-                      {item.fail_note_required && state === 'fail' && (
-                        <div className="mt-2 flex gap-2">
-                          <input value={qaNote[item.id] || ''} onChange={e => setQaNote(n => ({...n, [item.id]: e.target.value}))} placeholder="Note required on fail" className="flex-1 bg-[#243040] border border-white/5 rounded-lg px-3 py-2 text-sm text-white placeholder-[#4d6478] focus:outline-none"/>
-                          <button onClick={() => submitQAItemWithPhoto(item.id, 'fail')} className="bg-red-500 text-white rounded-lg px-4 py-2 text-sm font-semibold">Submit</button>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+
+                <div className="fixed bottom-0 left-0 right-0 bg-[#0f1923]/95 backdrop-blur border-t border-white/5 p-4">
+                  <button onClick={submitQAForApproval} disabled={!allDone}
+                    className="w-full bg-[#00d4a0] disabled:opacity-40 disabled:cursor-not-allowed text-[#0f1923] font-semibold rounded-lg py-3 text-sm transition-colors">
+                    {allDone ? 'Mark complete' : `Mark complete · ${remaining} remaining`}
+                  </button>
+                </div>
+              </>
             )}
           </div>
-        )}
+          )
+        })()}
 
       </div>
     </div>
