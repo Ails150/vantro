@@ -1,4 +1,4 @@
-// Shared notification engine used by both /api/notifications/cron (real run)
+﻿// Shared notification engine used by both /api/notifications/cron (real run)
 // and /api/notifications/cron-debug (dry run).
 //
 // The only difference between the two is `dryRun`: when true, the engine
@@ -312,20 +312,9 @@ export async function runNotificationEngine(
             .order("logged_at", { ascending: false })
             .limit(100)
 
-          const lastOnSite = (breadcrumbs || []).find((b: any) => {
-            const dist = distanceMetres(b.lat, b.lng, job.lat, job.lng)
-            return dist <= 150
-          })
-          if (lastOnSite) {
-            // Industry standard: pay for actual time on site.
-            // Use last on-site GPS point regardless of whether it is before
-            // or after the scheduled finish - this protects installer pay
-            // (no lost overtime) and prevents overpayment if they left early.
-            // Always flagged so admin reviews and approves payroll.
-            const lastOnSiteTime = new Date(lastOnSite.logged_at)
-            closeAt = lastOnSiteTime
-            closeReason = "auto_last_onsite"
-          }
+          // GPS breadcrumbs are for admin visibility only.
+          // Auto-close always uses scheduled sign-out time.
+          // Admin reviews the GPS trail and adjusts hours if needed.
         }
 
         const hoursWorked = Math.max(
@@ -361,3 +350,4 @@ export async function runNotificationEngine(
 
   return result
 }
+
