@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { verifyInstallerToken } from '@/lib/auth'
 
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const installer = verifyInstallerToken(request)
   if (!installer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { lat, lng, accuracy } = await request.json()
+  const { lat, lng, accuracy, source } = await request.json()
   if (!lat || !lng) return NextResponse.json({ error: 'Missing coordinates' }, { status: 400 })
 
   const service = await createServiceClient()
@@ -87,6 +87,7 @@ export async function POST(request: Request) {
     accuracy_metres: accuracy ? Math.round(accuracy) : null,
     distance_from_site_metres: distanceFromSite,
     within_range: withinRange,
+    source: source ?? null,
   })
 
   if (insertErr) {
@@ -96,3 +97,4 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ success: true, distanceFromSite, withinRange })
 }
+
