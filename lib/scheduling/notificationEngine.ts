@@ -312,9 +312,22 @@ export async function runNotificationEngine(
             .order("logged_at", { ascending: false })
             .limit(100)
 
-          // GPS breadcrumbs are for admin visibility only.
-          // Auto-close always uses scheduled sign-out time.
-          // Admin reviews the GPS trail and adjusts hours if needed.
+          const lastOnSite = (breadcrumbs || []).find((b: any) => {
+            const dist = distanceMetres(b.lat, b.lng, job.lat, job.lng)
+            return dist <= 150
+          })
+          if (lastOnSite) {
+            const lastOnSiteTime = new Date(lastOnSite.logged_at)
+            const minsBeforeSignOut = (scheduledSignOutAt.getTime() - lastOnSiteTime.getTime()) / 60000
+            // Only use last on-site point as close time if it is within the
+            // final 2 hours of the shift. Earlier exits are lunch/parts runs
+            // and the installer will return. If they left in the last 2 hours
+            // and didnt sign out, close at last confirmed on-site time.
+            if (minsBeforeSignOut <= 120 && minsBeforeSignOut > 0) {
+              closeAt = lastOnSiteTime
+              closeReason = "auto_last_onsite"
+            }
+          }
         }
 
         const hoursWorked = Math.max(
