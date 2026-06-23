@@ -1,12 +1,12 @@
-﻿// lib/scheduling/resolver.ts
+// lib/scheduling/resolver.ts
 //
 // SINGLE SOURCE OF TRUTH for "is this installer working right now?"
 //
 // Resolution order (first match wins):
-//   1. Approved time off            â†’ not working, reason='time_off', type=...
-//   2. Public holiday (country)     â†’ not working, reason='public_holiday'
-//   3. User-specific shifts         â†’ working if matched, else not_working
-//   4. Company default_schedule     â†’ working if today's day enabled
+//   1. Approved time off            → not working, reason='time_off', type=...
+//   2. Public holiday (country)     → not working, reason='public_holiday'
+//   3. User-specific shifts         → working if matched, else not_working
+//   4. Company default_schedule     → working if today's day enabled
 //
 // Used by: /api/signin, compliance scoring, no-show alerts, admin dashboard.
 
@@ -63,7 +63,7 @@ export async function isInstallerWorking(
   const dayKey = DAY_KEYS[dayOfWeek]
   const timeStr = when.toTimeString().slice(0, 5) // "HH:MM"
 
-  // â”€â”€â”€ 1. Approved time off â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── 1. Approved time off ────────────────────────────────────────────
   const { data: timeOff } = await service
     .from("time_off_entries")
     .select("type, is_half_day, half_day_period")
@@ -75,7 +75,7 @@ export async function isInstallerWorking(
     .maybeSingle()
 
   if (timeOff) {
-    // Half-day handling: morning off â†’ still working PM, and vice versa
+    // Half-day handling: morning off → still working PM, and vice versa
     if (timeOff.is_half_day) {
       const hour = when.getHours()
       const isMorning = hour < 12
@@ -83,7 +83,7 @@ export async function isInstallerWorking(
         (timeOff.half_day_period === "am" && isMorning) ||
         (timeOff.half_day_period === "pm" && !isMorning)
       if (!offThisHalf) {
-        // The other half â€” fall through to shift/default resolution
+        // The other half — fall through to shift/default resolution
       } else {
         return {
           working: false,
@@ -100,7 +100,7 @@ export async function isInstallerWorking(
     }
   }
 
-  // â”€â”€â”€ 2. Public holiday (country-aware) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── 2. Public holiday (country-aware) ───────────────────────────────
   const { data: holiday } = await service
     .from("public_holidays")
     .select("name")
@@ -117,7 +117,7 @@ export async function isInstallerWorking(
     }
   }
 
-  // â”€â”€â”€ 3. User-specific shifts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── 3. User-specific shifts ─────────────────────────────────────────
   const { data: shifts } = await service
     .from("user_shifts")
     .select("shift_type, start_time, end_time, effective_from, effective_until")
@@ -153,7 +153,7 @@ export async function isInstallerWorking(
     }
   }
 
-  // â”€â”€â”€ 4. Company default schedule â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── 4. Company default schedule ─────────────────────────────────────
   const defaultSchedule = company.default_schedule || {}
   const todayDefault = defaultSchedule[dayKey]
 
@@ -161,14 +161,15 @@ export async function isInstallerWorking(
     return { working: false, reason: "day_off" }
   }
 
-  const start = todayDefault.start || null
-  const end = todayDefault.end || null
-  const inHours = start && end ? timeStr >= start && timeStr <= end : true
+  const start = todayDefault.start || "08:00"
+  const end = todayDefault.end || "17:00"
+  const inHours = timeStr >= start && timeStr <= end
+
   return {
     working: inHours,
     reason: inHours ? "company_default" : "outside_hours",
-    expectedSignIn: start ?? null,
-    expectedSignOut: end ?? null,
+    expectedSignIn: start,
+    expectedSignOut: end,
   }
 }
 
@@ -206,5 +207,3 @@ export async function shouldEnforceCompliance(
   }
   return true
 }
-
-
