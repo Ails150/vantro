@@ -1,11 +1,9 @@
 ﻿"use client"
 import { useState, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 
 export default function ResetPasswordPage() {
-  const router = useRouter()
   const [password, setPassword] = useState("")
   const [confirm, setConfirm] = useState("")
   const [loading, setLoading] = useState(false)
@@ -34,7 +32,8 @@ export default function ResetPasswordPage() {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) { setError(error.message); setLoading(false); return }
     setDone(true)
-    setTimeout(() => router.push("/login"), 2000)
+    // Role-based redirect: installer -> /installer, everyone else -> /admin.
+    window.location.assign("/auth/route-after-login")
   }
 
   return (
@@ -57,7 +56,7 @@ export default function ResetPasswordPage() {
           <h1 className="text-xl font-semibold mb-2">Set new password</h1>
           <p className="text-sm text-[#4d6478] mb-6">Choose a strong password for your account.</p>
           {done ? (
-            <p className="text-sm text-[#00d4a0] bg-[#00d4a0]/10 border border-[#00d4a0]/20 rounded-lg px-4 py-3">Password updated. Redirecting to login...</p>
+            <p className="text-sm text-[#00d4a0] bg-[#00d4a0]/10 border border-[#00d4a0]/20 rounded-lg px-4 py-3">Password updated. Redirecting...</p>
           ) : !ready ? (
             <div className="flex items-center justify-center py-8">
               <div className="w-8 h-8 border-2 border-[#00d4a0] border-t-transparent rounded-full animate-spin"/>

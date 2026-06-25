@@ -1,6 +1,5 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
 export default function SetPasswordPage() {
@@ -8,7 +7,6 @@ export default function SetPasswordPage() {
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const router = useRouter()
 
   async function handleSet() {
     if (password.length < 8) { setError('Password must be at least 8 characters'); return }
@@ -17,7 +15,8 @@ export default function SetPasswordPage() {
     const supabase = createClient()
     const { error: e } = await supabase.auth.updateUser({ password })
     if (e) { setError(e.message); setLoading(false); return }
-    router.push('/admin')
+    // Role-based redirect: installer -> /installer, everyone else -> /admin.
+    window.location.assign('/auth/route-after-login')
   }
 
   return (
