@@ -37,11 +37,17 @@ export async function getCallerContext(): Promise<CallerContext | null> {
   if (!user) return null
 
   const service = await createServiceClient()
-  const { data: u } = await service
+  // Use limit(1), not .single(): if a data glitch ever leaves two users rows
+  // sharing one auth_user_id, .single() throws (PGRST116) and the caller gets
+  // null — silently bouncing the user back to /login. Picking the oldest match
+  // degrades gracefully instead of locking them out.
+  const { data: rows } = await service
     .from("users")
     .select("id, company_id, role, name, email")
     .eq("auth_user_id", user.id)
-    .single()
+    .order("created_at", { ascending: true })
+    .limit(1)
+  const u = rows?.[0]
   if (!u) return null
 
   const isSupport = u.role === "support"

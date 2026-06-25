@@ -11,11 +11,14 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.redirect(`${origin}/login?error=auth`)
 
   const service = await createServiceClient()
-  const { data: userData } = await service
+  // limit(1) rather than .single() so a duplicate auth_user_id row can't break routing.
+  const { data: rows } = await service
     .from('users')
     .select('role')
     .eq('auth_user_id', user.id)
-    .single()
+    .order('created_at', { ascending: true })
+    .limit(1)
+  const userData = rows?.[0]
 
   if (userData?.role === 'installer') {
     return NextResponse.redirect(`${origin}/installer`)
