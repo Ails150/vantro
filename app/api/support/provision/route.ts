@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
+import { PLATFORM_SENTINEL_COMPANY_ID } from "@/lib/company-context"
 
 // One-time bootstrap: provision Aileen as a platform "support" user.
 // Protected by SUPPORT_BOOTSTRAP_SECRET (set it in env, then call once with
@@ -31,13 +32,15 @@ export async function POST(request: Request) {
   const inviteUrl = linkData?.properties?.action_link
   if (!authUserId) return NextResponse.json({ error: "Could not create auth user" }, { status: 400 })
 
-  // Upsert the platform support users row (company_id null -> not tied to any company).
+  // Upsert the platform support users row. company_id is NOT NULL, so we park
+  // support users on a sentinel company; their effective company comes from the
+  // switcher cookie, not this row.
   const { error: upErr } = await service.from("users").upsert({
     auth_user_id: authUserId,
     email: AILEEN_EMAIL,
     name: AILEEN_NAME,
     role: "support",
-    company_id: null,
+    company_id: PLATFORM_SENTINEL_COMPANY_ID,
     is_active: true,
   }, { onConflict: "email" })
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })

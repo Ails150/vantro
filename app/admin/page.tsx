@@ -24,34 +24,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const user = { id: ctx.authUserId }
   const userData = { id: ctx.userId, company_id: ctx.companyId, name: ctx.name, role: ctx.role }
   const companyId = ctx.companyId
-  const { data: company } = await supabase.from('companies').select('*').eq('id', companyId).single()
 
-  // Setup wizard redirect: if onboarding not completed, send to setup
-  // EXCEPT when admin came from the wizard intending to use a tab (Jobs, Team).
-  // Support users skip this — they're viewing an existing company, not onboarding.
-  if (!ctx.isSupport && company && !company.onboarding_completed_at && params.from !== 'setup') {
-    redirect('/admin/setup')
-  }
-
-  // Trial/subscription check
-  // paywall_overlay_v1
-  let trialExpiredAndUnpaid = false
-  if (company && !ctx.isSupport) {
-    const now = new Date()
-    const trialEnds = company.trial_ends_at ? new Date(company.trial_ends_at) : null
-    const status = company.subscription_status
-    const trialExpired = trialEnds && now > trialEnds
-    const notActive = !status || status === 'trial' || status === 'cancelled' || status === 'past_due'
-    trialExpiredAndUnpaid = !!(trialExpired && notActive)
-  }
-
-  // PERF (20 May 2026): parallelize the 9 independent queries with Promise.all.
-  // Previously these ran sequentially - first-load was ~5s. Now ~700ms.
-  // Each query is identical to before, just no awaits between them.
+  // PERF: fetch the company alongside the dashboard data in one parallel batch
+  // (previously company was a separate sequential round-trip before this batch).
   const today = new Date(); today.setHours(0,0,0,0)
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
   const [
+    companyResult,
     jobsResult,
     signinsResult,
     alertsResult,
@@ -62,6 +42,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     checklistTemplatesResult,
     diaryEntriesResult,
   ] = await Promise.all([
+    supabase.from('companies').select('*').eq('id', companyId).single(),
     supabase
       .from('jobs')
       .select('*, job_checklists(template_id)')
@@ -115,6 +96,27 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       .order('created_at', { ascending: false })
       .limit(200),
   ])
+
+  const company = companyResult.data
+
+  // Setup wizard redirect: if onboarding not completed, send to setup
+  // EXCEPT when admin came from the wizard intending to use a tab (Jobs, Team).
+  // Support users skip this — they're viewing an existing company, not onboarding.
+  if (!ctx.isSupport && company && !company.onboarding_completed_at && params.from !== 'setup') {
+    redirect('/admin/setup')
+  }
+
+  // Trial/subscription check
+  // paywall_overlay_v1
+  let trialExpiredAndUnpaid = false
+  if (company && !ctx.isSupport) {
+    const now = new Date()
+    const trialEnds = company.trial_ends_at ? new Date(company.trial_ends_at) : null
+    const status = company.subscription_status
+    const trialExpired = trialEnds && now > trialEnds
+    const notActive = !status || status === 'trial' || status === 'cancelled' || status === 'past_due'
+    trialExpiredAndUnpaid = !!(trialExpired && notActive)
+  }
 
   return (
     <>

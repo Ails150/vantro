@@ -21,20 +21,8 @@ create index if not exists idx_support_access_log_company on public.support_acce
 -- Service-role only (routes use the service client, which bypasses RLS).
 alter table public.support_access_log enable row level security;
 
--- The 'support' role is a free-text value in users.role (there is no central
--- role enum). If a CHECK constraint on users.role exists, it must be widened to
--- permit 'support' — this surfaces it so you can update it in Supabase.
-do $$
-declare c record;
-begin
-  for c in
-    select con.conname, pg_get_constraintdef(con.oid) as def
-    from pg_constraint con
-    join pg_class t on t.oid = con.conrelid
-    join pg_namespace n on n.oid = t.relnamespace
-    where n.nspname = 'public' and t.relname = 'users' and con.contype = 'c'
-      and pg_get_constraintdef(con.oid) ilike '%role%'
-  loop
-    raise notice 'users.role CHECK constraint % may need to allow ''support'': %', c.conname, c.def;
-  end loop;
-end $$;
+-- users.role has a CHECK constraint (users_role_check) that must permit the new
+-- 'support' role. Widen it to include every role the app uses. Safe/idempotent.
+alter table public.users drop constraint if exists users_role_check;
+alter table public.users add constraint users_role_check
+  check (role in ('installer', 'foreman', 'admin', 'superadmin', 'support'));

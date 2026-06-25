@@ -1,10 +1,8 @@
 ﻿"use client"
 import { useState } from "react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 export default function LoginPage() {
-  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -17,7 +15,10 @@ export default function LoginPage() {
     const supabase = createClient()
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) { setError("Incorrect email or password"); setLoading(false); return }
-    router.push("/admin"); router.refresh()
+    // Full navigation (not router.push) so the freshly-set auth cookie is sent
+    // on a real request and /admin renders exactly once. A soft nav here caused
+    // a double render (push + refresh) and an occasional flash-then-bounce.
+    window.location.assign("/admin")
   }
   async function handleReset(e: React.FormEvent) {
     e.preventDefault()

@@ -4,6 +4,12 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 // Cookie that holds the company a platform "support" user is currently viewing.
 export const SUPPORT_COMPANY_COOKIE = "vantro_support_company"
 
+// users.company_id is NOT NULL, but a platform support user belongs to no real
+// company (their effective company comes from the switcher cookie). We park
+// their row on this sentinel company id to satisfy the constraint; support code
+// paths ignore the row's own company_id.
+export const PLATFORM_SENTINEL_COMPANY_ID = "00000000-0000-0000-0000-000000000001"
+
 export type CallerContext = {
   authUserId: string
   userId: string
