@@ -3,7 +3,9 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // Bulk import jobs via CSV.
 //   POST /api/admin/jobs/bulk-import
-//   body: { rows: [{ name, address, postcode?, foreman_email?, gps_radius?, start_date?, end_date? }] }
+//   body: { rows: [{ name, address?, postcode?, foreman_email?, contractor?,
+//                     shift_start_time?, sign_out_time?, geofence_radius_metres?,
+//                     distance_from_site_km?, start_date?, end_date? }] }
 //
 // Returns per-row results.
 
@@ -12,7 +14,12 @@ interface CsvRow {
   address: string
   postcode?: string
   foreman_email?: string
-  gps_radius?: string | number
+  contractor?: string
+  shift_start_time?: string
+  sign_out_time?: string
+  geofence_radius_metres?: string | number
+  distance_from_site_km?: string | number
+  gps_radius?: string | number // legacy alias for geofence_radius_metres
   start_date?: string
   end_date?: string
 }
@@ -111,17 +118,23 @@ export async function POST(request: Request) {
     const address = (r?.address || "").trim()
     const postcode = (r?.postcode || "").trim() || undefined
     const foremanEmail = (r?.foreman_email || "").trim().toLowerCase() || undefined
-    const gpsRadius = r?.gps_radius ? Number(r.gps_radius) : 150 // default 150m
+
+    const numOrNull = (v: any) => (v != null && String(v).trim() !== "" && !isNaN(Number(v)) ? Number(v) : null)
+    const distKm = numOrNull(r?.distance_from_site_km)
+    const radiusM = numOrNull(r?.geofence_radius_metres ?? r?.gps_radius)
+    const normTime = (t?: string) => {
+      const m = (t || "").trim().match(/^(\d{1,2}):(\d{2})/)
+      return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null
+    }
 
     if (!name) {
       results.push({ row: rowNum, name: "", address, status: "error", message: "Missing name" })
       continue
     }
-    if (!address) {
-      results.push({ row: rowNum, name, address: "", status: "error", message: "Missing address" })
+    if (!address && distKm == null) {
+      results.push({ row: rowNum, name, address: "", status: "error", message: "Missing address (or distance_from_site_km for remote sites)" })
       continue
     }
-    // gps_radius from CSV is ignored (radius is set globally per company)
     if (existingSet.has(name.toLowerCase())) {
       results.push({ row: rowNum, name, address, status: "skipped", message: "Job with this name already exists" })
       continue
@@ -131,22 +144,29 @@ export async function POST(request: Request) {
       continue
     }
 
-    // Geocode (best effort — don't fail row if geocoding fails)
-    const coords = await geocodeAddress(address, postcode)
+    // Geocode (best effort — don't fail row if geocoding fails). Remote jobs
+    // with no address skip geocoding and rely on distance_from_site_km.
+    const coords = address ? await geocodeAddress(address, postcode) : null
 
     const insertRow: any = {
       company_id: admin.company_id,
       name,
-      address: postcode ? `${address}, ${postcode}` : address,
+      address: address ? (postcode ? `${address}, ${postcode}` : address) : null,
       status: "active",
     }
     if (coords) {
       insertRow.lat = coords.lat
       insertRow.lng = coords.lng
     }
-    // Note: gps_radius and foreman_id columns do not exist on jobs table.
-    // Geofence radius is set globally (150m). foreman_email is validated above
-    // but assignment must be done via the admin UI after import.
+    const contractor = (r?.contractor || "").trim()
+    if (contractor) insertRow.contractor = contractor
+    const startT = normTime(r?.shift_start_time)
+    if (startT) insertRow.start_time = startT
+    const signOutT = normTime(r?.sign_out_time)
+    if (signOutT) insertRow.sign_out_time = signOutT
+    if (radiusM != null) insertRow.geofence_radius_metres = radiusM
+    if (distKm != null) insertRow.distance_from_site_km = distKm
+    // foreman_email is validated above but assignment must be done via the admin UI.
     if (r.start_date) {
       const d = new Date(r.start_date)
       if (!isNaN(d.getTime())) insertRow.start_date = d.toISOString()

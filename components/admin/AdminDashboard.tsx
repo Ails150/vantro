@@ -1254,10 +1254,14 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 endpoint="/api/admin/jobs/bulk-import"
                 fields={[
                   { key: "name", label: "Name", required: true, example: "14 The Parade" },
-                  { key: "address", label: "Address", required: true, example: "14 The Parade" },
+                  { key: "address", label: "Address (blank if remote)", example: "14 The Parade" },
                   { key: "postcode", label: "Postcode", example: "WD17 1AB" },
+                  { key: "contractor", label: "Contractor", example: "ABC Construction Ltd" },
                   { key: "foreman_email", label: "Supervisor email", example: "" },
-                  { key: "gps_radius", label: "GPS radius (m)", example: "150" },
+                  { key: "shift_start_time", label: "Shift start time", example: "08:00" },
+                  { key: "sign_out_time", label: "Sign-out time", example: "17:00" },
+                  { key: "geofence_radius_metres", label: "Geofence radius (m)", example: "150" },
+                  { key: "distance_from_site_km", label: "Distance from site (km)", example: "" },
                   { key: "start_date", label: "Start date", example: "2026-05-01" },
                   { key: "end_date", label: "End date", example: "2026-05-15" },
                 ]}
