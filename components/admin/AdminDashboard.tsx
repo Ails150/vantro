@@ -131,6 +131,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [editJobLng, setEditJobLng] = useState(null)
   const addAddressRef = useRef(null)
   const editAddressRef = useRef(null)
+  const editMapRef = useRef<any>(null)
+  const editMapObj = useRef<any>(null)
+  const editMarkerObj = useRef<any>(null)
+  const editLatLngRef = useRef<{ lat: any; lng: any }>({ lat: null, lng: null })
   const [memberName, setMemberName] = useState("")
   const [memberEmail, setMemberEmail] = useState("")
   const [memberRole, setMemberRole] = useState("installer")
@@ -534,6 +538,45 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return () => clearInterval(interval)
   }, [editingJobId])
 
+  // Keep the latest edit lat/lng available to the map-creation effect without
+  // re-running it on every drag.
+  editLatLngRef.current = { lat: editJobLat, lng: editJobLng }
+
+  // Draggable map preview in the edit form. (Re)creates the map when an edit
+  // form opens with a pin, or when a pin first appears (e.g. address picked).
+  useEffect(() => {
+    editMapObj.current = null
+    editMarkerObj.current = null
+    if (!editingJobId) return
+    let iv: any
+    const init = () => {
+      const google = (window as any).google
+      if (!google || !editMapRef.current) return false
+      const { lat, lng } = editLatLngRef.current
+      if (lat == null || lng == null) return false
+      const pos = { lat: Number(lat), lng: Number(lng) }
+      editMapObj.current = new google.maps.Map(editMapRef.current, {
+        center: pos, zoom: 16, mapTypeControl: false, streetViewControl: false, fullscreenControl: false,
+      })
+      editMarkerObj.current = new google.maps.Marker({ position: pos, map: editMapObj.current, draggable: true })
+      editMarkerObj.current.addListener("dragend", (e: any) => {
+        setEditJobLat(e.latLng.lat()); setEditJobLng(e.latLng.lng()); setEditJobPlaceSelected(true)
+      })
+      return true
+    }
+    if (!init()) { iv = setInterval(() => { if (init()) clearInterval(iv) }, 200) }
+    return () => { if (iv) clearInterval(iv) }
+  }, [editingJobId, editJobLat != null && editJobLng != null])
+
+  // Keep the marker/centre in sync when lat/lng changes (autocomplete or drag).
+  useEffect(() => {
+    if (!editMapObj.current || !editMarkerObj.current) return
+    if (editJobLat == null || editJobLng == null) return
+    const pos = { lat: Number(editJobLat), lng: Number(editJobLng) }
+    editMarkerObj.current.setPosition(pos)
+    editMapObj.current.panTo(pos)
+  }, [editJobLat, editJobLng])
+
   function switchTab(tab: string) {
     setActiveTab(tab)
     try { localStorage.setItem("vantro_tab", tab) } catch {}
@@ -593,7 +636,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
     if (!jobPlaceSelected && !jobDistanceKm.trim()) { setFormError("Select an address from the dropdown, or enter a distance from site for remote locations with no address"); return }
     setSaving(true); setFormError("")
-    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime, distance_from_site_km: jobDistanceKm.trim() === "" ? null : Number(jobDistanceKm), contractor: jobContractor.trim() || null, geofence_radius_metres: jobGeofenceRadius.trim() === "" ? null : Number(jobGeofenceRadius), required_trades: multiTradeEnabled ? jobRequiredTrades : null }).select("id").single()
+    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, gps_source: (jobLat != null && jobLng != null) ? "manual" : null, start_time: jobStartTime, sign_out_time: jobSignOutTime, distance_from_site_km: jobDistanceKm.trim() === "" ? null : Number(jobDistanceKm), contractor: jobContractor.trim() || null, geofence_radius_metres: jobGeofenceRadius.trim() === "" ? null : Number(jobGeofenceRadius), required_trades: multiTradeEnabled ? jobRequiredTrades : null }).select("id").single()
     if (error) { setFormError(error.message); setSaving(false); return }
     if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
     if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
@@ -606,7 +649,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!editJobPlaceSelected && (editJobLat == null || editJobLng == null) && !editJobDistanceKm.trim()) { setFormError("Address must be verified - please pick from the Google Maps dropdown, or enter a distance from site for remote locations"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, distance_from_site_km: editJobDistanceKm.trim() === "" ? null : Number(editJobDistanceKm), contractor: editJobContractor.trim() || null, geofence_radius_metres: editJobGeofenceRadius.trim() === "" ? null : Number(editJobGeofenceRadius), required_trades: multiTradeEnabled ? (editJobRequiredTrades || []) : [] }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, ...(editJobPlaceSelected ? { gps_source: "manual" } : {}), status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, distance_from_site_km: editJobDistanceKm.trim() === "" ? null : Number(editJobDistanceKm), contractor: editJobContractor.trim() || null, geofence_radius_metres: editJobGeofenceRadius.trim() === "" ? null : Number(editJobGeofenceRadius), required_trades: multiTradeEnabled ? (editJobRequiredTrades || []) : [] }).eq("id", jobId)
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
@@ -1381,10 +1424,17 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         {j.contractor && <div className={"text-xs " + sub + " mt-0.5"}>🏗️ {j.contractor}</div>}
                         {(() => {
                           const gps = j.lat != null && j.lng != null
+                          // Three states: unanchored (no GPS) / anchored by first installer / manually verified.
+                          const state = !gps ? "none" : (j.gps_source === "installer" ? "anchored" : "verified")
+                          const cfg = {
+                            none: { cls: "text-gray-400", label: "No GPS yet", title: "No GPS location set — the first installer to sign in will anchor it" },
+                            anchored: { cls: "text-amber-600", label: "GPS set on site", title: "Location anchored by the first installer to sign in" },
+                            verified: { cls: "text-teal-600", label: "GPS verified", title: "Location set/verified by an admin" },
+                          }[state]
                           return (
-                            <span className={"inline-flex items-center gap-1 mt-1 text-xs font-medium " + (gps ? "text-teal-600" : "text-gray-400")} title={gps ? "GPS location verified" : "No GPS location set for this job"}>
+                            <span className={"inline-flex items-center gap-1 mt-1 text-xs font-medium " + cfg.cls} title={cfg.title}>
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
-                              {gps ? "GPS verified" : "No GPS"}
+                              {cfg.label}
                             </span>
                           )
                         })()}
@@ -1415,6 +1465,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                               {editJobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
                             </div>
                           </div>
+                          {editJobLat != null && editJobLng != null && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-600 mb-1">Map preview — drag the pin to fix the exact location</label>
+                              <div ref={editMapRef} className="w-full h-48 rounded-xl border border-gray-200 overflow-hidden" />
+                            </div>
+                          )}
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Distance from site (km)</label>
                             <input type="number" min="0" step="0.1" inputMode="decimal" value={editJobDistanceKm} onChange={e => setEditJobDistanceKm(e.target.value)} placeholder="Optional - for remote sites with no address" className={inp}/>

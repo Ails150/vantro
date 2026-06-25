@@ -46,6 +46,18 @@ export async function POST(request: Request) {
   // Effective radius: per-job override / company default, plus smart geofence
   // for remote sites with no address (distance_from_site_km, or 500m minimum).
   const radius = await resolveGeofenceRadius(job, company)
+
+  // Smart site location: if the job has no GPS yet, the first installer to sign
+  // in anchors it — their coordinates become the job's lat/lng. Subsequent
+  // sign-ins geofence from that anchor.
+  let siteAnchored = false
+  if ((job.lat == null || job.lng == null) && lat != null && lng != null) {
+    await service.from("jobs").update({ lat, lng, gps_source: "installer" }).eq("id", jobId)
+    job.lat = lat
+    job.lng = lng
+    siteAnchored = true
+  }
+
   let distanceMetres = 0
   let withinRange = true
 
@@ -200,6 +212,7 @@ export async function POST(request: Request) {
     success: true,
     distanceMetres,
     withinRange,
+    siteAnchored,
     schedulingState: {
       reason: state.reason,
       expectedSignIn: state.expectedSignIn,

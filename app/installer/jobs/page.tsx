@@ -145,7 +145,9 @@ export default function InstallerJobsPage() {
         }
         setSignInTime(new Date())
         setGpsStatus('confirmed')
-        setGpsMessage(`GPS confirmed Â· ${data.distanceMetres}m from site Â· Â±${Math.round(accuracy)}m accuracy`)
+        setGpsMessage(data.siteAnchored
+          ? 'You are setting the site location for this job. Future sign-ins will use this spot.'
+          : `GPS confirmed Â· ${data.distanceMetres}m from site Â· Â±${Math.round(accuracy)}m accuracy`)
         setJobs(prev => prev.map(j => j.id === job.id ? { ...j, signed_in: true } : j))
       },
       (err) => {

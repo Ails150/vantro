@@ -34,6 +34,7 @@ export interface Job {
   distance_from_site_km?: number
   contractor?: string
   geofence_radius_metres?: number
+  gps_source?: 'manual' | 'installer' | null
   template_id?: string
   status: JobStatus
   contract_value?: number
