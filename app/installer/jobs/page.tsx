@@ -328,7 +328,7 @@ export default function InstallerJobsPage() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ jobId: activeJob.id })
     })
-    if (res.ok) { alert('QA submitted for foreman approval!'); loadQA(activeJob) }
+    if (res.ok) { alert('QA submitted for supervisor approval!'); loadQA(activeJob) }
   }
 
   function signOut() {
@@ -445,7 +445,7 @@ export default function InstallerJobsPage() {
                 </button>
               </div>
             </div>
-            <p className="text-xs text-[#4d6478] mt-3 text-center">AI reads your entry instantly and alerts the foreman to any issues.</p>
+            <p className="text-xs text-[#4d6478] mt-3 text-center">AI reads your entry instantly and alerts the supervisor to any issues.</p>
           </div>
         )}
 

@@ -18,12 +18,12 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
 
   // Get job location for distance check
-  const { data: job } = await service.from('jobs').select('lat, lng, name, company_id').eq('id', jobId).single()
+  const { data: job } = await service.from('jobs').select('lat, lng, name, company_id, geofence_radius_metres').eq('id', jobId).single()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
-  // Get company geofence radius (default 150m)
+  // Per-job geofence radius overrides the company default (fallback 150m)
   const { data: company } = await service.from('companies').select('geofence_radius_metres').eq('id', job.company_id).single()
-  const radius = company?.geofence_radius_metres || 150
+  const radius = job.geofence_radius_metres ?? company?.geofence_radius_metres ?? 150
 
   let distanceMetres = 0
   let withinRange = true

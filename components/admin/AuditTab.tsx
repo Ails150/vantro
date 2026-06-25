@@ -967,6 +967,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               <div className={card + " p-8 bg-gradient-to-br from-teal-50 via-white to-white"}>
                 <h2 className="text-2xl font-bold text-gray-900">{reportV2.job?.name}</h2>
                 <p className="text-sm text-gray-600 mt-1">{reportV2.job?.address}</p>
+                {reportV2.job?.contractor && <p className="text-sm text-gray-600">Contractor: {reportV2.job.contractor}</p>}
                 <p className="text-xs text-gray-400 mt-2">Status report · Generated {new Date(reportV2.generated || Date.now()).toLocaleDateString("en-GB")}</p>
                 {(() => {
                   const totalDeliverables = reportV2.deliverables?.length || 0
@@ -1217,6 +1218,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <tbody>
                     <tr><td className="font-semibold py-1 pr-2 w-32">Name</td><td>{reportV2.job?.name}</td></tr>
                     <tr><td className="font-semibold py-1 pr-2">Address</td><td>{reportV2.job?.address}</td></tr>
+                    {reportV2.job?.contractor && <tr><td className="font-semibold py-1 pr-2">Contractor</td><td>{reportV2.job.contractor}</td></tr>}
                     <tr><td className="font-semibold py-1 pr-2">Status</td><td>{reportV2.status}</td></tr>
                     <tr><td className="font-semibold py-1 pr-2">Final sign-off</td><td>{reportV2.finalSignoff ? "Completed" : "Pending"}</td></tr>
                   </tbody>

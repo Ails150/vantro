@@ -324,7 +324,7 @@ export async function POST(request: Request) {
 
       // Build context
       const context = {
-        job: { name: job.name, address: job.address, status: job.status },
+        job: { name: job.name, address: job.address, status: job.status, contractor: job.contractor },
         period: { from, to },
         onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance },
         deliverables: deliverables.map(d => ({ name: d.name, status: d.status, progress: `${d.approvedItems}/${d.totalItems} approved` })),

@@ -27,6 +27,7 @@ import CsvImportModal from "./CsvImportModal"
 import PayrollExportModal from "./PayrollExportModal"
 import SettingsMenu from "./SettingsMenu"
 import { analyzeAllJobs, jobsNeedingAttention, summarizeJobStaffing } from "@/lib/staffing"
+import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 
 interface Props {
   user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
@@ -111,6 +112,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [jobAddress, setJobAddress] = useState("")
   const [jobDistanceKm, setJobDistanceKm] = useState("")
   const [editJobDistanceKm, setEditJobDistanceKm] = useState("")
+  const [jobContractor, setJobContractor] = useState("")
+  const [editJobContractor, setEditJobContractor] = useState("")
+  const [jobGeofenceRadius, setJobGeofenceRadius] = useState("")
+  const [editJobGeofenceRadius, setEditJobGeofenceRadius] = useState("")
   const [jobTemplateId, setJobTemplateId] = useState("")
   const [jobTemplateIds, setJobTemplateIds] = useState<string[]>([])
   const [jobAssignedMembers, setJobAssignedMembers] = useState<string[]>([])
@@ -308,7 +313,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   // Counts per role/trade/status for the filter chips
   const teamCounts = useMemo(() => {
-    const byRole: Record<string, number> = { all: teamMembers.length, installer: 0, foreman: 0, admin: 0 }
+    const byRole: Record<string, number> = { all: teamMembers.length, installer: 0, foreman: 0, subcontractor: 0, admin: 0 }
     const byTrade: Record<string, number> = {}
     let active = 0, inactive = 0
     for (const m of teamMembers) {
@@ -586,11 +591,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
     if (!jobPlaceSelected && !jobDistanceKm.trim()) { setFormError("Select an address from the dropdown, or enter a distance from site for remote locations with no address"); return }
     setSaving(true); setFormError("")
-    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime, distance_from_site_km: jobDistanceKm.trim() === "" ? null : Number(jobDistanceKm), required_trades: multiTradeEnabled ? jobRequiredTrades : null }).select("id").single()
+    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime, distance_from_site_km: jobDistanceKm.trim() === "" ? null : Number(jobDistanceKm), contractor: jobContractor.trim() || null, geofence_radius_metres: jobGeofenceRadius.trim() === "" ? null : Number(jobGeofenceRadius), required_trades: multiTradeEnabled ? jobRequiredTrades : null }).select("id").single()
     if (error) { setFormError(error.message); setSaving(false); return }
     if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
     if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
-    setJobName(""); setJobAddress(""); setJobDistanceKm(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00"); setJobRequiredTrades([])
+    setJobName(""); setJobAddress(""); setJobDistanceKm(""); setJobContractor(""); setJobGeofenceRadius(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00"); setJobRequiredTrades([])
     router.refresh()
   }
 
@@ -599,7 +604,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (!editJobPlaceSelected && (editJobLat == null || editJobLng == null) && !editJobDistanceKm.trim()) { setFormError("Address must be verified - please pick from the Google Maps dropdown, or enter a distance from site for remote locations"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, distance_from_site_km: editJobDistanceKm.trim() === "" ? null : Number(editJobDistanceKm), required_trades: multiTradeEnabled ? (editJobRequiredTrades || []) : [] }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, distance_from_site_km: editJobDistanceKm.trim() === "" ? null : Number(editJobDistanceKm), contractor: editJobContractor.trim() || null, geofence_radius_metres: editJobGeofenceRadius.trim() === "" ? null : Number(editJobGeofenceRadius), required_trades: multiTradeEnabled ? (editJobRequiredTrades || []) : [] }).eq("id", jobId)
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
@@ -785,10 +790,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     router.refresh()
   }
 
-  async function removeMember(userId: string, authUserId: string) {
-    if (!window.confirm("Remove this member from your team? This cannot be undone.")) return
+  async function removeMember(userId: string, authUserId: string, memberName?: string) {
+    if (!window.confirm(`Delete ${memberName || "this member"} from your team? This permanently removes their account and cannot be undone.`)) return
     const res = await fetch("/api/team/remove", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ authUserId, userId }) })
-    if (res.ok) window.location.reload()
+    if (res.ok) { window.location.reload() }
+    else { const d = await res.json().catch(() => ({})); alert(d.error || "Could not remove this member.") }
   }
 
   async function resendInvite(email: string, name: string) {
@@ -887,7 +893,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     setScheduleDays(m.working_days || ["mon","tue","wed","thu","fri"])
   }
 
-  const installers = teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman")
+  const installers = teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor" || m.role === "subcontractor")
   const getAssigned = (jobId: string) => {
     const ids = localAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
     return teamMembers.filter((m: any) => ids.includes(m.id))
@@ -937,7 +943,19 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     admin: "bg-purple-50 text-purple-700",
     foreman: "bg-blue-50 text-blue-700",
     installer: "bg-gray-100 text-gray-600",
+    subcontractor: "bg-orange-50 text-orange-700",
   }
+  // Display label for a role value. NB: DB value 'foreman' is shown as "Supervisor".
+  const roleLabel = (role: string) => (({
+    installer: "Installer",
+    foreman: "Supervisor",
+    subcontractor: "Subcontractor",
+    admin: "Admin",
+    superadmin: "Superadmin",
+    support: "Support",
+  } as Record<string, string>)[role] || role)
+  // Field roles that use the PIN app / installer mobile view and can be assigned to jobs.
+  const isFieldRole = (role: string) => role === "installer" || role === "foreman" || role === "subcontractor"
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -1236,7 +1254,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   { key: "name", label: "Name", required: true, example: "14 The Parade" },
                   { key: "address", label: "Address", required: true, example: "14 The Parade" },
                   { key: "postcode", label: "Postcode", example: "WD17 1AB" },
-                  { key: "foreman_email", label: "Foreman email", example: "" },
+                  { key: "foreman_email", label: "Supervisor email", example: "" },
                   { key: "gps_radius", label: "GPS radius (m)", example: "150" },
                   { key: "start_date", label: "Start date", example: "2026-05-01" },
                   { key: "end_date", label: "End date", example: "2026-05-15" },
@@ -1262,6 +1280,17 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input type="number" min="0" step="0.1" inputMode="decimal" value={jobDistanceKm} onChange={e => setJobDistanceKm(e.target.value)} placeholder="Optional - for remote sites with no address" className={inp}/>
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Contractor (optional)</label>
+                  <input value={jobContractor} onChange={e => setJobContractor(e.target.value)} placeholder="Contractor company name" className={inp}/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Geofence radius (optional)</label>
+                  <select value={jobGeofenceRadius} onChange={e => setJobGeofenceRadius(e.target.value)} className={inp}>
+                    <option value="">Use company default</option>
+                    {GEOFENCE_RADIUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Shift start time</label>
                   <input type="time" value={jobStartTime} onChange={e => setJobStartTime(e.target.value)} className={inp}/>
@@ -1271,11 +1300,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input type="time" value={jobSignOutTime} onChange={e => setJobSignOutTime(e.target.value)} className={inp}/>
                 </div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
-                  {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").length === 0 ? (
+                  {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor").length === 0 ? (
                     <p className="text-sm text-gray-400">No team yet - <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
                   ) : (
                     <div className="space-y-2 mt-1">
-                      {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman").map((m: any) => (
+                      {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor").map((m: any) => (
                         <label key={m.id} className="flex items-center gap-2 cursor-pointer">
                           <input type="checkbox" checked={jobAssignedMembers?.includes(m.id) || false} onChange={e => setJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="w-4 h-4 accent-teal-500"/>
                           <span className="text-sm text-gray-700">{m.name}</span>
@@ -1343,6 +1372,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <div className="font-semibold">{j.name}</div>
                         <div className={"text-sm " + sub + " mt-0.5"}>{j.address}</div>
                         {j.distance_from_site_km != null && <div className={"text-xs " + sub + " mt-0.5"}>📍 {j.distance_from_site_km} km from site</div>}
+                        {j.contractor && <div className={"text-xs " + sub + " mt-0.5"}>🏗️ {j.contractor}</div>}
                         {(j.job_checklists || []).map((jc: any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full mr-1">{checklistTemplates.find((t:any) => t.id === jc.template_id)?.name}</span>)}
                         {assigned.length > 0 && (
                           <div className="flex gap-2 mt-2 flex-wrap">
@@ -1350,7 +1380,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobContractor(j.contractor || ""); setEditJobGeofenceRadius(j.geofence_radius_metres != null ? String(j.geofence_radius_metres) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -1373,6 +1403,17 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Distance from site (km)</label>
                             <input type="number" min="0" step="0.1" inputMode="decimal" value={editJobDistanceKm} onChange={e => setEditJobDistanceKm(e.target.value)} placeholder="Optional - for remote sites with no address" className={inp}/>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Contractor (optional)</label>
+                            <input value={editJobContractor} onChange={e => setEditJobContractor(e.target.value)} placeholder="Contractor company name" className={inp}/>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Geofence radius (optional)</label>
+                            <select value={editJobGeofenceRadius} onChange={e => setEditJobGeofenceRadius(e.target.value)} className={inp}>
+                              <option value="">Use company default</option>
+                              {GEOFENCE_RADIUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            </select>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
@@ -1582,7 +1623,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <label className="block text-sm font-medium text-gray-600 mb-1">Role</label>
                   <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
                     <option value="installer">Installer - PIN app access only</option>
-                    <option value="foreman">Foreman - PIN app + alert emails</option>
+                    <option value="foreman">Supervisor - PIN app + alert emails</option>
+                    <option value="subcontractor">Subcontractor - PIN app, sees only their assigned jobs</option>
                     {userData?.role === "superadmin" && (<option value="admin">Admin - full dashboard access (no PIN needed)</option>)}
                   </select>
                 </div>
@@ -1623,7 +1665,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               {/* Role chips */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-gray-500 mr-1">Role:</span>
-                {(["all", "installer", "foreman", "admin"] as const).map(r => {
+                {(["all", "installer", "foreman", "subcontractor", "admin"] as const).map(r => {
                   const count = teamCounts.byRole[r] || 0
                   const active = teamRoleFilter === r
                   return (
@@ -1632,7 +1674,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       onClick={() => setTeamRoleFilter(r)}
                       className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
                     >
-                      {r === "all" ? "All" : r.charAt(0).toUpperCase() + r.slice(1)} {count}
+                      {r === "all" ? "All" : roleLabel(r)} {count}
                     </button>
                   )
                 })}
@@ -1697,7 +1739,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
                     {filteredTeamMembers.map((m: any) => {
                       const isActive = m.is_active !== false
-                      const isInstFm = m.role === "installer" || m.role === "foreman"
+                      const isInstFm = m.role === "installer" || m.role === "foreman" || m.role === "subcontractor"
                       const memberTrades = Array.isArray(m.trades) ? m.trades : []
                       const tradeLabels = memberTrades.map((tk: string) => {
                         const t = companyTrades.find((ct: any) => ct.trade_key === tk)
@@ -1718,7 +1760,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                               <div className={"font-semibold text-sm truncate " + (isActive ? "" : "text-gray-400")} title={m.name}>{m.name}</div>
                               <div className="text-xs text-gray-500 truncate" title={m.email}>{m.email || "No email"}</div>
                             </div>
-                            <span className={"text-[10px] px-2 py-0.5 rounded-full capitalize font-medium flex-shrink-0 " + roleBadgeCls}>{m.role}</span>
+                            <span className={"text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 " + roleBadgeCls}>{roleLabel(m.role)}</span>
                           </div>
 
                           {(!isActive || (!m.pin_hash && m.role === "installer")) && (
@@ -1728,7 +1770,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             </div>
                           )}
 
-                          {multiTradeEnabled && (m.role === "installer" || m.role === "foreman") && (
+                          {multiTradeEnabled && (m.role === "installer" || m.role === "foreman" || m.role === "subcontractor") && (
                             <div className="flex flex-wrap gap-1 mb-3">
                               {tradeLabels.length > 0 ? (
                                 tradeLabels.map((label: string, idx: number) => (
@@ -1767,11 +1809,22 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                       <button onClick={() => { resetPin(m.id); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50">Reset PIN</button>
                                       <button onClick={() => { toggleActive(m.id, isActive); setOpenMenuMemberId(null) }} className={"w-full text-left text-xs px-3 py-2 hover:bg-gray-50 " + (isActive ? "text-amber-600" : "text-teal-600")}>{isActive ? "Suspend" : "Reactivate"}</button>
                                       <div className="border-t border-gray-100 my-1"></div>
-                                      <button onClick={() => { removeMember(m.id, m.auth_user_id); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 text-red-600 hover:bg-red-50">Remove</button>
+                                      <button onClick={() => { removeMember(m.id, m.auth_user_id, m.name); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 text-red-600 hover:bg-red-50">Remove</button>
                                     </div>
                                   </>
                                 )}
                               </div>
+                            </div>
+                          )}
+                          {/* Superadmin can delete any member, including admins (which have no menu above). */}
+                          {!isInstFm && userData?.role === "superadmin" && !m.is_superadmin && m.id !== userData?.id && (
+                            <div className="flex items-center gap-2 pt-3 mt-auto border-t border-gray-100">
+                              <button
+                                onClick={() => removeMember(m.id, m.auth_user_id, m.name)}
+                                className="flex-1 text-xs rounded-lg px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                Delete
+                              </button>
                             </div>
                           )}
                         </div>

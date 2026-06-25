@@ -92,7 +92,7 @@ export async function fetchAuditData(
 ): Promise<AuditData | null> {
   const { data: job } = await service
     .from("jobs")
-    .select("id, name, address, lat, lng, company_id, required_trades")
+    .select("id, name, address, contractor, lat, lng, company_id, required_trades")
     .eq("id", jobId).eq("company_id", companyId).single()
   if (!job) return null
 

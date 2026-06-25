@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
+import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 
 export default function SettingsTab() {
   const [gracePeriod, setGracePeriod] = useState(60)
@@ -98,12 +99,7 @@ export default function SettingsTab() {
               onChange={(e) => setGeofenceRadius(Number(e.target.value))}
               className={inp}
             >
-              <option value={50}>50m (strict)</option>
-              <option value={100}>100m</option>
-              <option value={150}>150m (recommended)</option>
-              <option value={200}>200m</option>
-              <option value={300}>300m (relaxed)</option>
-              <option value={500}>500m</option>
+              {GEOFENCE_RADIUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <p className="text-xs text-gray-400 mt-1">
               Installers must be within this distance of the job site to sign

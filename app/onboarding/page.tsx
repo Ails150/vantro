@@ -132,7 +132,7 @@ function OnboardingInner() {
                     <input value={inst.email} onChange={e => { const u=[...installers]; u[i]={...u[i],email:e.target.value}; setInstallers(u); if(error)setError('') }} placeholder="Email" type="email" disabled={loading} className="w-full bg-[#243040] border border-white/5 rounded-lg px-3 py-2.5 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm disabled:opacity-60"/>
                     <select value={inst.role} onChange={e => { const u=[...installers]; u[i]={...u[i],role:e.target.value}; setInstallers(u) }} disabled={loading} className="w-full bg-[#243040] border border-white/5 rounded-lg px-3 py-2.5 text-white focus:outline-none focus:border-[#00d4a0]/40 text-sm disabled:opacity-60">
                       <option value="installer">Installer - PIN app access only</option>
-                      <option value="foreman">Foreman - PIN app + alert emails</option>
+                      <option value="foreman">Supervisor - PIN app + alert emails</option>
                     </select>
                     {installers.length > 1 && <button onClick={() => setInstallers(installers.filter((_,idx)=>idx!==i))} disabled={loading} className="text-[#4d6478] hover:text-red-400 px-2 disabled:opacity-40">Remove</button>}
                   </div>

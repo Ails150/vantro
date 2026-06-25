@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   const { data: job } = await service
     .from("jobs")
-    .select("lat, lng, company_id, name, sign_out_time")
+    .select("lat, lng, company_id, name, sign_out_time, geofence_radius_metres")
     .eq("id", jobId)
     .single()
   if (!job)
@@ -42,7 +42,8 @@ export async function POST(request: Request) {
     .eq("id", job.company_id)
     .single()
 
-  const radius = company?.geofence_radius_metres || 150
+  // Per-job radius overrides the company default; fall back to 150m.
+  const radius = job.geofence_radius_metres ?? company?.geofence_radius_metres ?? 150
   let distanceMetres = 0
   let withinRange = true
 

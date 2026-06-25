@@ -286,7 +286,7 @@ function AddMemberModal({
               className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm bg-white focus:outline-none focus:border-teal-400"
             >
               <option value="installer">Installer</option>
-              <option value="foreman">Foreman</option>
+              <option value="foreman">Supervisor</option>
               {isSuperadmin && <option value="admin">Admin</option>}
             </select>
             {!isSuperadmin && (

@@ -632,6 +632,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
 
   <h1>${escapeHtml(job.name)}</h1>
   <p class="muted">${escapeHtml(job.address || "")}</p>
+  ${job.contractor ? `<p class="muted">Contractor: ${escapeHtml(job.contractor)}</p>` : ""}
 
   <dl class="meta">
     <dt>Period</dt><dd>${escapeHtml(periodStr)}</dd>

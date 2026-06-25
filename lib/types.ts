@@ -32,6 +32,8 @@ export interface Job {
   lat?: number
   lng?: number
   distance_from_site_km?: number
+  contractor?: string
+  geofence_radius_metres?: number
   template_id?: string
   status: JobStatus
   contract_value?: number

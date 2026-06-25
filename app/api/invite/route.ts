@@ -12,11 +12,13 @@ export async function POST(request: Request) {
   // Installers get the app-download email instead.
   const isDashboardUser = role === 'foreman' || role === 'admin'
   const isAdmin = role === 'admin'
-  const roleLabel = isAdmin ? 'Admin' : 'Foreman'
+  const roleLabel = isAdmin ? 'Admin' : 'Supervisor'
   const roleArticle = isAdmin ? 'an' : 'a'
   const roleBlurb = isAdmin
     ? 'Your manager has added you as an <strong style="color:#0A1A14">Admin</strong> on Vantro. You have full access to the dashboard - jobs, team, diary alerts, QA, payroll and company settings.'
-    : 'Your manager has added you as a <strong style="color:#0A1A14">Foreman</strong> on Vantro. You have full access to the dashboard - jobs, team, diary alerts, QA and payroll.'
+    : 'Your manager has added you as a <strong style="color:#0A1A14">Supervisor</strong> on Vantro. You have full access to the dashboard - jobs, team, diary alerts, QA and payroll.'
+  // Field role shown in the installer-style (app + PIN) email.
+  const fieldLabel = role === 'subcontractor' ? 'Subcontractor' : 'Installer'
 
   if (isDashboardUser) {
     const { data, error } = await service.auth.admin.generateLink({
@@ -83,7 +85,7 @@ export async function POST(request: Request) {
         </div>
         <h2 style="color:#0A1A14;font-size:1.4rem;margin-bottom:12px">Welcome to Vantro</h2>
         <p style="color:#4A6158;line-height:1.6;margin-bottom:8px">Hi ${name || 'there'},</p>
-        <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">Your manager has added you as an <strong style="color:#0A1A14">Installer</strong> on Vantro. Use the app to sign in to jobs, log your diary and complete QA checklists on site.</p>
+        <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">Your manager has added you as ${fieldLabel === 'Subcontractor' ? 'a' : 'an'} <strong style="color:#0A1A14">${fieldLabel}</strong> on Vantro. Use the app to sign in to jobs, log your diary and complete QA checklists on site.</p>
 
         <p style="color:#0A1A14;font-weight:700;margin-bottom:12px">Step 1 - Download the app</p>
         <a href="https://apps.apple.com/app/vantro/id6762612407" style="display:inline-block;background:#0A1A14;color:#FFFFFF;padding:14px 24px;border-radius:8px;text-decoration:none;font-weight:700;font-size:0.95rem;margin-right:8px;margin-bottom:8px">Download on App Store</a>

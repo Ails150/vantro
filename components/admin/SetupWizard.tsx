@@ -86,7 +86,7 @@ export default function SetupWizard({ companyId, onComplete }: { companyId: stri
               <input value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="Email address" type="email" className="w-full bg-[#0A1628] border border-white/10 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/50 text-sm"/>
               <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className="w-full bg-[#0A1628] border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#00d4a0]/50 text-sm">
                 <option value="installer">Installer — PIN app access</option>
-                <option value="foreman">Foreman — Dashboard + PIN app</option>
+                <option value="foreman">Supervisor — Dashboard + PIN app</option>
               </select>
             </div>
           )}
