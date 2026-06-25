@@ -7,6 +7,7 @@ import { verifyInstallerToken } from "@/lib/auth"
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { isInstallerWorking } from "@/lib/scheduling/resolver"
+import { resolveGeofenceRadius } from "@/lib/geofence-server"
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
 
   const { data: job } = await service
     .from("jobs")
-    .select("lat, lng, company_id, name, sign_out_time, geofence_radius_metres")
+    .select("lat, lng, company_id, name, sign_out_time, geofence_radius_metres, address, distance_from_site_km")
     .eq("id", jobId)
     .single()
   if (!job)
@@ -42,8 +43,9 @@ export async function POST(request: Request) {
     .eq("id", job.company_id)
     .single()
 
-  // Per-job radius overrides the company default; fall back to 150m.
-  const radius = job.geofence_radius_metres ?? company?.geofence_radius_metres ?? 150
+  // Effective radius: per-job override / company default, plus smart geofence
+  // for remote sites with no address (distance_from_site_km, or 500m minimum).
+  const radius = await resolveGeofenceRadius(job, company)
   let distanceMetres = 0
   let withinRange = true
 
