@@ -5,6 +5,8 @@ import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 export default function SettingsTab() {
   const [gracePeriod, setGracePeriod] = useState(60)
   const [geofenceRadius, setGeofenceRadius] = useState(150)
+  const [defaultStart, setDefaultStart] = useState("")
+  const [defaultSignOut, setDefaultSignOut] = useState("")
   const [backgroundGps, setBackgroundGps] = useState(true)
   const [sickAutoApprove, setSickAutoApprove] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -23,6 +25,8 @@ export default function SettingsTab() {
         if (c.background_gps_enabled != null)
           setBackgroundGps(c.background_gps_enabled)
         if (c.sick_auto_approve != null) setSickAutoApprove(c.sick_auto_approve)
+        if (c.default_start_time) setDefaultStart(String(c.default_start_time).slice(0, 5))
+        if (c.default_sign_out_time) setDefaultSignOut(String(c.default_sign_out_time).slice(0, 5))
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -40,6 +44,8 @@ export default function SettingsTab() {
         geofence_radius_metres: geofenceRadius,
         background_gps_enabled: backgroundGps,
         sick_auto_approve: sickAutoApprove,
+        default_start_time: defaultStart || null,
+        default_sign_out_time: defaultSignOut || null,
       }),
     })
     setSaving(false)
@@ -106,6 +112,34 @@ export default function SettingsTab() {
               in and out.
             </p>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Default shift start
+              </label>
+              <input
+                type="time"
+                value={defaultStart}
+                onChange={(e) => setDefaultStart(e.target.value)}
+                className={inp}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Default sign-out
+              </label>
+              <input
+                type="time"
+                value={defaultSignOut}
+                onChange={(e) => setDefaultSignOut(e.target.value)}
+                className={inp}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 -mt-3">
+            New jobs pre-fill with these times. You can override them per job.
+          </p>
 
           <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100">
             <div className="flex-1">

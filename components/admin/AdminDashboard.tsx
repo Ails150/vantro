@@ -102,8 +102,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [editingJobId, setEditingJobId] = useState(null)
   const [editJobName, setEditJobName] = useState("")
   const [editJobAddress, setEditJobAddress] = useState("")
-  const [jobStartTime, setJobStartTime] = useState("08:00")
-  const [jobSignOutTime, setJobSignOutTime] = useState("17:00")
+  const companyDefaultStart = company?.default_start_time ? String(company.default_start_time).slice(0, 5) : "08:00"
+  const companyDefaultSignOut = company?.default_sign_out_time ? String(company.default_sign_out_time).slice(0, 5) : "17:00"
+  const [jobStartTime, setJobStartTime] = useState(companyDefaultStart)
+  const [jobSignOutTime, setJobSignOutTime] = useState(companyDefaultSignOut)
   const [editJobSignOutTime, setEditJobSignOutTime] = useState("17:00")
   const [assigningAll, setAssigningAll] = useState(false)
   const [editJobStartTime, setEditJobStartTime] = useState("08:00")
@@ -595,7 +597,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (error) { setFormError(error.message); setSaving(false); return }
     if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
     if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
-    setJobName(""); setJobAddress(""); setJobDistanceKm(""); setJobContractor(""); setJobGeofenceRadius(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00"); setJobRequiredTrades([])
+    setJobName(""); setJobAddress(""); setJobDistanceKm(""); setJobContractor(""); setJobGeofenceRadius(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime(companyDefaultStart); setJobSignOutTime(companyDefaultSignOut); setJobRequiredTrades([])
     router.refresh()
   }
 
@@ -1380,7 +1382,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobContractor(j.contractor || ""); setEditJobGeofenceRadius(j.geofence_radius_metres != null ? String(j.geofence_radius_metres) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobContractor(j.contractor || ""); setEditJobGeofenceRadius(j.geofence_radius_metres != null ? String(j.geofence_radius_metres) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobStartTime(j.start_time ? j.start_time.slice(0, 5) : companyDefaultStart); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : companyDefaultSignOut); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -1423,6 +1425,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                               <option value="completed">Completed</option>
                               <option value="cancelled">Cancelled</option>
                             </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Shift start time</label>
+                            <input type="time" value={editJobStartTime} onChange={e => setEditJobStartTime(e.target.value)} className={inp}/>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Sign-out time</label>

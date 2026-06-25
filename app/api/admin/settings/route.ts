@@ -20,6 +20,8 @@ const FIELDS = [
     "leave_year_start_day",
   "background_gps_enabled",
   "sick_auto_approve",
+  "default_start_time",
+  "default_sign_out_time",
 ] as const
 
 export async function GET() {
@@ -87,6 +89,20 @@ export async function POST(request: Request) {
     updates.background_gps_enabled = body.background_gps_enabled
   if (body.sick_auto_approve !== undefined)
     updates.sick_auto_approve = body.sick_auto_approve
+
+  // Global default shift times (HH:MM); blank/null clears them.
+  for (const key of ["default_start_time", "default_sign_out_time"] as const) {
+    if (body[key] !== undefined) {
+      const v = body[key]
+      if (v === null || v === "") {
+        updates[key] = null
+      } else if (typeof v === "string" && /^\d{2}:\d{2}(:\d{2})?$/.test(v)) {
+        updates[key] = v
+      } else {
+        return NextResponse.json({ error: `${key} must be in HH:MM format` }, { status: 400 })
+      }
+    }
+  }
 
   if (body.country_code !== undefined) {
     const code = String(body.country_code).trim().toUpperCase()
