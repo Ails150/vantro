@@ -61,12 +61,12 @@ export async function POST(request: Request) {
     .single()
 
   if (company?.installer_limit) {
-    // active_team_count_v1: only count active installer/foreman users
+    // active_team_count_v1: count active installer/foreman/subcontractor seats
     const { count: currentCount } = await service
       .from("users")
       .select("*", { count: "exact", head: true })
       .eq("company_id", admin.company_id)
-      .in("role", ["installer", "foreman"])
+      .in("role", ["installer", "foreman", "subcontractor"])
       .eq("is_active", true)
     if (currentCount !== null && currentCount + rows.length > company.installer_limit) {
       return NextResponse.json(

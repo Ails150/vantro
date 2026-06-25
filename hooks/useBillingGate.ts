@@ -66,12 +66,12 @@ export function useBillingGate(companyId: string | null): BillingState {
         return
       }
 
-      // Count active installers
+      // Count active installers (subcontractors count as installer seats too)
       const { count: installerCount } = await supabase
         .from('users')
         .select('id', { count: 'exact', head: true })
         .eq('company_id', companyId!)
-        .eq('role', 'installer')
+        .in('role', ['installer', 'subcontractor'])
         .neq('status', 'removed')
 
       const activeInstallers = installerCount || 0

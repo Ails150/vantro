@@ -34,7 +34,7 @@ export async function GET() {
     .from('users')
     .select('*', { count: 'exact', head: true })
     .eq('company_id', company.id)
-    .eq('role', 'installer')
+    .in('role', ['installer', 'subcontractor'])
     .eq('is_active', true)
 
   let subscription: any = null

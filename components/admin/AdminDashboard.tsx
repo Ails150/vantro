@@ -760,7 +760,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           .from("users")
           .select("*", { count: "exact", head: true })
           .eq("company_id", userData.company_id)
-          .in("role", ["installer", "foreman"])
+          .in("role", ["installer", "foreman", "subcontractor"])
           .eq("is_active", true)
         if (activeCount !== null && activeCount >= limit) {
           setFormError(`You've reached your plan limit of ${limit} installers. Upgrade your plan to add more, or remove an existing user first.`)
