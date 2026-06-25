@@ -1379,6 +1379,15 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <div className={"text-sm " + sub + " mt-0.5"}>{j.address}</div>
                         {j.distance_from_site_km != null && <div className={"text-xs " + sub + " mt-0.5"}>📍 {j.distance_from_site_km} km from site</div>}
                         {j.contractor && <div className={"text-xs " + sub + " mt-0.5"}>🏗️ {j.contractor}</div>}
+                        {(() => {
+                          const gps = j.lat != null && j.lng != null
+                          return (
+                            <span className={"inline-flex items-center gap-1 mt-1 text-xs font-medium " + (gps ? "text-teal-600" : "text-gray-400")} title={gps ? "GPS location verified" : "No GPS location set for this job"}>
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+                              {gps ? "GPS verified" : "No GPS"}
+                            </span>
+                          )
+                        })()}
                         {(j.job_checklists || []).map((jc: any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full mr-1">{checklistTemplates.find((t:any) => t.id === jc.template_id)?.name}</span>)}
                         {assigned.length > 0 && (
                           <div className="flex gap-2 mt-2 flex-wrap">
