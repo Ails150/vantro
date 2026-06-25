@@ -1,38 +1,42 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import AdminDashboard from '@/components/admin/AdminDashboard'
+import SupportBanner from '@/components/support/SupportBanner'
+import { getCallerContext } from '@/lib/company-context'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+const DASHBOARD_ROLES = ['admin', 'foreman', 'superadmin', 'support']
+
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string; from?: string }> }) {
   const params = await searchParams
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  const ctx = await getCallerContext()
+  if (!ctx) redirect('/login')
+  if (!DASHBOARD_ROLES.includes(ctx.role)) redirect('/onboarding')
 
-  const { data: userData, error: userError } = await supabase
-    .from('users')
-    .select('id, company_id, name, role')
-    .eq('auth_user_id', user.id)
-    .in('role', ['admin', 'foreman', 'superadmin'])
-    .single()
+  // Support users must pick a company first (their effective company comes from
+  // the switcher cookie, not their own row).
+  if (ctx.isSupport && !ctx.companyId) redirect('/support')
+  if (!ctx.companyId) redirect('/onboarding')
 
-  if (userError || !userData || !userData.company_id) redirect('/onboarding')
-
-  const companyId = userData.company_id
+  const user = { id: ctx.authUserId }
+  const userData = { id: ctx.userId, company_id: ctx.companyId, name: ctx.name, role: ctx.role }
+  const companyId = ctx.companyId
   const { data: company } = await supabase.from('companies').select('*').eq('id', companyId).single()
 
   // Setup wizard redirect: if onboarding not completed, send to setup
-  // EXCEPT when admin came from the wizard intending to use a tab (Jobs, Team)
-  if (company && !company.onboarding_completed_at && params.from !== 'setup') {
+  // EXCEPT when admin came from the wizard intending to use a tab (Jobs, Team).
+  // Support users skip this — they're viewing an existing company, not onboarding.
+  if (!ctx.isSupport && company && !company.onboarding_completed_at && params.from !== 'setup') {
     redirect('/admin/setup')
   }
 
   // Trial/subscription check
   // paywall_overlay_v1
   let trialExpiredAndUnpaid = false
-  if (company) {
+  if (company && !ctx.isSupport) {
     const now = new Date()
     const trialEnds = company.trial_ends_at ? new Date(company.trial_ends_at) : null
     const status = company.subscription_status
@@ -93,7 +97,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     supabase
       .from('users')
       .select('*')
-      .eq('company_id', companyId),
+      .eq('company_id', companyId)
+      .neq('role', 'support'),
     supabase
       .from('job_assignments')
       .select('*')
@@ -112,20 +117,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   ])
 
   return (
-    <AdminDashboard
-      user={user}
-      userData={userData}
-      company={company}
-      trialExpiredAndUnpaid={trialExpiredAndUnpaid}
-      jobs={jobsResult.data || []}
-      signins={signinsResult.data || []}
-      alerts={alertsResult.data || []} resolvedAlerts={resolvedAlertsResult.data || []}
-      pendingQA={pendingQAResult.data || []}
-      teamMembers={teamMembersResult.data || []}
-      jobAssignments={jobAssignmentsResult.data || []}
-      checklistTemplates={checklistTemplatesResult.data || []}
-      diaryEntries={diaryEntriesResult.data || []}
-      defaultTab={params.tab || "overview"}
-    />
+    <>
+      {ctx.isSupport && <SupportBanner companyName={company?.name || 'this company'} />}
+      <AdminDashboard
+        user={user}
+        userData={userData}
+        company={company}
+        trialExpiredAndUnpaid={trialExpiredAndUnpaid}
+        jobs={jobsResult.data || []}
+        signins={signinsResult.data || []}
+        alerts={alertsResult.data || []} resolvedAlerts={resolvedAlertsResult.data || []}
+        pendingQA={pendingQAResult.data || []}
+        teamMembers={teamMembersResult.data || []}
+        jobAssignments={jobAssignmentsResult.data || []}
+        checklistTemplates={checklistTemplatesResult.data || []}
+        diaryEntries={diaryEntriesResult.data || []}
+        defaultTab={params.tab || "overview"}
+      />
+    </>
   )
 }

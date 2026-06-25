@@ -401,6 +401,7 @@ export default function InstallerJobsPage() {
                   <div>
                     <div className="font-medium text-sm">{job.name}</div>
                     <div className="text-xs text-[#4d6478] mt-0.5">{job.address}</div>
+                    {job.distance_from_site_km != null && <div className="text-xs text-[#4d6478] mt-0.5">📍 {job.distance_from_site_km} km from site</div>}
                   </div>
                   {job.signed_in && <span className="text-xs bg-[#00d4a0]/10 text-[#00d4a0] border border-[#00d4a0]/20 rounded-full px-2 py-0.5 flex-shrink-0">On site</span>}
                 </div>

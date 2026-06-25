@@ -31,6 +31,7 @@ export interface Job {
   address: string
   lat?: number
   lng?: number
+  distance_from_site_km?: number
   template_id?: string
   status: JobStatus
   contract_value?: number

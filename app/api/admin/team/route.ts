@@ -1,33 +1,30 @@
 ﻿import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getCallerContext } from "@/lib/company-context"
 
 const VALID_ROLES = ["installer", "foreman", "admin"]
-const CAN_LIST = ["admin", "foreman", "superadmin"]
-const CAN_ADD = ["admin", "superadmin"]
+const CAN_LIST = ["admin", "foreman", "superadmin", "support"]
+const CAN_ADD = ["admin", "superadmin", "support"]
 const CAN_ADD_ADMINS = ["superadmin"]
 
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const ctx = await getCallerContext()
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!CAN_LIST.includes(ctx.role) || !ctx.companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const service = await createServiceClient()
-  const { data: u } = await service.from("users").select("company_id, role").eq("auth_user_id", user.id).single()
-  if (!u || !CAN_LIST.includes(u.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-
-  const { data: members } = await service.from("users").select("*").eq("company_id", u.company_id).order("name")
+  // Platform support users are never shown as company team members.
+  const { data: members } = await service.from("users").select("*").eq("company_id", ctx.companyId).neq("role", "support").order("name")
   return NextResponse.json({ members: members || [] })
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const ctx = await getCallerContext()
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!CAN_ADD.includes(ctx.role) || !ctx.companyId) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  const u = { company_id: ctx.companyId, role: ctx.role }
 
   const service = await createServiceClient()
-  const { data: u } = await service.from("users").select("company_id, role").eq("auth_user_id", user.id).single()
-  if (!u || !CAN_ADD.includes(u.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-
   const body = await request.json().catch(() => null)
   if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid body" }, { status: 400 })
 
@@ -56,6 +53,9 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error("[admin/team] insert failed:", error)
+    if (error.code === "23505") {
+      return NextResponse.json({ error: "This email is already registered." }, { status: 400 })
+    }
     return NextResponse.json({ error: "Could not add team member", detail: error.message }, { status: 400 })
   }
 

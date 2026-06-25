@@ -15,6 +15,7 @@ import ComplianceTab from "@/components/admin/ComplianceTab"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
+import SupportTab from "@/components/admin/SupportTab"
 import React, { useState, useEffect, useRef, useMemo } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
@@ -108,6 +109,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [editJobTemplateId, setEditJobTemplateId] = useState("")
   const [jobName, setJobName] = useState("")
   const [jobAddress, setJobAddress] = useState("")
+  const [jobDistanceKm, setJobDistanceKm] = useState("")
+  const [editJobDistanceKm, setEditJobDistanceKm] = useState("")
   const [jobTemplateId, setJobTemplateId] = useState("")
   const [jobTemplateIds, setJobTemplateIds] = useState<string[]>([])
   const [jobAssignedMembers, setJobAssignedMembers] = useState<string[]>([])
@@ -581,22 +584,22 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   async function addJob() {
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
-    if (!jobPlaceSelected) { setFormError("Select an address from the dropdown - do not just type it"); return }
+    if (!jobPlaceSelected && !jobDistanceKm.trim()) { setFormError("Select an address from the dropdown, or enter a distance from site for remote locations with no address"); return }
     setSaving(true); setFormError("")
-    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime, required_trades: multiTradeEnabled ? jobRequiredTrades : null }).select("id").single()
+    const { data: newJobData, error } = await supabase.from("jobs").insert({ company_id: userData.company_id, name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, start_time: jobStartTime, sign_out_time: jobSignOutTime, distance_from_site_km: jobDistanceKm.trim() === "" ? null : Number(jobDistanceKm), required_trades: multiTradeEnabled ? jobRequiredTrades : null }).select("id").single()
     if (error) { setFormError(error.message); setSaving(false); return }
     if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
     if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
-    setJobName(""); setJobAddress(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00"); setJobRequiredTrades([])
+    setJobName(""); setJobAddress(""); setJobDistanceKm(""); setJobTemplateId(""); setJobTemplateIds([]); setJobAssignedMembers([]); setJobPlaceSelected(false); setShowAddJob(false); setSaving(false); setJobStartTime("08:00"); setJobSignOutTime("17:00"); setJobRequiredTrades([])
     router.refresh()
   }
 
   async function updateJob(jobId: string) {
     if (!editJobName.trim()) { setFormError("Enter a job name"); return }
-    if (!editJobPlaceSelected && (editJobLat == null || editJobLng == null)) { setFormError("Address must be verified - please pick from the Google Maps dropdown"); return }
+    if (!editJobPlaceSelected && (editJobLat == null || editJobLng == null) && !editJobDistanceKm.trim()) { setFormError("Address must be verified - please pick from the Google Maps dropdown, or enter a distance from site for remote locations"); return }
     setSaving(true); setFormError("")
     const newStatus = editJobStatus || "active"
-    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, required_trades: multiTradeEnabled ? (editJobRequiredTrades || []) : [] }).eq("id", jobId)
+    const { error } = await supabase.from("jobs").update({ name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, distance_from_site_km: editJobDistanceKm.trim() === "" ? null : Number(editJobDistanceKm), required_trades: multiTradeEnabled ? (editJobRequiredTrades || []) : [] }).eq("id", jobId)
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
@@ -899,6 +902,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     { id: "schedule", label: "Scheduler" }, // schedule_link_added
     { id: "calendar", label: "Calendar" }, // calendar_sidebar_marker
     { id: "settings", label: "Settings" },
+    { id: "support", label: "Support" },
   ]
 
   const operationsTabs: Array<{ id: string; label: string; badge?: number }> = [
@@ -1254,6 +1258,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   )}
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Distance from site (km)</label>
+                  <input type="number" min="0" step="0.1" inputMode="decimal" value={jobDistanceKm} onChange={e => setJobDistanceKm(e.target.value)} placeholder="Optional - for remote sites with no address" className={inp}/>
+                </div>
+                <div>
                 <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Shift start time</label>
                   <input type="time" value={jobStartTime} onChange={e => setJobStartTime(e.target.value)} className={inp}/>
@@ -1334,6 +1342,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <div className="flex-1">
                         <div className="font-semibold">{j.name}</div>
                         <div className={"text-sm " + sub + " mt-0.5"}>{j.address}</div>
+                        {j.distance_from_site_km != null && <div className={"text-xs " + sub + " mt-0.5"}>📍 {j.distance_from_site_km} km from site</div>}
                         {(j.job_checklists || []).map((jc: any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full mr-1">{checklistTemplates.find((t:any) => t.id === jc.template_id)?.name}</span>)}
                         {assigned.length > 0 && (
                           <div className="flex gap-2 mt-2 flex-wrap">
@@ -1341,7 +1350,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : "17:00"); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -1360,6 +1369,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             <div className={"absolute right-3 top-3 text-xs font-semibold " + (editJobPlaceSelected ? "text-teal-500" : "text-red-400")}>
                               {editJobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
                             </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Distance from site (km)</label>
+                            <input type="number" min="0" step="0.1" inputMode="decimal" value={editJobDistanceKm} onChange={e => setEditJobDistanceKm(e.target.value)} placeholder="Optional - for remote sites with no address" className={inp}/>
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
@@ -2069,6 +2082,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "schedule" && <ScheduleTab />}
         {activeTab === "calendar" && <CalendarTab />}
         {activeTab === "settings" && <SettingsTab />}
+
+        {activeTab === "support" && <SupportTab />}
 
         {activeTab === "alerts" && (
           <div className={card}>

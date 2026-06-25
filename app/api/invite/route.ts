@@ -8,9 +8,17 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
   const { email, name, role } = await request.json()
 
-  const isForeman = role === 'foreman' || role === 'admin'
+  // Dashboard users (admin + foreman) get the set-password invite flow.
+  // Installers get the app-download email instead.
+  const isDashboardUser = role === 'foreman' || role === 'admin'
+  const isAdmin = role === 'admin'
+  const roleLabel = isAdmin ? 'Admin' : 'Foreman'
+  const roleArticle = isAdmin ? 'an' : 'a'
+  const roleBlurb = isAdmin
+    ? 'Your manager has added you as an <strong style="color:#0A1A14">Admin</strong> on Vantro. You have full access to the dashboard - jobs, team, diary alerts, QA, payroll and company settings.'
+    : 'Your manager has added you as a <strong style="color:#0A1A14">Foreman</strong> on Vantro. You have full access to the dashboard - jobs, team, diary alerts, QA and payroll.'
 
-  if (isForeman) {
+  if (isDashboardUser) {
     const { data, error } = await service.auth.admin.generateLink({
       type: 'invite',
       email,
@@ -26,14 +34,14 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         from: 'Vantro <noreply@getvantro.com>',
         to: email,
-        subject: 'You have been added to Vantro',
+        subject: `You have been added to Vantro as ${roleArticle} ${roleLabel}`,
         html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
           <div style="background:#00C896;width:40px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:24px">
             <span style="color:#07100D;font-weight:800;font-size:1rem">V</span>
           </div>
           <h2 style="color:#0A1A14;font-size:1.4rem;margin-bottom:12px">Welcome to Vantro</h2>
           <p style="color:#4A6158;line-height:1.6;margin-bottom:8px">Hi ${name || 'there'},</p>
-          <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">Your manager has added you as a <strong style="color:#0A1A14">Foreman</strong> on Vantro. You have full access to the dashboard - jobs, team, diary alerts, QA and payroll.</p>
+          <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">${roleBlurb}</p>
           <ol style="color:#4A6158;line-height:2;margin-bottom:24px">
             <li>Click the button below to accept your invite</li>
             <li>Set your password</li>

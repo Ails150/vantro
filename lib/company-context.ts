@@ -1,0 +1,59 @@
+import { cookies } from "next/headers"
+import { createClient, createServiceClient } from "@/lib/supabase/server"
+
+// Cookie that holds the company a platform "support" user is currently viewing.
+export const SUPPORT_COMPANY_COOKIE = "vantro_support_company"
+
+export type CallerContext = {
+  authUserId: string
+  userId: string
+  role: string
+  name: string | null
+  email: string | null
+  isSupport: boolean
+  // The company this request should operate on. For normal users this is their
+  // own company; for a support user it's the company they've switched into
+  // (null if they haven't picked one yet).
+  companyId: string | null
+  // The user's own company_id (null for platform support users).
+  baseCompanyId: string | null
+}
+
+// Resolves the effective company context for the logged-in user from the
+// session cookie. Works in both server components and route handlers.
+//
+// This is the single place cross-company "support" access is granted: a
+// support user's effective company comes from the SUPPORT_COMPANY_COOKIE
+// rather than their own users row.
+export async function getCallerContext(): Promise<CallerContext | null> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const service = await createServiceClient()
+  const { data: u } = await service
+    .from("users")
+    .select("id, company_id, role, name, email")
+    .eq("auth_user_id", user.id)
+    .single()
+  if (!u) return null
+
+  const isSupport = u.role === "support"
+  let companyId: string | null = u.company_id
+
+  if (isSupport) {
+    const jar = await cookies()
+    companyId = jar.get(SUPPORT_COMPANY_COOKIE)?.value || null
+  }
+
+  return {
+    authUserId: user.id,
+    userId: u.id,
+    role: u.role,
+    name: u.name,
+    email: u.email,
+    isSupport,
+    companyId,
+    baseCompanyId: u.company_id,
+  }
+}
