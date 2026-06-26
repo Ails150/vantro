@@ -1,6 +1,16 @@
 ﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
+// True if a Postgres/PostgREST error is about a given column not existing.
+// Lets us gracefully drop a column (e.g. gps_source) when the DB migration that
+// adds it hasn't been applied yet, instead of failing the whole write.
+function isMissingColumn(error: any, col: string) {
+  if (!error) return false
+  const blob = `${error.message || ""} ${error.details || ""} ${error.hint || ""}`
+  // 42703 = undefined_column (Postgres); PGRST204 = column not in schema cache.
+  return (error.code === "42703" || error.code === "PGRST204") && blob.includes(col)
+}
+
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -29,7 +39,7 @@ export async function POST(request: Request) {
   const insert: any = {
     company_id: u.company_id,
     name,
-    address: typeof b.address === "string" ? (b.address.trim() || null) : null,
+    address: typeof b.address === "string" ? b.address.trim() : "", // jobs.address is NOT NULL; "" for remote
     status: b.status || "active",
     checklist_template_id: b.checklist_template_id || null,
     lat: b.lat ?? null,
@@ -42,7 +52,12 @@ export async function POST(request: Request) {
     geofence_radius_metres: b.geofence_radius_metres ?? null,
     required_trades: b.required_trades ?? null,
   }
-  const { data, error } = await service.from("jobs").insert(insert).select("id").single()
+  let { data, error } = await service.from("jobs").insert(insert).select("id").single()
+  if (isMissingColumn(error, "gps_source")) {
+    console.warn("[admin/jobs POST] jobs.gps_source missing in DB — creating job without it. Run the gps_source migration.")
+    const { gps_source, ...rest } = insert
+    ;({ data, error } = await service.from("jobs").insert(rest).select("id").single())
+  }
   if (error) {
     console.error("[admin/jobs POST] insert failed:", JSON.stringify({ message: error.message, code: error.code, details: error.details, hint: error.hint }))
     return NextResponse.json(
@@ -50,7 +65,7 @@ export async function POST(request: Request) {
       { status: 400 }
     )
   }
-  return NextResponse.json({ id: data.id })
+  return NextResponse.json({ id: data?.id })
 }
 
 // Update a job's core fields via the service role (same schema-cache reason).
@@ -74,7 +89,12 @@ export async function PUT(request: Request) {
   for (const k of allowed) if (b[k] !== undefined) update[k] = b[k]
   if (Object.keys(update).length === 0) return NextResponse.json({ error: "No fields to update" }, { status: 400 })
 
-  const { error } = await service.from("jobs").update(update).eq("id", jobId)
+  let { error } = await service.from("jobs").update(update).eq("id", jobId)
+  if (isMissingColumn(error, "gps_source")) {
+    console.warn("[admin/jobs PUT] jobs.gps_source missing in DB — updating job without it. Run the gps_source migration.")
+    const { gps_source, ...rest } = update
+    ;({ error } = await service.from("jobs").update(rest).eq("id", jobId))
+  }
   if (error) {
     console.error("[admin/jobs PUT] update failed:", JSON.stringify({ message: error.message, code: error.code, details: error.details, hint: error.hint }))
     return NextResponse.json(

@@ -52,7 +52,11 @@ export async function POST(request: Request) {
   // sign-ins geofence from that anchor.
   let siteAnchored = false
   if ((job.lat == null || job.lng == null) && lat != null && lng != null) {
-    await service.from("jobs").update({ lat, lng, gps_source: "installer" }).eq("id", jobId)
+    const { error: anchorErr } = await service.from("jobs").update({ lat, lng, gps_source: "installer" }).eq("id", jobId)
+    if (anchorErr) {
+      // gps_source column may not exist yet — still anchor the coordinates.
+      await service.from("jobs").update({ lat, lng }).eq("id", jobId)
+    }
     job.lat = lat
     job.lng = lng
     siteAnchored = true

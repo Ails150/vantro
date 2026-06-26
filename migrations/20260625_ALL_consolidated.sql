@@ -76,3 +76,6 @@ begin
     raise notice 'Dropped admin-limiting unique index: %', r.idxname;
   end loop;
 end $$;
+
+-- ── Force PostgREST to reload its schema cache so the API sees new columns ──
+NOTIFY pgrst, 'reload schema';

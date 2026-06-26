@@ -151,7 +151,7 @@ export async function POST(request: Request) {
     const insertRow: any = {
       company_id: admin.company_id,
       name,
-      address: address ? (postcode ? `${address}, ${postcode}` : address) : null,
+      address: address ? (postcode ? `${address}, ${postcode}` : address) : "", // jobs.address is NOT NULL
       status: "active",
     }
     if (coords) {

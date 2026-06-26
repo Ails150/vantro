@@ -5,6 +5,10 @@
 --   'manual'           -> set/verified by an admin (address or map pin)
 --
 -- Run once in the Supabase SQL editor.
+-- DROP + ADD (not "add if not exists") to recover from a half-created column,
+-- then force PostgREST to reload its schema cache so the API sees it immediately.
 
-alter table public.jobs
-  add column if not exists gps_source text;
+ALTER TABLE public.jobs DROP COLUMN IF EXISTS gps_source;
+ALTER TABLE public.jobs ADD COLUMN gps_source text;
+
+NOTIFY pgrst, 'reload schema';
