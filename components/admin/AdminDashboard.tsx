@@ -1010,6 +1010,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   } as Record<string, string>)[role] || role)
   // Field roles that use the PIN app / installer mobile view and can be assigned to jobs.
   const isFieldRole = (role: string) => role === "installer" || role === "foreman" || role === "subcontractor"
+  // The viewer is a superadmin if their role says so OR their own member record
+  // carries the is_superadmin flag (transferred superadmins keep role 'admin').
+  const viewerIsSuperadmin = userData?.role === "superadmin" || teamMembers.some((m: any) => m.id === userData?.id && m.is_superadmin === true)
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -1916,9 +1919,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                               </div>
                             </div>
                           )}
-                          {/* Superadmin can delete any member, including admins (which have no menu above). */}
-                          {!isInstFm && userData?.role === "superadmin" && !m.is_superadmin && m.id !== userData?.id && (
-                            <div className="flex items-center gap-2 pt-3 mt-auto border-t border-gray-100">
+                          {/* Superadmin can delete ANY member (admin, subcontractor, installer,
+                              foreman) — never themselves or the superadmin account. */}
+                          {viewerIsSuperadmin && !m.is_superadmin && m.id !== userData?.id && (
+                            <div className={"flex items-center gap-2 pt-3 border-t border-gray-100 " + (isInstFm ? "" : "mt-auto")}>
                               <button
                                 onClick={() => removeMember(m.id, m.auth_user_id, m.name)}
                                 className="flex-1 text-xs rounded-lg px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
