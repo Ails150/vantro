@@ -50,7 +50,7 @@ export async function POST(request: Request) {
     distance_from_site_km: b.distance_from_site_km ?? null,
     contractor: b.contractor || null,
     geofence_radius_metres: b.geofence_radius_metres ?? null,
-    required_trades: b.required_trades ?? null,
+    required_trades: Array.isArray(b.required_trades) ? b.required_trades : [], // jobs.required_trades is NOT NULL
   }
   let { data, error } = await service.from("jobs").insert(insert).select("id").single()
   if (isMissingColumn(error, "gps_source")) {
@@ -87,6 +87,8 @@ export async function PUT(request: Request) {
   const allowed = ["name","address","lat","lng","gps_source","status","start_time","sign_out_time","distance_from_site_km","contractor","geofence_radius_metres","required_trades"]
   const update: any = {}
   for (const k of allowed) if (b[k] !== undefined) update[k] = b[k]
+  // jobs.required_trades is NOT NULL — never write null.
+  if ("required_trades" in update && !Array.isArray(update.required_trades)) update.required_trades = []
   if (Object.keys(update).length === 0) return NextResponse.json({ error: "No fields to update" }, { status: 400 })
 
   let { error } = await service.from("jobs").update(update).eq("id", jobId)
