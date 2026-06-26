@@ -1,8 +1,11 @@
 ﻿import { redirect } from 'next/navigation'
 
-export default function InstallerSetupPage({ searchParams }: { searchParams: { email?: string } }) {
+export default function InstallerSetupPage({ searchParams }: { searchParams: { email?: string; token?: string } }) {
   const email = searchParams.email || ''
-  const deepLink = `vantro://login?email=${encodeURIComponent(email)}`
+  const token = searchParams.token || ''
+  // Forward the token to the app if the link carries one (token-based path);
+  // the email-based path works on email alone.
+  const deepLink = `vantro://login?email=${encodeURIComponent(email)}${token ? `&token=${encodeURIComponent(token)}` : ''}`
 
   return (
     <html>
