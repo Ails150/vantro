@@ -6,7 +6,8 @@ export async function POST(request: Request) {
   const { pin, token } = await request.json()
   if (!pin || pin.length !== 4) return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   if (!/^\d{4}$/.test(pin)) return NextResponse.json({ error: 'PIN must be 4 digits' }, { status: 400 })
-  if (!token) return NextResponse.json({ error: 'Reset token required' }, { status: 400 })
+  const INVITE_EXPIRED = 'Your invite link has expired. Please ask your manager to resend your invite.'
+  if (!token) return NextResponse.json({ error: INVITE_EXPIRED }, { status: 400 })
 
   const service = await createServiceClient()
   // Look up user by token only - token is unique and uniquely identifies the user
@@ -16,9 +17,9 @@ export async function POST(request: Request) {
     .eq('pin_reset_token', token)
     .single()
 
-  if (!user) return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+  if (!user) return NextResponse.json({ error: INVITE_EXPIRED }, { status: 401 })
   if (!user.pin_reset_expires || new Date(user.pin_reset_expires) < new Date()) {
-    return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    return NextResponse.json({ error: INVITE_EXPIRED }, { status: 401 })
   }
 
   const pin_hash = await bcrypt.hash(pin, 10)

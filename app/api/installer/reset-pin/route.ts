@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ success: true }) // silent fail for security
 
   const token = crypto.randomBytes(32).toString('hex')
-  const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour
+  const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
 
   await service.from('users').update({ pin_reset_token: token, pin_reset_expires: expires }).eq('id', user.id)
 
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
           </div>
           <h2 style="color:#0f1923;text-align:center">Reset your PIN</h2>
           <p style="color:#444">Hi ${user.name},</p>
-          <p style="color:#444">Click the button below to set a new PIN for your Vantro account. This link expires in 1 hour.</p>
+          <p style="color:#444">Click the button below to set a new PIN for your Vantro account. This link expires in 7 days.</p>
           <div style="text-align:center;margin:24px 0">
             <a href="${resetUrl}" style="background:#00d4a0;color:#0f1923;font-weight:700;padding:12px 28px;border-radius:10px;text-decoration:none;display:inline-block">Set new PIN →</a>
           </div>
