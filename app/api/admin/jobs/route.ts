@@ -44,8 +44,11 @@ export async function POST(request: Request) {
   }
   const { data, error } = await service.from("jobs").insert(insert).select("id").single()
   if (error) {
-    console.error("[admin/jobs POST] insert failed:", error)
-    return NextResponse.json({ error: "Could not create job", detail: error.message }, { status: 400 })
+    console.error("[admin/jobs POST] insert failed:", JSON.stringify({ message: error.message, code: error.code, details: error.details, hint: error.hint }))
+    return NextResponse.json(
+      { error: error.message || "Could not create job", code: error.code, details: error.details, hint: error.hint },
+      { status: 400 }
+    )
   }
   return NextResponse.json({ id: data.id })
 }
@@ -73,8 +76,11 @@ export async function PUT(request: Request) {
 
   const { error } = await service.from("jobs").update(update).eq("id", jobId)
   if (error) {
-    console.error("[admin/jobs PUT] update failed:", error)
-    return NextResponse.json({ error: "Could not update job", detail: error.message }, { status: 400 })
+    console.error("[admin/jobs PUT] update failed:", JSON.stringify({ message: error.message, code: error.code, details: error.details, hint: error.hint }))
+    return NextResponse.json(
+      { error: error.message || "Could not update job", code: error.code, details: error.details, hint: error.hint },
+      { status: 400 }
+    )
   }
   return NextResponse.json({ success: true })
 }

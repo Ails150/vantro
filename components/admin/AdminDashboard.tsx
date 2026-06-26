@@ -638,7 +638,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     setSaving(true); setFormError("")
     const createRes = await fetch("/api/admin/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, gps_source: (jobLat != null && jobLng != null) ? "manual" : null, start_time: jobStartTime, sign_out_time: jobSignOutTime, distance_from_site_km: jobDistanceKm.trim() === "" ? null : Number(jobDistanceKm), contractor: jobContractor.trim() || null, geofence_radius_metres: jobGeofenceRadius.trim() === "" ? null : Number(jobGeofenceRadius), required_trades: multiTradeEnabled ? jobRequiredTrades : null }) })
     const createData = await createRes.json().catch(() => ({}))
-    if (!createRes.ok) { setFormError(createData.error || "Could not create job"); setSaving(false); return }
+    if (!createRes.ok) { setFormError([createData.error, createData.hint, createData.details].filter(Boolean).join(" · ") || "Could not create job"); setSaving(false); return }
     const newJobData = createData.id ? { id: createData.id } : null
     if (jobTemplateIds.length > 0 && newJobData) { for (const tid of jobTemplateIds) { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "assign_to_job", jobId: newJobData.id, templateId: tid }) }) } }
     if (jobAssignedMembers.length > 0) { const newJob = await supabase.from("jobs").select("id").eq("company_id", userData.company_id).order("created_at", { ascending: false }).limit(1).single(); if (newJob.data) { for (const uid of jobAssignedMembers) { await supabase.from("job_assignments").upsert({ job_id: newJob.data.id, user_id: uid, company_id: userData.company_id }, { onConflict: "job_id,user_id" }) } } }
@@ -656,7 +656,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     if (newStatus === "completed" || newStatus === "cancelled") {
       await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
     }
-    if (!updateRes.ok) { setFormError(updateData.error || "Could not update job"); setSaving(false); return }
+    if (!updateRes.ok) { setFormError([updateData.error, updateData.hint, updateData.details].filter(Boolean).join(" · ") || "Could not update job"); setSaving(false); return }
     const { error: delErr } = await supabase.from("job_checklists").delete().eq("job_id", jobId)
     if (delErr) { setFormError("Couldn't update checklists: " + delErr.message); setSaving(false); return }
     if (editJobTemplateIds.length > 0) {
