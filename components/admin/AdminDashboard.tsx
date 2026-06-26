@@ -121,6 +121,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [jobTemplateId, setJobTemplateId] = useState("")
   const [jobTemplateIds, setJobTemplateIds] = useState<string[]>([])
   const [jobAssignedMembers, setJobAssignedMembers] = useState<string[]>([])
+  const [editJobAssignedMembers, setEditJobAssignedMembers] = useState<string[]>([])
   const [editJobTemplateIds, setEditJobTemplateIds] = useState<string[]>([])
   const [jobLat, setJobLat] = useState(null)
   const [jobLng, setJobLng] = useState(null)
@@ -663,7 +664,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       const { error: insErr } = await supabase.from("job_checklists").insert(editJobTemplateIds.map((tid: string) => ({ job_id: jobId, template_id: tid })))
       if (insErr) { setFormError("Couldn't save checklists: " + insErr.message); setSaving(false); return }
     }
-    setEditingJobId(null); setSaving(false); setEditJobRequiredTrades([])
+    // Sync team assignments to match the edit-form checkboxes.
+    await supabase.from("job_assignments").delete().eq("job_id", jobId)
+    if (editJobAssignedMembers.length > 0) {
+      await supabase.from("job_assignments").insert(editJobAssignedMembers.map((uid: string) => ({ job_id: jobId, user_id: uid, company_id: userData.company_id })))
+    }
+    setEditingJobId(null); setSaving(false); setEditJobRequiredTrades([]); setEditJobAssignedMembers([])
     window.location.reload()
   }
 
@@ -1448,7 +1454,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobContractor(j.contractor || ""); setEditJobGeofenceRadius(j.geofence_radius_metres != null ? String(j.geofence_radius_metres) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobStartTime(j.start_time ? j.start_time.slice(0, 5) : companyDefaultStart); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : companyDefaultSignOut); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
+                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobContractor(j.contractor || ""); setEditJobGeofenceRadius(j.geofence_radius_metres != null ? String(j.geofence_radius_metres) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobStartTime(j.start_time ? j.start_time.slice(0, 5) : companyDefaultStart); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : companyDefaultSignOut); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setEditJobAssignedMembers(getAssigned(j.id).map((m: any) => m.id)); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
                         {editingJobId === j.id ? "Cancel" : "Edit"}
                       </button>
                       <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
@@ -1505,6 +1511,22 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Sign-out time</label>
                             <input type="time" value={editJobSignOutTime} onChange={e => setEditJobSignOutTime(e.target.value)} className={inp}/>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
+                            {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor").length === 0 ? (
+                              <p className="text-sm text-gray-400">No team yet - <button type="button" onClick={() => { setEditingJobId(null); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
+                            ) : (
+                              <div className="space-y-2 mt-1">
+                                {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor").map((m: any) => (
+                                  <label key={m.id} className="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" checked={editJobAssignedMembers?.includes(m.id) || false} onChange={e => setEditJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="w-4 h-4 accent-teal-500"/>
+                                    <span className="text-sm text-gray-700">{m.name}</span>
+                                    <span className="text-xs text-gray-400">{m.role}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           {/* trades_jobs_patched: edit-job */}
                           {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
