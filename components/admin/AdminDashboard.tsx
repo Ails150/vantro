@@ -144,6 +144,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [scheduleSignOut, setScheduleSignOut] = useState("17:00")
   const [scheduleDays, setScheduleDays] = useState<string[]>(["mon","tue","wed","thu","fri"])
   const [templateName, setTemplateName] = useState("")
+  const [importingPdf, setImportingPdf] = useState(false)
+  const checklistPdfRef = useRef<HTMLInputElement>(null)
   const [templateFrequency, setTemplateFrequency] = useState("job")
   const [editingTemplateId, setEditingTemplateId] = useState<string|null>(null)
   const [editTemplateName, setEditTemplateName] = useState("")
@@ -894,6 +896,27 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       }
     }
     router.refresh()
+  }
+
+  async function importChecklistPdf(file: File) {
+    if (!file) return
+    setImportingPdf(true)
+    try {
+      const fd = new FormData(); fd.append("file", file)
+      const res = await fetch("/api/admin/checklist-templates/import-pdf", { method: "POST", body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setToast({ message: [data.error, data.detail].filter(Boolean).join(" · ") || "PDF import failed", type: "error" })
+        setImportingPdf(false); return
+      }
+      const extra = [data.holdPoints ? `${data.holdPoints} hold point${data.holdPoints === 1 ? "" : "s"}` : "", data.photoItems ? `${data.photoItems} photo` : ""].filter(Boolean).join(", ")
+      setToast({ message: `Imported "${data.template?.name}" — ${data.itemCount} items${extra ? " (" + extra + ")" : ""}`, type: "success" })
+      setImportingPdf(false)
+      router.refresh()
+    } catch {
+      setToast({ message: "PDF import failed. Please try again.", type: "error" })
+      setImportingPdf(false)
+    }
   }
 
   async function addTemplate() {
@@ -1963,7 +1986,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
         {activeTab === "checklists" && (
           <div className="space-y-5">
-            <div className="flex justify-end"><button onClick={() => { setShowAddTemplate(true); setFormError("") }} className={btn}>+ New template</button></div>
+            <div className="flex justify-end gap-2 items-center">
+              <input ref={checklistPdfRef} type="file" accept="application/pdf,.pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) importChecklistPdf(f); e.target.value = "" }} />
+              <button onClick={() => checklistPdfRef.current?.click()} disabled={importingPdf} className={btnGhost} title="Upload a PDF checklist (e.g. Fieldwire) — Vantro builds the template automatically">{importingPdf ? "Reading PDF…" : "Import from PDF"}</button>
+              <button onClick={() => { setShowAddTemplate(true); setFormError("") }} className={btn}>+ New template</button>
+            </div>
             {showAddTemplate && (
               <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
                 <h3 className="font-semibold">New checklist template</h3>
@@ -2062,6 +2089,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <div className="flex gap-2 mt-1 flex-wrap">
                         <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{itemTypeOptions.find(o => o.value === item.item_type)?.label || item.item_type}</span>
                         {item.trade && <span className="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded-full font-medium">{companyTrades.find(t => t.trade_key === item.trade)?.label || item.trade}</span>}
+                        {item.hold_point && <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">⛔ Hold point</span>}
                         {item.is_mandatory && <span className="text-xs bg-red-50 text-red-500 px-2 py-0.5 rounded-full">Mandatory</span>}
                         {item.requires_photo && <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">Photo</span>}
                         {item.requires_video && <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full">Video</span>}
