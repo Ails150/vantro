@@ -146,6 +146,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [templateName, setTemplateName] = useState("")
   const [importingPdf, setImportingPdf] = useState(false)
   const checklistPdfRef = useRef<HTMLInputElement>(null)
+  const [expandedTemplates, setExpandedTemplates] = useState<Set<string>>(new Set())
+  const toggleTemplate = (id: string) => setExpandedTemplates(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const [templateFrequency, setTemplateFrequency] = useState("job")
   const [editingTemplateId, setEditingTemplateId] = useState<string|null>(null)
   const [editTemplateName, setEditTemplateName] = useState("")
@@ -2017,11 +2019,14 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             ) : checklistTemplates.map((t: any) => (
               <div key={t.id} className={card}>
                 <div className={cardHeader}>
-                  <div>
+                  <button onClick={() => toggleTemplate(t.id)} className="flex items-center gap-2 text-left flex-wrap min-w-0">
+                    <svg className={"flex-shrink-0 text-gray-400 transition-transform " + (expandedTemplates.has(t.id) ? "rotate-90" : "")} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     <span className="font-semibold">{t.name}</span>
-                    <span className="ml-2 text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full">{t.frequency === "job" || !t.frequency ? "Per job" : t.frequency.charAt(0).toUpperCase() + t.frequency.slice(1)}</span>
-                    <span className={"text-sm " + sub + " ml-3"}>{t.checklist_items?.length || 0} items</span>
-                  </div>
+                    <span className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full">{t.frequency === "job" || !t.frequency ? "Per job" : t.frequency.charAt(0).toUpperCase() + t.frequency.slice(1)}</span>
+                    <span className={"text-sm " + sub}>{t.checklist_items?.length || 0} items</span>
+                    {t.requires_approval && <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded-full">Approval</span>}
+                    {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Audit only</span>}
+                  </button>
                   <div className="flex gap-2 flex-wrap items-center">
                     <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600">
                       <input type="checkbox" checked={t.requires_approval || false} onChange={async e => { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_template", templateId: t.id, requires_approval: e.target.checked, audit_only: t.audit_only || false }) }); window.location.reload() }} className="w-3.5 h-3.5 accent-teal-500"/>
@@ -2031,13 +2036,13 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <input type="checkbox" checked={t.audit_only || false} onChange={async e => { await fetch("/api/checklist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "update_template", templateId: t.id, requires_approval: t.requires_approval || false, audit_only: e.target.checked }) }); window.location.reload() }} className="w-3.5 h-3.5 accent-teal-500"/>
                       Audit only
                     </label>
-                    <button onClick={() => { setShowAddItem(t.id); setFormError("") }} className="text-sm bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 rounded-xl px-3 py-1.5 font-medium">+ Add item</button>
+                    <button onClick={() => { setShowAddItem(t.id); setFormError(""); setExpandedTemplates(prev => new Set(prev).add(t.id)) }} className="text-sm bg-teal-50 text-teal-600 hover:bg-teal-100 border border-teal-200 rounded-xl px-3 py-1.5 font-medium">+ Add item</button>
                     <button onClick={() => { setEditingTemplateId(t.id); setEditTemplateName(t.name); setEditTemplateFrequency(t.frequency || "job") }} className="text-sm bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-xl px-3 py-1.5 font-medium">Edit</button>
                     <button onClick={() => deleteTemplate(t.id)} className="text-sm bg-red-50 text-red-500 hover:bg-red-100 border border-red-200 rounded-xl px-3 py-1.5 font-medium">Delete</button>
                     {editingTemplateId === t.id && (<div className="w-full mt-3 p-3 bg-gray-50 rounded-xl border border-gray-200 flex flex-wrap gap-3 items-end"><div className="flex-1 min-w-[160px]"><label className="block text-xs font-medium text-gray-600 mb-1">Name</label><input value={editTemplateName} onChange={e => setEditTemplateName(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm" /></div><div><label className="block text-xs font-medium text-gray-600 mb-1">Frequency</label><select value={editTemplateFrequency} onChange={e => setEditTemplateFrequency(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm"><option value="job">Per job (QA)</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></div><button onClick={() => saveEditTemplate(t.id)} className="text-sm bg-teal-500 text-white rounded-xl px-4 py-1.5 font-medium">Save</button><button onClick={() => setEditingTemplateId(null)} className="text-sm text-gray-500 px-3 py-1.5">Cancel</button></div>)}
                   </div>
                 </div>
-                {showAddItem === t.id && (
+                {expandedTemplates.has(t.id) && showAddItem === t.id && (
                   <div className="px-6 py-5 border-b border-gray-100 bg-gray-50 space-y-3">
                     <h4 className="text-sm font-semibold">New checklist item</h4>
                     <input value={itemLabel} onChange={e => setItemLabel(e.target.value)} placeholder="Item label e.g. Check sealant cured" className={inp}/>
@@ -2080,7 +2085,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     </div>
                   </div>
                 )}
-                {(!t.checklist_items || t.checklist_items.length === 0) ? (
+                {expandedTemplates.has(t.id) && ((!t.checklist_items || t.checklist_items.length === 0) ? (
                   <div className={"px-6 py-8 text-center " + sub + " text-sm"}>No items yet</div>
                 ) : t.checklist_items.sort((a: any, b: any) => a.sort_order - b.sort_order).map((item: any) => (
                   <div key={item.id} className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 last:border-0">
@@ -2098,7 +2103,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     </div>
                     <button onClick={() => deleteItem(item.id)} className={"text-xs " + sub + " hover:text-red-500 transition-colors"}>Remove</button>
                   </div>
-                ))}
+                )))}
               </div>
             ))}
           </div>
