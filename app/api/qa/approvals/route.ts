@@ -16,11 +16,19 @@ export async function GET() {
     .order('submitted_at', { ascending: false })
 
   const results = await Promise.all((approvals || []).map(async (approval: any) => {
-    const { data: submissions } = await service
+    // Include hold_point on the joined item; fall back if that column isn't migrated yet.
+    let { data: submissions, error: subErr } = await service
       .from('qa_submissions')
-      .select('*, checklist_items(label, item_type)')
+      .select('*, checklist_items(label, item_type, hold_point)')
       .eq('job_id', approval.job_id)
       .eq('user_id', approval.user_id)
+    if (subErr) {
+      ;({ data: submissions } = await service
+        .from('qa_submissions')
+        .select('*, checklist_items(label, item_type)')
+        .eq('job_id', approval.job_id)
+        .eq('user_id', approval.user_id))
+    }
 
     let photoUrls: Record<string, string> = {}
     for (const sub of submissions || []) {
@@ -44,6 +52,30 @@ export async function POST(request: Request) {
   if (!userData) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { approvalId, action, note } = await request.json()
+
+  // Hold-point gate: can't approve until every submitted hold-point item has RFL sign-off.
+  if (action === 'approved') {
+    try {
+      const { data: appr } = await service.from('qa_approvals').select('job_id, user_id').eq('id', approvalId).single()
+      if (appr) {
+        const { data: subs, error: sErr } = await service
+          .from('qa_submissions')
+          .select('rfl_initials, checklist_items(hold_point, label)')
+          .eq('job_id', appr.job_id)
+          .eq('user_id', appr.user_id)
+        if (!sErr) {
+          const pending = (subs || []).filter((s: any) => s.checklist_items?.hold_point === true && !(s.rfl_initials && String(s.rfl_initials).trim()))
+          if (pending.length) {
+            return NextResponse.json({
+              error: `Cannot approve — ${pending.length} hold point${pending.length === 1 ? '' : 's'} still need RFL sign-off.`,
+              holdPointsPending: pending.length,
+            }, { status: 400 })
+          }
+        }
+      }
+    } catch { /* if hold_point/rfl columns aren't migrated yet, skip the gate */ }
+  }
+
   const { error } = await service.from('qa_approvals').update({
     status: action,
     rejection_note: note || null,
