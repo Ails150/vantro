@@ -36,8 +36,11 @@ async function geocodeAddress(address: string, postcode?: string): Promise<{ lat
   const apiKey = process.env.GOOGLE_MAPS_API_KEY
   if (!apiKey) return null
 
-  const fullAddress = postcode ? `${address}, ${postcode}` : address
-  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&key=${apiKey}`
+  // Bias to the UK: append country and pass region/components so Google
+  // doesn't match a same-named town/city in another country.
+  const base = postcode ? `${address}, ${postcode}` : address
+  const fullAddress = `${base}, UK`
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(fullAddress)}&region=GB&components=country:GB&key=${apiKey}`
 
   try {
     const res = await fetch(url)
