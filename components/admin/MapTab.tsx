@@ -359,7 +359,7 @@ export default function MapTab() {
         {/* RIGHT: map */}
         <div style={{ borderRadius: 10, overflow: "hidden", height: 600, border: "1px solid #e5e7eb" }}>
           <MapErrorBoundary>
-          <APIProvider apiKey={GOOGLE_MAPS_KEY}>
+          <APIProvider apiKey={GOOGLE_MAPS_KEY} onError={(e) => console.error("[Maps API]", e)}>
             <Map
               defaultCenter={center}
               defaultZoom={data.jobs.length > 0 ? 12 : 6}
