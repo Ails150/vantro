@@ -1,9 +1,27 @@
 "use client"
-import { useState, useEffect, useCallback, useMemo, useRef } from "react"
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap } from "@vis.gl/react-google-maps"
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || ""
 const GOOGLE_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || ""
+
+class MapErrorBoundary extends React.Component<{children: React.ReactNode}> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  componentDidCatch(e: any) { console.error("[Map]", e) }
+  render() {
+    if ((this.state as any).hasError) return (
+      <div className="flex items-center justify-center h-full bg-gray-50 rounded-xl">
+        <div className="text-center p-8">
+          <div className="font-medium text-gray-700">Map unavailable</div>
+          <div className="text-sm text-gray-500 mt-1">Google Maps API key issue</div>
+          <button onClick={() => this.setState({hasError:false})} className="mt-3 px-4 py-2 bg-teal-500 text-white rounded-lg text-sm">Retry</button>
+        </div>
+      </div>
+    )
+    return this.props.children
+  }
+}
 
 interface MapData {
   signins: any[]
@@ -340,6 +358,7 @@ export default function MapTab() {
 
         {/* RIGHT: map */}
         <div style={{ borderRadius: 10, overflow: "hidden", height: 600, border: "1px solid #e5e7eb" }}>
+          <MapErrorBoundary>
           <APIProvider apiKey={GOOGLE_MAPS_KEY}>
             <Map
               defaultCenter={center}
@@ -350,7 +369,7 @@ export default function MapTab() {
             >
               <MapController focus={focusPoint} fitPoints={fitPoints} />
 
-              {data.jobs.map((job: any) => (
+              {data.jobs.filter((job: any) => job.lat != null && job.lng != null && !isNaN(Number(job.lat)) && !isNaN(Number(job.lng))).map((job: any) => (
                 <AdvancedMarker key={`job-${job.id}`} position={{ lat: job.lat, lng: job.lng }} onClick={() => setSelected({ type: "job", data: job })}>
                   <Pin background="#3b82f6" borderColor="#1d4ed8" glyphColor="#fff" scale={1.1} />
                 </AdvancedMarker>
@@ -407,6 +426,7 @@ export default function MapTab() {
               )}
             </Map>
           </APIProvider>
+          </MapErrorBoundary>
         </div>
       </div>
 
