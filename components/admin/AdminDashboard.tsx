@@ -343,7 +343,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const overviewData = useMemo(() => {
     const now = new Date()
     const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0)
-    const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay()); startOfWeek.setHours(0,0,0,0)
+    const startOfWeek = new Date(now)
+    const day = startOfWeek.getDay()
+    startOfWeek.setDate(startOfWeek.getDate() - (day === 0 ? 6 : day - 1))
+    startOfWeek.setHours(0,0,0,0)
     const startOfLastWeek = new Date(startOfWeek); startOfLastWeek.setDate(startOfLastWeek.getDate() - 7)
 
     // Resolved alert ids set for fast lookup
