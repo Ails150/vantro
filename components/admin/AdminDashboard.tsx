@@ -1241,7 +1241,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           onClick={() => setActiveTab(item.tab)}
                           className="text-xs font-semibold text-teal-700 hover:text-teal-900 flex-shrink-0"
                         >
-                          View â†’
+                          View →
                         </button>
                       </li>
                     )
@@ -1256,7 +1256,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">On site now</h3>
-                  <button onClick={() => setActiveTab("map")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">View map â†’</button>
+                  <button onClick={() => setActiveTab("map")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">View map →</button>
                 </div>
                 {overviewData.onSiteTiles.length === 0 ? (
                   <div className={"text-sm py-6 text-center " + sub}>No active jobs</div>
@@ -1743,7 +1743,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       onClick={handleOpenBillingPortal}
                       className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                     >
-                      Upgrade plan â†’
+                      Upgrade plan →
                     </button>
                   </div>
                 )
