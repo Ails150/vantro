@@ -3,15 +3,16 @@
 // Safety net for when mobile geofence-exit didn't fire (Android background killed,
 // permission downgrade, app crash, etc). Ensures no shift stays open indefinitely.
 //
-// Logic per open signin:
-//   - If signed_in_at > 12 hours ago -> close (hard cap)
-//   - Fetch most recent location_log for that user since signed_in_at
-//   - If no pings at all and sign-in > 30 min ago -> close (mobile never reported)
-//   - If last ping > 30 min old OR > 300m from site -> close
+// Logic per open signin (conservative — only close when we're confident):
+//   - If signed_in_at > 14 hours ago -> close (hard cap)
+//   - If now > job sign_out_time + 2 hours -> close (scheduled shift ended)
+//   - Else fetch most recent location_log since signed_in_at:
+//       - No pings at all -> skip (never close purely because GPS never reported)
+//       - Close only if last ping is BOTH stale (>30 min old) AND far (>300m)
 //
-// signed_out_at is set to the LAST proximity ping time (best guess of when they left),
-// or signed_in_at + 8 hours for the hard-cap case.
-// auto_closed_reason: "no_recent_proximity" | "stale_no_pings" | "max_shift_duration"
+// signed_out_at is set to the last proximity ping time when available, else the
+// expected shift end, or signed_in_at + 8 hours for the hard-cap case.
+// auto_closed_reason: "no_recent_proximity" | "shift_ended" | "max_shift_duration"
 // flagged: true so admin sees the server caught it.
 //
 // Auth: Vercel cron sends Authorization: Bearer <CRON_SECRET>
@@ -21,8 +22,8 @@ import { createServiceClient } from "@/lib/supabase/server"
 
 const STALE_PING_MINUTES = 30
 const PROXIMITY_BUFFER_M = 300
-const MAX_SHIFT_HOURS = 12
-const NO_PINGS_GRACE_MINUTES = 30
+const MAX_SHIFT_HOURS = 14
+const SHIFT_END_GRACE_HOURS = 2
 
 function haversineMetres(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
 
   const { data: openSignins, error: signinsErr } = await service
     .from("signins")
-    .select("id, user_id, job_id, signed_in_at, jobs!inner(id, lat, lng)")
+    .select("id, user_id, job_id, signed_in_at, jobs!inner(id, lat, lng, sign_out_time)")
     .is("signed_out_at", null)
 
   if (signinsErr) {
@@ -59,11 +60,31 @@ export async function GET(request: Request) {
     const ageHours = ageMs / 3600000
     const job = (s as any).jobs
 
+    // Hard cap: nobody works a single shift longer than this.
     if (ageHours > MAX_SHIFT_HOURS) {
       const closeAt = new Date(signedInAt.getTime() + 8 * 3600000)
       await closeSignin(service, s.id, closeAt, signedInAt, "max_shift_duration", null, null)
       results.push({ signinId: s.id, action: "closed", reason: "max_shift_duration", ageHours: ageHours.toFixed(1) })
       continue
+    }
+
+    // Scheduled shift ended: now is past the job's sign_out_time plus a grace window.
+    if (job?.sign_out_time) {
+      const [h, m] = String(job.sign_out_time).split(":").map(Number)
+      if (!isNaN(h) && !isNaN(m)) {
+        const expectedSignOut = new Date(signedInAt)
+        expectedSignOut.setHours(h, m, 0, 0)
+        // Overnight shift: scheduled end is before sign-in, so it's the next day.
+        if (expectedSignOut.getTime() < signedInAt.getTime()) {
+          expectedSignOut.setDate(expectedSignOut.getDate() + 1)
+        }
+        const threshold = expectedSignOut.getTime() + SHIFT_END_GRACE_HOURS * 3600000
+        if (now.getTime() > threshold) {
+          await closeSignin(service, s.id, expectedSignOut, signedInAt, "shift_ended", null, null)
+          results.push({ signinId: s.id, action: "closed", reason: "shift_ended", ageHours: ageHours.toFixed(1) })
+          continue
+        }
+      }
     }
 
     const { data: latestPing } = await service
@@ -75,13 +96,10 @@ export async function GET(request: Request) {
       .limit(1)
       .maybeSingle()
 
+    // Never close purely because GPS never reported — too many false positives
+    // (background location killed, permission downgrade). Wait for the shift-end rule.
     if (!latestPing) {
-      if (ageMs > NO_PINGS_GRACE_MINUTES * 60000) {
-        await closeSignin(service, s.id, now, signedInAt, "stale_no_pings", null, null)
-        results.push({ signinId: s.id, action: "closed", reason: "stale_no_pings", ageHours: ageHours.toFixed(1) })
-      } else {
-        results.push({ signinId: s.id, action: "skip", reason: "no_pings_within_grace" })
-      }
+      results.push({ signinId: s.id, action: "skip", reason: "no_pings" })
       continue
     }
 
@@ -96,10 +114,11 @@ export async function GET(request: Request) {
     const isStale = pingAgeMin > STALE_PING_MINUTES
     const isFar = dist > PROXIMITY_BUFFER_M
 
-    if (isStale || isFar) {
-      const reason = isFar ? "no_recent_proximity" : "stale_no_pings"
-      await closeSignin(service, s.id, pingAt, signedInAt, reason, latestPing.lat, latestPing.lng)
-      results.push({ signinId: s.id, action: "closed", reason, distMetres: dist, pingAgeMin: pingAgeMin.toFixed(1) })
+    // Require BOTH: a stale ping alone (phone asleep on site) or a far ping alone
+    // (one bad GPS fix) is not enough — only close when they're stale AND far.
+    if (isStale && isFar) {
+      await closeSignin(service, s.id, pingAt, signedInAt, "no_recent_proximity", latestPing.lat, latestPing.lng)
+      results.push({ signinId: s.id, action: "closed", reason: "no_recent_proximity", distMetres: dist, pingAgeMin: pingAgeMin.toFixed(1) })
     } else {
       results.push({ signinId: s.id, action: "skip", reason: "still_on_site", distMetres: dist, pingAgeMin: pingAgeMin.toFixed(1) })
     }

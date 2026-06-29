@@ -437,8 +437,9 @@ export default function InstallerJobsPage() {
             </div>
             <div className="bg-[#1a2635] border border-white/5 rounded-xl p-4">
               <textarea value={diaryText} onChange={e => setDiaryText(e.target.value)}
+                onFocus={e => setTimeout(() => e.target.scrollIntoView({ behavior: "smooth", block: "center" }), 300)}
                 placeholder="What happened on site today? Log progress, issues, blockers, or anything the office needs to know..."
-                rows={6} className="w-full bg-transparent text-white placeholder-[#4d6478] text-sm resize-none outline-none leading-relaxed"/>
+                rows={4} className="w-full bg-transparent text-white placeholder-[#4d6478] text-sm resize-none outline-none leading-relaxed"/>
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
                 <span className="text-xs text-[#4d6478]">{diaryText.length} characters</span>
                 <button onClick={submitDiary} disabled={!diaryText.trim() || diaryLoading}
@@ -461,7 +462,7 @@ export default function InstallerJobsPage() {
             </div>
             <div className="bg-[#1a2535] rounded-2xl p-4 space-y-3">
               <div className="text-sm font-semibold">Log a defect</div>
-              <textarea value={defectText} onChange={e => setDefectText(e.target.value)} placeholder="Describe the defect..." rows={3} className="w-full bg-[#243040] border border-white/5 rounded-xl px-3 py-2 text-sm text-white placeholder-[#4d6478] focus:outline-none resize-none"/>
+              <textarea value={defectText} onChange={e => setDefectText(e.target.value)} onFocus={e => setTimeout(() => e.target.scrollIntoView({ behavior: "smooth", block: "center" }), 300)} placeholder="Describe the defect..." rows={3} className="w-full bg-[#243040] border border-white/5 rounded-xl px-3 py-2 text-sm text-white placeholder-[#4d6478] focus:outline-none resize-none"/>
               <select value={defectSeverity} onChange={e => setDefectSeverity(e.target.value)} className="w-full bg-[#243040] border border-white/5 rounded-xl px-3 py-2 text-sm text-white focus:outline-none">
                 <option value="minor">Minor</option>
                 <option value="major">Major</option>

@@ -227,7 +227,7 @@ Return ONLY valid JSON, no preamble, no markdown:
           companyId: payload.companyId,
           jobId,
           alertType: finalSeverity as "blocker" | "issue",
-          summary: aiSummary || entryText.slice(0, 200),
+          summary: entryText?.trim() || aiSummary || "Diary entry",
           loggedBy: loggerRow?.name || "Installer",
           photoUrls: Array.isArray(photoUrls) ? photoUrls : []
         })
