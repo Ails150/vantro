@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
-import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap } from "@vis.gl/react-google-maps"
+import { APIProvider, Map, Marker, InfoWindow, useMap } from "@vis.gl/react-google-maps"
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || ""
 const GOOGLE_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || ""
@@ -363,20 +363,17 @@ export default function MapTab() {
             <Map
               defaultCenter={center}
               defaultZoom={data.jobs.length > 0 ? 12 : 6}
-              mapId={GOOGLE_MAP_ID}
               style={{ width: "100%", height: "100%" }}
               gestureHandling="greedy"
             >
               <MapController focus={focusPoint} fitPoints={fitPoints} />
 
               {data.jobs.filter((job: any) => job.lat != null && job.lng != null && !isNaN(Number(job.lat)) && !isNaN(Number(job.lng))).map((job: any) => (
-                <AdvancedMarker key={`job-${job.id}`} position={{ lat: job.lat, lng: job.lng }} onClick={() => setSelected({ type: "job", data: job })}>
-                  <Pin background="#3b82f6" borderColor="#1d4ed8" glyphColor="#fff" scale={1.1} />
-                </AdvancedMarker>
+                <Marker key={`job-${job.id}`} position={{ lat: job.lat, lng: job.lng }} onClick={() => setSelected({ type: "job", data: job })} />
               ))}
 
               {rows.filter((r: any) => r.signin && r.pos).map((row: any) => (
-                <AdvancedMarker
+                <Marker
                   key={`installer-${row.id}`}
                   position={row.pos}
                   onClick={() => { setFocusPoint(row.pos); setSelected({ type: "installer", data: {
@@ -387,9 +384,7 @@ export default function MapTab() {
                     user: { name: row.name, initials: row.initials },
                     job: row.signin?.jobs, hoursOnSite: row.statusLabel,
                   } }) }}
-                >
-                  <Pin background={row.status === "off_site" ? "#ef4444" : "#10b981"} borderColor={row.status === "off_site" ? "#b91c1c" : "#047857"} glyphColor="#fff" scale={1.2} />
-                </AdvancedMarker>
+                />
               ))}
 
               {selected && selected.data.lat && selected.data.lng && (
