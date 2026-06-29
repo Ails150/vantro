@@ -24,14 +24,32 @@ function formatDuration(ms: number): string {
   return `${h}h ${m}m`
 }
 
-// Sub-component to control map imperatively (pan/zoom to selected installer)
-function MapController({ focus }: { focus: { lat: number; lng: number } | null }) {
+// Sub-component to control map imperatively (fit to people, pan to selected installer)
+function MapController({ focus, fitPoints }: { focus: { lat: number; lng: number } | null; fitPoints: { lat: number; lng: number }[] }) {
   const map = useMap()
+
+  // Fit the viewport to the supplied points (on-site workers, else jobs).
+  // Re-runs whenever the point set changes (e.g. after a 5-min data refresh).
+  useEffect(() => {
+    if (!map || !fitPoints || fitPoints.length === 0) return
+    const g = (typeof window !== "undefined" ? (window as any).google : undefined)
+    if (fitPoints.length === 1 || !g?.maps) {
+      map.panTo(fitPoints[0])
+      if ((map.getZoom() || 0) < 14) map.setZoom(14)
+      return
+    }
+    const bounds = new g.maps.LatLngBounds()
+    fitPoints.forEach((p) => bounds.extend(p))
+    map.fitBounds(bounds, 64)
+  }, [map, fitPoints])
+
+  // Pan to a specific marker when its list row is clicked.
   useEffect(() => {
     if (!map || !focus) return
     map.panTo(focus)
     if ((map.getZoom() || 0) < 14) map.setZoom(14)
   }, [map, focus])
+
   return null
 }
 
@@ -64,7 +82,9 @@ export default function MapTab() {
   const team = data.team || []
   const rows = useMemo(() => {
     const now = Date.now()
-    // If team list not provided by API, derive from signins + locations
+    // The people layer is driven by OPEN signins, not by GPS breadcrumbs.
+    // If a team list isn't provided by the API, derive members from the open
+    // signins so every signed-in worker gets a row even with no GPS ping.
     const members = team.length > 0 ? team : (() => {
       const uniq: Record<string, any> = {}
       data.signins.forEach((s: any) => {
@@ -74,28 +94,49 @@ export default function MapTab() {
     })()
 
     return members.map((m: any) => {
-      const signin = data.signins.find((s: any) => s.user_id === m.id)
+      const signin = data.signins.find((s: any) => s.user_id === m.id && !s.signed_out_at)
       const location = data.locations.find((l: any) => l.user_id === m.id)
       const alertsForUser = (data.alerts || []).filter((a: any) => a.user_id === m.id)
+
+      // Resolve marker position in priority order:
+      //   a) most recent GPS fix  b) lat/lng captured at sign-in  c) the job's location
+      const num = (v: any) => (typeof v === "number" && !Number.isNaN(v) ? v : null)
+      let pos: { lat: number; lng: number } | null = null
+      let posSource: "gps" | "signin" | "job" | null = null
+      if (location && num(location.lat) !== null && num(location.lng) !== null) {
+        pos = { lat: location.lat, lng: location.lng }; posSource = "gps"
+      } else if (signin && num(signin.lat) !== null && num(signin.lng) !== null) {
+        pos = { lat: signin.lat, lng: signin.lng }; posSource = "signin"
+      } else if (signin && num(signin.jobs?.lat) !== null && num(signin.jobs?.lng) !== null) {
+        pos = { lat: signin.jobs.lat, lng: signin.jobs.lng }; posSource = "job"
+      }
+
+      // Prefer live GPS range/distance; fall back to the values captured at
+      // sign-in (a fresh sign-in is always within range to be accepted).
+      const within: boolean | null = location
+        ? !!location.within_range
+        : (signin && typeof signin.within_range === "boolean" ? signin.within_range : null)
+      const dist: number | null = location
+        ? num(location.distance_from_site_metres)
+        : (signin ? num(signin.distance_from_site_metres) : null)
 
       let status: "on_site" | "off_site" | "offline" = "offline"
       let statusLabel = "Not signed in today"
       let statusDetail = ""
 
-      if (signin && !signin.signed_out_at) {
+      if (signin) {
         const dur = now - new Date(signin.signed_in_at).getTime()
-        if (location?.within_range) {
+        statusDetail = signin.jobs?.name || ""
+        if (within === false) {
+          status = "off_site"
+          statusLabel = dist !== null ? `Off site (${Math.round(dist)}m away)` : "Off site"
+        } else if (within === true) {
           status = "on_site"
           statusLabel = `On site ${formatDuration(dur)}`
-          statusDetail = signin.jobs?.name || ""
-        } else if (location) {
-          status = "off_site"
-          statusLabel = `Off site (${Math.round(location.distance_from_site_metres)}m away)`
-          statusDetail = signin.jobs?.name || ""
         } else {
+          // Signed in but no range info yet (no GPS ping) - still on site.
           status = "on_site"
           statusLabel = `Signed in ${formatDuration(dur)}`
-          statusDetail = signin.jobs?.name || ""
         }
       }
 
@@ -108,6 +149,10 @@ export default function MapTab() {
         statusDetail,
         location,
         signin,
+        pos,
+        posSource,
+        within,
+        dist,
         hasAlert: alertsForUser.length > 0,
       }
     })
@@ -136,14 +181,31 @@ export default function MapTab() {
   }), [rows, data.alerts])
 
   const defaultCenter = { lat: 52.5, lng: -1.5 }
-  const center = data.jobs[0]?.lat ? { lat: data.jobs[0].lat, lng: data.jobs[0].lng } : defaultCenter
+
+  // Fit to the on-site workers' markers. Fall back to jobs, then the hardcoded
+  // default, only when nobody is on site - so one mis-geocoded job can't drag
+  // the centre while people are signed in.
+  const fitPoints = useMemo(() => {
+    const people = rows.filter((r: any) => r.signin && r.pos).map((r: any) => r.pos as { lat: number; lng: number })
+    if (people.length > 0) return people
+    return data.jobs
+      .filter((j: any) => typeof j.lat === "number" && typeof j.lng === "number")
+      .map((j: any) => ({ lat: j.lat, lng: j.lng }))
+  }, [rows, data.jobs])
+
+  const center = fitPoints[0] || defaultCenter
 
   function onRowClick(row: any) {
-    if (row.location?.lat && row.location?.lng) {
-      const point = { lat: row.location.lat, lng: row.location.lng }
-      setFocusPoint(point)
-      setSelected({ type: "installer", data: { ...row.location, user: { name: row.name, initials: row.initials }, job: row.signin?.jobs, hoursOnSite: row.statusLabel } })
-    }
+    if (!row.pos) return
+    setFocusPoint(row.pos)
+    setSelected({ type: "installer", data: {
+      lat: row.pos.lat, lng: row.pos.lng,
+      within_range: row.within, distance_from_site_metres: row.dist,
+      logged_at: row.location?.logged_at || row.signin?.signed_in_at,
+      posSource: row.posSource,
+      user: { name: row.name, initials: row.initials },
+      job: row.signin?.jobs, hoursOnSite: row.statusLabel,
+    } })
   }
 
   if (loading) return (
@@ -286,7 +348,7 @@ export default function MapTab() {
               style={{ width: "100%", height: "100%" }}
               gestureHandling="greedy"
             >
-              <MapController focus={focusPoint} />
+              <MapController focus={focusPoint} fitPoints={fitPoints} />
 
               {data.jobs.map((job: any) => (
                 <AdvancedMarker key={`job-${job.id}`} position={{ lat: job.lat, lng: job.lng }} onClick={() => setSelected({ type: "job", data: job })}>
@@ -294,14 +356,22 @@ export default function MapTab() {
                 </AdvancedMarker>
               ))}
 
-              {data.locations.map((loc: any) => {
-                const signin = data.signins.find((s: any) => s.user_id === loc.user_id)
-                return (
-                  <AdvancedMarker key={`installer-${loc.user_id}`} position={{ lat: loc.lat, lng: loc.lng }} onClick={() => setSelected({ type: "installer", data: { ...loc, user: signin?.users, job: signin?.jobs } })}>
-                    <Pin background={loc.within_range ? "#10b981" : "#ef4444"} borderColor={loc.within_range ? "#047857" : "#b91c1c"} glyphColor="#fff" scale={1.2} />
-                  </AdvancedMarker>
-                )
-              })}
+              {rows.filter((r: any) => r.signin && r.pos).map((row: any) => (
+                <AdvancedMarker
+                  key={`installer-${row.id}`}
+                  position={row.pos}
+                  onClick={() => { setFocusPoint(row.pos); setSelected({ type: "installer", data: {
+                    lat: row.pos.lat, lng: row.pos.lng,
+                    within_range: row.within, distance_from_site_metres: row.dist,
+                    logged_at: row.location?.logged_at || row.signin?.signed_in_at,
+                    posSource: row.posSource,
+                    user: { name: row.name, initials: row.initials },
+                    job: row.signin?.jobs, hoursOnSite: row.statusLabel,
+                  } }) }}
+                >
+                  <Pin background={row.status === "off_site" ? "#ef4444" : "#10b981"} borderColor={row.status === "off_site" ? "#b91c1c" : "#047857"} glyphColor="#fff" scale={1.2} />
+                </AdvancedMarker>
+              ))}
 
               {selected && selected.data.lat && selected.data.lng && (
                 <InfoWindow position={{ lat: selected.data.lat, lng: selected.data.lng }} onCloseClick={() => setSelected(null)}>
@@ -319,16 +389,16 @@ export default function MapTab() {
                         <div style={{ fontWeight: 600, marginBottom: 4 }}>{selected.data.user?.name}</div>
                         <div style={{ fontSize: 12, color: "#666" }}>{selected.data.job?.name}</div>
                         <div style={{ fontSize: 12, marginTop: 4 }}>
-                          {selected.data.within_range
-                            ? <span style={{ color: "#047857" }}>✓ On site ({Math.round(selected.data.distance_from_site_metres)}m)</span>
-                            : <span style={{ color: "#b91c1c" }}>⚠ Off site ({Math.round(selected.data.distance_from_site_metres)}m away)</span>
+                          {selected.data.within_range === false
+                            ? <span style={{ color: "#b91c1c" }}>⚠ Off site{typeof selected.data.distance_from_site_metres === "number" ? ` (${Math.round(selected.data.distance_from_site_metres)}m away)` : ""}</span>
+                            : <span style={{ color: "#047857" }}>✓ On site{typeof selected.data.distance_from_site_metres === "number" ? ` (${Math.round(selected.data.distance_from_site_metres)}m)` : ""}</span>
                           }
                         </div>
                         {selected.data.hoursOnSite && (
                           <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{selected.data.hoursOnSite}</div>
                         )}
                         <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-                          Last seen: {new Date(selected.data.logged_at).toLocaleTimeString("en-GB")}
+                          {selected.data.posSource === "gps" ? "Last seen: " : "Signed in: "}{selected.data.logged_at ? new Date(selected.data.logged_at).toLocaleTimeString("en-GB") : "-"}
                         </div>
                       </>
                     )}

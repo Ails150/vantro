@@ -677,11 +677,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     window.location.reload()
   }
 
-  async function deleteJob(jobId: string, jobName: string) {
-    if (!window.confirm("Delete job: " + jobName + "? This cannot be undone.")) return
-    const res = await fetch("/api/jobs/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId }) })
+  async function archiveJob(jobId: string, jobName: string) {
+    if (!window.confirm("Archive job: " + jobName + "? It will be hidden from the jobs list but all data is retained for audit purposes.")) return
+    const res = await fetch("/api/jobs/archive", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId }) })
     if (res.ok) { window.location.href = "/admin?tab=jobs" }
-    else { const d = await res.json(); alert("Failed to delete: " + d.error) }
+    else { const d = await res.json(); alert("Failed to archive: " + d.error) }
   }
 
   // csv_import_v1
@@ -1584,7 +1584,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <div className="flex gap-3">
                             <button onClick={() => updateJob(j.id)} disabled={saving} className={btn}>{saving ? "Saving..." : "Save changes"}</button>
                             <button onClick={() => setEditingJobId(null)} className={btnGhost}>Cancel</button>
-                            <button onClick={() => deleteJob(j.id, j.name)} className="bg-red-50 hover:bg-red-100 text-red-500 border border-red-200 rounded-xl px-5 py-2.5 text-sm transition-colors">Delete</button>
+                            <button onClick={() => archiveJob(j.id, j.name)} className="bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 rounded-xl px-5 py-2.5 text-sm transition-colors">Archive</button>
                           </div>
                         </div>
                       </div>

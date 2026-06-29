@@ -93,6 +93,7 @@ export default function CalendarTab() {
   const numDays = numWeeks * 7
   const [data, setData] = useState<CalendarData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // Compute week's 7 dates
   const weekDates = useMemo(() => {
@@ -122,14 +123,22 @@ export default function CalendarTab() {
   const load = useCallback(async () => {
     if (!startStr || !endStr) return
     setLoading(true)
+    setLoadError(null)
     try {
       const res = await fetch(
         `/api/admin/calendar?start=${startStr}&end=${endStr}`
       )
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        setLoadError(j.error || `Failed to load calendar (${res.status})`)
+        setLoading(false)
+        return
+      }
       const json = await res.json()
       setData(json)
     } catch (err) {
       console.error("[calendar] load failed", err)
+      setLoadError("Could not load the calendar. Check your connection and try again.")
     }
     setLoading(false)
   }, [startStr, endStr])
@@ -352,7 +361,17 @@ export default function CalendarTab() {
         </div>
       </div>
 
-      {loading && !data ? (
+      {loadError ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
+          <p className="text-sm font-medium text-red-700">{loadError}</p>
+          <button
+            onClick={load}
+            className="mt-4 px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      ) : loading && !data ? (
         <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-500">
           Loading calendar...
         </div>

@@ -10,10 +10,12 @@ export async function GET() {
   const { data: u } = await service.from("users").select("company_id").eq("auth_user_id", user.id).single()
   if (!u) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
-  // Get all active signins with user and job location
+  // Get all active signins with user and job location.
+  // Select signins.lat/lng (captured at sign-in) and within_range/distance so the
+  // people layer can place a worker even before any GPS breadcrumb exists.
   const { data: signins } = await service
     .from("signins")
-    .select("id, signed_in_at, user_id, job_id, users(name, role), jobs(name, address, lat, lng)")
+    .select("id, signed_in_at, user_id, job_id, lat, lng, within_range, distance_from_site_metres, users(name, role), jobs(name, address, lat, lng)")
     .eq("company_id", u.company_id)
     .is("signed_out_at", null)
     .gte("signed_in_at", new Date(new Date().setHours(0,0,0,0)).toISOString())
