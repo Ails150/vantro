@@ -497,18 +497,88 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     const jobsCompletedThisWeek = jobsCompletedInRange(startOfWeek, now)
     const jobsCompletedLastWeek = jobsCompletedInRange(startOfLastWeek, startOfWeek)
 
+    // Installer hours this week
+    const installerHoursThisWeek: Record<string, number> = {}
+    for (const s of (signins || [])) {
+      if (!s.signed_in_at || !s.signed_out_at) continue
+      const t = new Date(s.signed_in_at)
+      if (t >= startOfWeek && t < now) {
+        const ms = new Date(s.signed_out_at).getTime() - t.getTime()
+        if (ms > 0) installerHoursThisWeek[s.user_id] = (installerHoursThisWeek[s.user_id] || 0) + ms / (1000 * 60 * 60)
+      }
+    }
+
+    // Job RAG status
+    const jobRAG = activeJobs.map((j: any) => {
+      const assigned = localAssignments.filter((a: any) => a.job_id === j.id)
+      const onSite = onSiteByJobId[j.id] || 0
+      const jobSignins = (signins || []).filter((s: any) => s.job_id === j.id)
+      const lastSignin = jobSignins.length > 0 ? new Date(Math.max(...jobSignins.map((s: any) => new Date(s.signed_in_at).getTime()))) : null
+      const daysSinceActivity = lastSignin ? (now.getTime() - lastSignin.getTime()) / (1000 * 60 * 60 * 24) : 999
+      const jobAlerts = (alerts || []).filter((a: any) => a.job_id === j.id && a.alert_type === 'blocker' && !resolvedIds.has(a.id))
+      const jobPendingQA = (pendingQA || []).filter((q: any) => q.job_id === j.id)
+      let rag: 'green' | 'amber' | 'red' = 'green'
+      if (jobAlerts.length > 0 || daysSinceActivity > 3) rag = 'red'
+      else if (assigned.length > 0 && onSite === 0) rag = 'amber'
+      else if (jobPendingQA.length > 0) rag = 'amber'
+      return { jobId: j.id, jobName: j.name, rag, onSite, assigned: assigned.length, openBlockers: jobAlerts.length, pendingQA: jobPendingQA.length, daysSinceActivity: Math.floor(daysSinceActivity) }
+    }).sort((a: any, b: any) => { const order: any = { red: 0, amber: 1, green: 2 }; return order[a.rag] - order[b.rag] })
+
+    // Attendance with minutes late
+    const attendanceWithTime: Array<{ installerName: string; jobName: string; minsLate: number }> = []
+    for (const job of activeJobs) {
+      const assigned = localAssignments.filter((a: any) => a.job_id === job.id)
+      const shiftStart = job.start_time || '08:00'
+      const [sh, sm] = shiftStart.split(':').map(Number)
+      const expectedStart = new Date(startOfToday); expectedStart.setHours(sh, sm, 0, 0)
+      const minsLate = Math.max(0, Math.floor((now.getTime() - expectedStart.getTime()) / 60000))
+      for (const a of assigned) {
+        if (!signedInUserIds.has(a.user_id)) {
+          const member = (teamMembers || []).find((m: any) => m.id === a.user_id)
+          if (member) attendanceWithTime.push({ installerName: member.name, jobName: job.name, minsLate })
+        }
+      }
+    }
+
+    const unresolvedAlertCount = (alerts || []).filter((a: any) => !resolvedIds.has(a.id)).length
+    const oldAlertCount = (alerts || []).filter((a: any) => !resolvedIds.has(a.id) && (now.getTime() - new Date(a.created_at).getTime()) > 7 * 86400000).length
+
+    // On site now: per-person active signins (command-centre cards)
+    const onSiteNow = todaySignins.filter((s: any) => !s.signed_out_at).map((s: any) => {
+      const member = (teamMembers || []).find((m: any) => m.id === s.user_id)
+      const job = jobs.find((j: any) => j.id === s.job_id)
+      const name = member?.name || "Unknown"
+      const initials = member?.initials || name.split(" ").map((p: string) => p[0] || "").join("").toUpperCase().slice(0, 2)
+      return { name, initials, jobName: job?.name || "Unknown job", signedInAt: s.signed_in_at }
+    })
+
+    // Sparkline day labels (Mon/Tue...) aligned with the 7-day sparkline
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    const sparklineLabels: string[] = []
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(startOfToday); d.setDate(d.getDate() - i)
+      sparklineLabels.push(dayNames[d.getDay()])
+    }
+
     return {
       actionItems,
       onSiteTiles,
+      onSiteNow,
       todayHours: Math.round(todayHours),
       liveHours: Math.round(liveHours),
       attendanceGaps,
+      attendanceWithTime,
       recentActivity,
       sparkline,
+      sparklineLabels,
       hoursThisWeek,
       hoursLastWeek,
       jobsCompletedThisWeek,
       jobsCompletedLastWeek,
+      installerHoursThisWeek,
+      jobRAG,
+      unresolvedAlertCount,
+      oldAlertCount,
     }
   }, [jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults, teamMembers])
 
@@ -1252,26 +1322,30 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
             {/* ZONE 2: Live state */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Left: On-site tiles */}
+              {/* Left: On site now (per-person) */}
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="font-semibold">On site now</h3>
-                  <button onClick={() => setActiveTab("map")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">View map →</button>
+                  <button onClick={() => setActiveTab("map")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">View map &rarr;</button>
                 </div>
-                {overviewData.onSiteTiles.length === 0 ? (
-                  <div className={"text-sm py-6 text-center " + sub}>No active jobs</div>
+                {overviewData.onSiteNow.length === 0 ? (
+                  <div className={"text-sm py-6 text-center " + sub}>Nobody signed in yet today</div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    {overviewData.onSiteTiles.slice(0, 8).map((tile: any) => {
-                      const empty = tile.onSiteCount === 0
-                      const full = tile.assignedCount > 0 && tile.onSiteCount >= tile.assignedCount
-                      const cls = empty ? "bg-red-50 border-red-200" : full ? "bg-teal-50 border-teal-200" : "bg-amber-50 border-amber-200"
-                      const numCls = empty ? "text-red-700" : full ? "text-teal-700" : "text-amber-700"
+                  <div className="space-y-2 max-h-80 overflow-y-auto">
+                    {overviewData.onSiteNow.map((p: any, idx: number) => {
+                      const ms = new Date().getTime() - new Date(p.signedInAt).getTime()
+                      const mins = Math.max(0, Math.floor(ms / 60000))
+                      const h = Math.floor(mins / 60)
+                      const m = mins % 60
+                      const onSiteStr = (h > 0 ? h + "h " : "") + m + "m on site"
                       return (
-                        <div key={tile.jobId} className={"border rounded-xl px-3 py-2.5 " + cls}>
-                          <div className="text-xs font-medium truncate" title={tile.jobName}>{tile.jobName}</div>
-                          <div className={"text-2xl font-bold mt-0.5 leading-none " + numCls}>{tile.onSiteCount}</div>
-                          <div className="text-[10px] text-gray-500 mt-1">of {tile.assignedCount || 0} assigned</div>
+                        <div key={idx} className="flex items-center gap-3 border border-gray-100 rounded-xl px-3 py-2.5">
+                          <div className="w-9 h-9 rounded-full bg-teal-500 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">{p.initials}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">{p.name}</div>
+                            <div className="text-xs text-gray-500 truncate" title={p.jobName}>{p.jobName}</div>
+                          </div>
+                          <div className="text-xs font-semibold text-teal-600 flex-shrink-0">{onSiteStr}</div>
                         </div>
                       )
                     })}
@@ -1279,17 +1353,21 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 )}
               </div>
 
-              {/* Right: Today's hours + sparkline */}
+              {/* Right: Hours today + sparkline */}
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <h3 className="font-semibold mb-3">Hours logged today</h3>
-                <div className="flex items-end gap-6 mb-4">
+                <h3 className="font-semibold mb-3">Hours today</h3>
+                <div className="flex items-end justify-between mb-4">
                   <div>
                     <div className="text-3xl font-bold text-teal-600 leading-none">{overviewData.liveHours}h</div>
-                    <div className="text-xs text-teal-700 mt-1">Live (inc. active shifts)</div>
+                    <div className="text-xs text-teal-700 mt-1">Live total</div>
                   </div>
                   <div>
                     <div className="text-xl font-semibold text-gray-500 leading-none">{overviewData.todayHours}h</div>
-                    <div className="text-xs text-gray-400 mt-1">Signed out only</div>
+                    <div className="text-xs text-gray-400 mt-1">Signed out</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xl font-semibold text-gray-700 leading-none">{overviewData.hoursThisWeek}h</div>
+                    <div className="text-xs text-gray-400 mt-1">This week</div>
                   </div>
                 </div>
                 <div className="flex items-end gap-1 h-12">
@@ -1304,66 +1382,116 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     )
                   })}
                 </div>
-                <div className="flex justify-between text-[10px] text-gray-400 mt-1">
-                  <span>7d ago</span>
-                  <span>today</span>
+                <div className="flex gap-1 mt-1">
+                  {overviewData.sparklineLabels.map((lbl: string, idx: number) => {
+                    const isToday = idx === overviewData.sparklineLabels.length - 1
+                    return <div key={idx} className={"flex-1 text-center text-[10px] " + (isToday ? "text-teal-600 font-semibold" : "text-gray-400")}>{lbl}</div>
+                  })}
                 </div>
               </div>
             </div>
 
-            {/* ZONE 2b: Attendance gaps */}
-            {overviewData.attendanceGaps.length > 0 && (
+            {/* ZONE 2b: Not signed in yet (with minutes late) */}
+            {overviewData.attendanceWithTime.length > 0 && (
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-semibold">Not signed in yet</h3>
-                  <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-700 flex-shrink-0">{overviewData.attendanceGaps.length}</span>
+                  <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-700 flex-shrink-0">{overviewData.attendanceWithTime.length}</span>
                 </div>
                 <div className="text-xs text-gray-500 mb-3">Assigned to active jobs but no sign-in recorded today</div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {overviewData.attendanceGaps.slice(0, 6).map((g: any, idx: number) => (
+                  {overviewData.attendanceWithTime.slice(0, 9).map((g: any, idx: number) => (
                     <div key={idx} className="border border-amber-200 bg-amber-50 rounded-xl px-3 py-2.5">
-                      <div className="text-sm font-medium text-amber-900 truncate" title={g.installerName}>{g.installerName}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-sm font-medium text-amber-900 truncate" title={g.installerName}>{g.installerName}</div>
+                        {g.minsLate > 0 && <span className="text-[10px] font-semibold text-red-600 flex-shrink-0">{g.minsLate}m late</span>}
+                      </div>
                       <div className="text-xs text-amber-700 truncate mt-0.5" title={g.jobName}>{g.jobName}</div>
                     </div>
                   ))}
                 </div>
-                {overviewData.attendanceGaps.length > 6 && (
-                  <div className="text-xs text-gray-500 mt-2">+ {overviewData.attendanceGaps.length - 6} more</div>
+                {overviewData.attendanceWithTime.length > 9 && (
+                  <div className="text-xs text-gray-500 mt-2">+ {overviewData.attendanceWithTime.length - 9} more</div>
                 )}
               </div>
             )}
 
-            {/* ZONE 3: Trajectory + recent activity */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Left: This week vs last week */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                <h3 className="font-semibold mb-3">This week vs last week</h3>
-                <div className="space-y-2">
-                  {(() => {
-                    const rows = [
-                      { label: "Hours signed", current: overviewData.hoursThisWeek, previous: overviewData.hoursLastWeek, suffix: "h" },
-                      { label: "Jobs completed", current: overviewData.jobsCompletedThisWeek, previous: overviewData.jobsCompletedLastWeek, suffix: "" },
-                    ]
-                    return rows.map((t) => {
-                      const delta = t.current - t.previous
-                      const pct = t.previous > 0 ? Math.round((delta / t.previous) * 100) : 0
-                      const arrow = delta > 0 ? "↗" : delta < 0 ? "↘" : "="
-                      const deltaCls = delta > 0 ? "text-teal-600" : delta < 0 ? "text-red-600" : "text-gray-500"
-                      return (
-                        <div key={t.label} className="flex items-center justify-between border border-gray-100 rounded-xl px-4 py-3">
-                          <div>
-                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t.label}</div>
-                            <div className="text-2xl font-bold mt-0.5">{t.current}{t.suffix}</div>
-                          </div>
-                          <div className={"text-sm text-right " + deltaCls}>
-                            <div className="text-lg">{arrow}</div>
-                            <div>{delta >= 0 ? "+" : ""}{delta}{t.suffix}{t.previous > 0 ? " (" + (delta >= 0 ? "+" : "") + pct + "%)" : ""}</div>
+            {/* ZONE 3: Jobs at a glance (RAG) */}
+            <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">Jobs at a glance</h3>
+                <button onClick={() => setActiveTab("jobs")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">View all jobs &rarr;</button>
+              </div>
+              {overviewData.jobRAG.length === 0 ? (
+                <div className={"text-sm py-6 text-center " + sub}>No active jobs</div>
+              ) : (
+                <ul className="space-y-2">
+                  {overviewData.jobRAG.map((j: any) => {
+                    const dotCls = j.rag === "red" ? "bg-red-500" : j.rag === "amber" ? "bg-amber-500" : "bg-teal-500"
+                    const parts: string[] = []
+                    if (j.openBlockers > 0) parts.push(j.openBlockers === 1 ? "1 blocker" : j.openBlockers + " blockers")
+                    if (j.assigned > 0 && j.onSite === 0) parts.push("nobody on site")
+                    if (j.pendingQA > 0) parts.push(j.pendingQA === 1 ? "1 QA waiting" : j.pendingQA + " QA waiting")
+                    if (j.daysSinceActivity >= 999) parts.push("no activity yet")
+                    else if (j.daysSinceActivity > 3) parts.push("quiet " + j.daysSinceActivity + "d")
+                    const summary = parts.length > 0 ? parts.join(" · ") : "On track"
+                    return (
+                      <li key={j.jobId} className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={"w-2.5 h-2.5 rounded-full flex-shrink-0 " + dotCls}></span>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate" title={j.jobName}>{j.jobName}</div>
+                            <div className="text-xs text-gray-500 truncate">{summary}</div>
                           </div>
                         </div>
-                      )
-                    })
-                  })()}
+                        <div className="text-sm font-semibold text-gray-700 flex-shrink-0">{j.onSite}/{j.assigned}</div>
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+
+            {/* ZONE 4: People this week + Recent activity */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Left: People this week */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold">People this week</h3>
+                  <button onClick={() => setActiveTab("payroll")} className="text-xs font-semibold text-teal-700 hover:text-teal-900">Payroll &rarr;</button>
                 </div>
+                {(() => {
+                  const people = (teamMembers || [])
+                    .filter((m: any) => ["installer", "foreman", "subcontractor"].includes(m.role) && m.is_active !== false)
+                    .map((m: any) => ({ name: m.name, hours: overviewData.installerHoursThisWeek[m.id] || 0 }))
+                    .sort((a: any, b: any) => b.hours - a.hours)
+                  if (people.length === 0) return <div className={"text-sm py-6 text-center " + sub}>No team members</div>
+                  const maxH = Math.max(...people.map((p: any) => p.hours), 40)
+                  return (
+                    <div className="space-y-2.5 max-h-80 overflow-y-auto">
+                      {people.map((p: any, idx: number) => {
+                        const hrs = Math.round(p.hours)
+                        const barCls = hrs > 35 ? "bg-teal-500" : hrs > 20 ? "bg-amber-500" : "bg-gray-300"
+                        const initials = p.name.split(" ").map((x: string) => x[0] || "").join("").toUpperCase().slice(0, 2)
+                        const pct = Math.min(100, (p.hours / maxH) * 100)
+                        return (
+                          <div key={idx} className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gray-200 text-gray-700 flex items-center justify-center text-[11px] font-bold flex-shrink-0">{initials}</div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-sm font-medium truncate">{p.name}</div>
+                                <div className="text-xs font-semibold text-gray-600 flex-shrink-0">{hrs}h</div>
+                              </div>
+                              <div className="h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                                <div className={"h-full rounded-full " + barCls} style={{ width: pct + "%" }}></div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
               </div>
 
               {/* Right: Recent activity feed */}
@@ -1393,6 +1521,24 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   </ul>
                 )}
               </div>
+            </div>
+
+            {/* ZONE 5: Admin queue stat tiles */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {(() => {
+                const tiles = [
+                  { label: "QA approvals", value: pendingQA.length, tab: "approvals", active: pendingQA.length > 0, cls: "text-amber-600" },
+                  { label: "Open alerts", value: overviewData.unresolvedAlertCount, tab: "alerts", active: overviewData.unresolvedAlertCount > 0, cls: "text-red-600" },
+                  { label: "Alerts >7d", value: overviewData.oldAlertCount, tab: "alerts", active: overviewData.oldAlertCount > 0, cls: "text-red-600" },
+                  { label: "Jobs completed", value: overviewData.jobsCompletedThisWeek, tab: "jobs", active: true, cls: "text-teal-600" },
+                ]
+                return tiles.map((t) => (
+                  <button key={t.label} onClick={() => setActiveTab(t.tab)} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm text-left hover:border-teal-300 transition-colors">
+                    <div className={"text-3xl font-bold " + (t.active ? t.cls : "text-gray-300")}>{t.value}</div>
+                    <div className="text-xs font-medium text-gray-500 mt-1">{t.label}</div>
+                  </button>
+                ))
+              })()}
             </div>
           </div>
         )}
