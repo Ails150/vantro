@@ -416,6 +416,41 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       }
     }
 
+    // Attendance gaps: assigned to an active job but no current sign-in today
+    const signedInUserIds = new Set((signins || []).filter((s: any) => !s.signed_out_at).map((s: any) => s.user_id))
+    const attendanceGaps: Array<{ installerName: string; jobName: string }> = []
+    for (const job of activeJobs) {
+      const assigned = localAssignments.filter((a: any) => a.job_id === job.id)
+      for (const a of assigned) {
+        if (!signedInUserIds.has(a.user_id)) {
+          const member = (teamMembers || []).find((m: any) => m.id === a.user_id)
+          if (member) attendanceGaps.push({ installerName: member.name, jobName: job.name })
+        }
+      }
+    }
+
+    // Live hours: today's signed-out hours plus elapsed time on active shifts
+    let liveHours = todayHours
+    for (const s of todaySignins) {
+      if (s.signed_in_at && !s.signed_out_at) {
+        const ms = now.getTime() - new Date(s.signed_in_at).getTime()
+        if (ms > 0) liveHours += ms / (1000 * 60 * 60)
+      }
+    }
+
+    // Recent activity: last 8 sign in/out events, newest first
+    const allEvents: Array<{ name: string; jobName: string; time: Date; type: "in" | "out" }> = []
+    for (const s of (signins || [])) {
+      const member = (teamMembers || []).find((m: any) => m.id === s.user_id)
+      const job = jobs.find((j: any) => j.id === s.job_id)
+      const name = member?.name || "Unknown"
+      const jobName = job?.name || "Unknown job"
+      if (s.signed_in_at) allEvents.push({ name, jobName, time: new Date(s.signed_in_at), type: "in" })
+      if (s.signed_out_at) allEvents.push({ name, jobName, time: new Date(s.signed_out_at), type: "out" })
+    }
+    allEvents.sort((a, b) => b.time.getTime() - a.time.getTime())
+    const recentActivity = allEvents.slice(0, 8)
+
     // Last 7 days sparkline (hours per day, oldest -> newest)
     const sparkline: number[] = []
     for (let i = 6; i >= 0; i--) {
@@ -466,13 +501,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       actionItems,
       onSiteTiles,
       todayHours: Math.round(todayHours),
+      liveHours: Math.round(liveHours),
+      attendanceGaps,
+      recentActivity,
       sparkline,
       hoursThisWeek,
       hoursLastWeek,
       jobsCompletedThisWeek,
       jobsCompletedLastWeek,
     }
-  }, [jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults])
+  }, [jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults, teamMembers])
 
   const supabase = createClient()
 
@@ -1244,8 +1282,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               {/* Right: Today's hours + sparkline */}
               <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
                 <h3 className="font-semibold mb-3">Hours logged today</h3>
-                <div className="text-3xl font-bold text-gray-900">{overviewData.todayHours}h</div>
-                <div className="text-xs text-gray-500 mt-1 mb-4">From signed-out shifts only</div>
+                <div className="flex items-end gap-6 mb-4">
+                  <div>
+                    <div className="text-3xl font-bold text-teal-600 leading-none">{overviewData.liveHours}h</div>
+                    <div className="text-xs text-teal-700 mt-1">Live (inc. active shifts)</div>
+                  </div>
+                  <div>
+                    <div className="text-xl font-semibold text-gray-500 leading-none">{overviewData.todayHours}h</div>
+                    <div className="text-xs text-gray-400 mt-1">Signed out only</div>
+                  </div>
+                </div>
                 <div className="flex items-end gap-1 h-12">
                   {overviewData.sparkline.map((v: number, idx: number) => {
                     const max = Math.max(...overviewData.sparkline, 1)
@@ -1265,29 +1311,88 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               </div>
             </div>
 
-            {/* ZONE 3: Week-over-week trajectory */}
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-5">
-              {(() => {
-                const tiles = [
-                  { label: "Hours signed", current: overviewData.hoursThisWeek, previous: overviewData.hoursLastWeek, suffix: "h" },
-                  { label: "Jobs completed", current: overviewData.jobsCompletedThisWeek, previous: overviewData.jobsCompletedLastWeek, suffix: "" },
-                ]
-                return tiles.map((t) => {
-                  const delta = t.current - t.previous
-                  const pct = t.previous > 0 ? Math.round((delta / t.previous) * 100) : 0
-                  const arrow = delta > 0 ? "â†—" : delta < 0 ? "â†˜" : "="
-                  const deltaCls = delta > 0 ? "text-teal-600" : delta < 0 ? "text-red-600" : "text-gray-500"
-                  return (
-                    <div key={t.label} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
-                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t.label}</div>
-                      <div className="text-3xl font-bold mt-1">{t.current}{t.suffix}</div>
-                      <div className={"text-sm mt-1 " + deltaCls}>
-                        {arrow} {Math.abs(delta)}{t.suffix} vs last week{t.previous > 0 ? " (" + (delta >= 0 ? "+" : "") + pct + "%)" : ""}
-                      </div>
+            {/* ZONE 2b: Attendance gaps */}
+            {overviewData.attendanceGaps.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold">Not signed in yet</h3>
+                  <span className="text-xs px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-700 flex-shrink-0">{overviewData.attendanceGaps.length}</span>
+                </div>
+                <div className="text-xs text-gray-500 mb-3">Assigned to active jobs but no sign-in recorded today</div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {overviewData.attendanceGaps.slice(0, 6).map((g: any, idx: number) => (
+                    <div key={idx} className="border border-amber-200 bg-amber-50 rounded-xl px-3 py-2.5">
+                      <div className="text-sm font-medium text-amber-900 truncate" title={g.installerName}>{g.installerName}</div>
+                      <div className="text-xs text-amber-700 truncate mt-0.5" title={g.jobName}>{g.jobName}</div>
                     </div>
-                  )
-                })
-              })()}
+                  ))}
+                </div>
+                {overviewData.attendanceGaps.length > 6 && (
+                  <div className="text-xs text-gray-500 mt-2">+ {overviewData.attendanceGaps.length - 6} more</div>
+                )}
+              </div>
+            )}
+
+            {/* ZONE 3: Trajectory + recent activity */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Left: This week vs last week */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <h3 className="font-semibold mb-3">This week vs last week</h3>
+                <div className="space-y-2">
+                  {(() => {
+                    const rows = [
+                      { label: "Hours signed", current: overviewData.hoursThisWeek, previous: overviewData.hoursLastWeek, suffix: "h" },
+                      { label: "Jobs completed", current: overviewData.jobsCompletedThisWeek, previous: overviewData.jobsCompletedLastWeek, suffix: "" },
+                    ]
+                    return rows.map((t) => {
+                      const delta = t.current - t.previous
+                      const pct = t.previous > 0 ? Math.round((delta / t.previous) * 100) : 0
+                      const arrow = delta > 0 ? "↗" : delta < 0 ? "↘" : "="
+                      const deltaCls = delta > 0 ? "text-teal-600" : delta < 0 ? "text-red-600" : "text-gray-500"
+                      return (
+                        <div key={t.label} className="flex items-center justify-between border border-gray-100 rounded-xl px-4 py-3">
+                          <div>
+                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">{t.label}</div>
+                            <div className="text-2xl font-bold mt-0.5">{t.current}{t.suffix}</div>
+                          </div>
+                          <div className={"text-sm text-right " + deltaCls}>
+                            <div className="text-lg">{arrow}</div>
+                            <div>{delta >= 0 ? "+" : ""}{delta}{t.suffix}{t.previous > 0 ? " (" + (delta >= 0 ? "+" : "") + pct + "%)" : ""}</div>
+                          </div>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+
+              {/* Right: Recent activity feed */}
+              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
+                <h3 className="font-semibold mb-3">Recent activity</h3>
+                {overviewData.recentActivity.length === 0 ? (
+                  <div className={"text-sm py-6 text-center " + sub}>No recent sign-in activity</div>
+                ) : (
+                  <ul className="space-y-2">
+                    {overviewData.recentActivity.map((ev: any, idx: number) => (
+                      <li key={idx} className="flex items-center justify-between gap-3 border border-gray-100 rounded-xl px-3 py-2.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={"w-2 h-2 rounded-full flex-shrink-0 " + (ev.type === "in" ? "bg-teal-500" : "bg-gray-400")}></span>
+                          <div className="min-w-0">
+                            <div className="text-sm font-medium truncate">
+                              {ev.name} <span className={"font-normal " + (ev.type === "in" ? "text-teal-700" : "text-gray-500")}>signed {ev.type === "in" ? "in" : "out"}</span>
+                            </div>
+                            <div className="text-xs text-gray-500 truncate" title={ev.jobName}>{ev.jobName}</div>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-xs font-medium text-gray-700">{ev.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+                          <div className="text-[10px] text-gray-400">{ev.time.toLocaleDateString([], { day: "numeric", month: "short" })}</div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </div>
         )}
