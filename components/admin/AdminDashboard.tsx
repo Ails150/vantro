@@ -446,7 +446,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     for (const s of (signins || [])) {
       const member = (teamMembers || []).find((m: any) => m.id === s.user_id)
       const job = jobs.find((j: any) => j.id === s.job_id)
-      const name = member?.name || "Unknown"
+      const name = s.users?.name ?? member?.name ?? "?"
       const jobName = job?.name || "Unknown job"
       if (s.signed_in_at) allEvents.push({ name, jobName, time: new Date(s.signed_in_at), type: "in" })
       if (s.signed_out_at) allEvents.push({ name, jobName, time: new Date(s.signed_out_at), type: "out" })
@@ -550,8 +550,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     const onSiteNow = todaySignins.filter((s: any) => !s.signed_out_at).map((s: any) => {
       const member = (teamMembers || []).find((m: any) => m.id === s.user_id)
       const job = jobs.find((j: any) => j.id === s.job_id)
-      const name = member?.name || "Unknown"
-      const initials = member?.initials || name.split(" ").map((p: string) => p[0] || "").join("").toUpperCase().slice(0, 2)
+      const name = s.users?.name ?? member?.name ?? "?"
+      const initials = s.users?.initials || member?.initials || name.split(" ").map((p: string) => p[0] || "").join("").toUpperCase().slice(0, 2)
       return { name, initials, jobName: job?.name || "Unknown job", signedInAt: s.signed_in_at }
     })
 
