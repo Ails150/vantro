@@ -54,9 +54,8 @@ export async function POST(request: Request) {
 
           <div style="margin-top:32px;padding-top:24px;border-top:1px solid #DCE5E0">
             <p style="color:#0A1A14;font-weight:700;margin-bottom:8px">Before you roll out to your team</p>
-            <p style="color:#4A6158;line-height:1.6;margin-bottom:12px">Send the GPS Tracking Explainer and the Installer How-To Guide to every installer before they start. Use the GDPR Quick-Reference as your script when briefing them. All docs are inside Vantro at <strong style="color:#0A1A14">gear icon then Compliance</strong>:</p>
+            <p style="color:#4A6158;line-height:1.6;margin-bottom:12px">Send the Installer How-To Guide to every installer before they start. Use the GDPR Quick-Reference as your script when briefing them. All docs are inside Vantro at <strong style="color:#0A1A14">gear icon then Compliance</strong>:</p>
             <p style="line-height:2;margin-bottom:0">
-              <a href="https://app.getvantro.com/legal/Vantro_GPS_Tracking_Explainer.pdf" style="color:#0F6E56;text-decoration:none;font-weight:600">GPS Tracking Explainer</a><br>
               <a href="https://app.getvantro.com/legal/Vantro_Installer_HowTo_Guide.pdf" style="color:#0F6E56;text-decoration:none;font-weight:600">Installer How-To Guide</a><br>
               <a href="https://app.getvantro.com/legal/Vantro_GDPR_QuickRef_for_Andy.pdf" style="color:#0F6E56;text-decoration:none;font-weight:600">GDPR Quick-Reference (for office managers)</a><br>
               <a href="https://app.getvantro.com/legal/Vantro_Privacy_Policy.pdf" style="color:#0F6E56;text-decoration:none;font-weight:600">Privacy Policy</a><br>
@@ -96,12 +95,11 @@ export async function POST(request: Request) {
         <p style="color:#4A6158;line-height:1.6;margin-top:16px;margin-bottom:4px">Open the Vantro app, tap <strong style="color:#0A1A14">New installer? Tap here to set up</strong> at the bottom, enter <strong style="color:#0A1A14">this email address</strong> (the one this invite was sent to) and choose a 4-digit PIN. You are now ready to sign in to jobs on site.</p>
 
         <p style="color:#0A1A14;font-weight:700;margin-top:24px;margin-bottom:8px">Step 3 - Read this before you start</p>
-        <p style="color:#4A6158;line-height:1.6;margin-bottom:12px">Vantro records when you sign in and sign out of shifts, along with your GPS location at those moments. It does <strong style="color:#0A1A14">not</strong> track you outside your shift. It does <strong style="color:#0A1A14">not</strong> follow you minute-by-minute during the day. Two short documents explain exactly what is tracked, when, and why - please take 5 minutes to read both before you start:</p>
+        <p style="color:#4A6158;line-height:1.6;margin-bottom:12px">Vantro records when you sign in and sign out of your shifts so your hours are logged accurately. The short guide below explains how to use the app on site - please take 5 minutes to read it before you start:</p>
         <p style="line-height:2;margin-bottom:12px">
-          <a href="https://app.getvantro.com/legal/Vantro_GPS_Tracking_Explainer.pdf" style="color:#0F6E56;text-decoration:none;font-weight:700">GPS Tracking Explainer (PDF)</a><br>
           <a href="https://app.getvantro.com/legal/Vantro_Installer_HowTo_Guide.pdf" style="color:#0F6E56;text-decoration:none;font-weight:700">Installer How-To Guide (PDF)</a>
         </p>
-        <p style="color:#4A6158;line-height:1.6;font-size:13px;margin-bottom:16px">If anything in those docs is not clear, ask your manager - they have the full GDPR pack.</p>
+        <p style="color:#4A6158;line-height:1.6;font-size:13px;margin-bottom:16px">If anything in the guide is not clear, ask your manager.</p>
 
         <p style="color:#888;font-size:12px;margin-top:24px">Need help? Contact your manager or email aileen@applyscale8.com</p>
         <p style="color:#888;font-size:12px">Vantro - getvantro.com</p>

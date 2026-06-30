@@ -77,6 +77,7 @@ export async function POST(request: Request) {
 
   const updateData: any = {
     signed_out_at: now.toISOString(),
+    signed_out_method: 'manual',
     sign_out_lat: lat || null,
     sign_out_lng: lng || null,
     sign_out_accuracy_metres: accuracy ? Math.round(accuracy) : null,
