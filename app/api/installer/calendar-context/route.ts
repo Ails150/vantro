@@ -70,12 +70,14 @@ export async function GET(request: Request) {
     }
     for (const s of shifts) {
       const key = dayKeys[s.day_of_week]
-      if (key) {
+      // Guard against null start/end_time on a user_shifts row — a missing time
+      // shouldn't 500 the whole schedule. Skip rows with no usable times.
+      if (key && s.start_time && s.end_time) {
         weeklySchedule[key] = {
           working: true,
           enabled: true,
-          start: s.start_time.slice(0, 5),
-          end: s.end_time.slice(0, 5),
+          start: String(s.start_time).slice(0, 5),
+          end: String(s.end_time).slice(0, 5),
         }
       }
     }
@@ -151,9 +153,11 @@ export async function GET(request: Request) {
   const myJobs: Array<{ assignment_id: string; visit_id: string; date: string; job_id: string; job_name: string; job_address: string | null; role: string | null; status: string | null }> = []
   for (const a of myAssignments || []) {
     const v: any = (a as any).visits
-    if (!v || !v.jobs) continue
-    const startDay = v.start_at.slice(0, 10)
-    const endDay = v.end_at ? v.end_at.slice(0, 10) : startDay
+    // Skip visits with no job link or no start time — a null start_at must not
+    // 500 the schedule (it would break the whole calendar for one bad row).
+    if (!v || !v.jobs || !v.start_at) continue
+    const startDay = String(v.start_at).slice(0, 10)
+    const endDay = v.end_at ? String(v.end_at).slice(0, 10) : startDay
     // Expand visit range and intersect with [startDate, endDate]
     const s = startDay < startDate ? startDate : startDay
     const e = endDay > endDate ? endDate : endDay
