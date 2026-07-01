@@ -49,7 +49,7 @@ export async function isInstallerWorking(
   // Need company context for timezone, country, default schedule
   const { data: user } = await service
     .from("users")
-    .select("id, company_id, companies(id, country_code, timezone, default_schedule)")
+    .select("id, company_id, companies!users_company_id_fkey(id, country_code, timezone, default_schedule)")
     .eq("id", userId)
     .single()
 

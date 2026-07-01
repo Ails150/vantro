@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   // 1. Get user + company country
   const { data: user } = await service
     .from("users")
-    .select("company_id, companies(country_code)")
+    .select("company_id, companies!users_company_id_fkey(country_code)")
     .eq("id", installer.userId)
     .single()
   if (!user)

@@ -84,7 +84,7 @@ export async function POST(request: Request) {
   // Need company_id and the company's sick_auto_approve setting
   const { data: user } = await service
     .from("users")
-    .select("company_id, companies(sick_auto_approve)")
+    .select("company_id, companies!users_company_id_fkey(sick_auto_approve)")
     .eq("id", installer.userId)
     .single()
   if (!user)

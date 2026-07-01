@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   // Resolve user + company in one go
   const { data: me } = await service
     .from("users")
-    .select("id, name, company_id, companies(country_code, default_schedule, timezone, leave_year_start_month, leave_year_start_day)")
+    .select("id, name, company_id, companies!users_company_id_fkey(country_code, default_schedule, timezone, leave_year_start_month, leave_year_start_day)")
     .eq("id", installer.userId)
     .single()
   if (!me?.company_id) return NextResponse.json({ error: "User not found" }, { status: 404 })
