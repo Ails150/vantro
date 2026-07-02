@@ -29,6 +29,31 @@ import SettingsMenu from "./SettingsMenu"
 import { analyzeAllJobs, jobsNeedingAttention, summarizeJobStaffing } from "@/lib/staffing"
 import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 
+// Parse lat/lng out of a pasted Google Maps link or a raw "lat,lng" / "lat lng" string.
+function parseCoordsFromInput(raw: string): { lat: number; lng: number } | null {
+  const s = (raw || "").trim()
+  if (!s) return null
+  const inRange = (lat: number, lng: number) =>
+    Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+  // Plain "lat,lng" or "lat lng"
+  const plain = s.match(/^(-?\d{1,3}(?:\.\d+)?)\s*[,\s]\s*(-?\d{1,3}(?:\.\d+)?)$/)
+  if (plain) {
+    const lat = parseFloat(plain[1]); const lng = parseFloat(plain[2])
+    if (inRange(lat, lng)) return { lat, lng }
+  }
+  // Google Maps link: @lat,lng  or  ?q=lat,lng / &q=lat,lng
+  if (/maps\.app\.goo\.gl|google\.[^/]*\/maps|goo\.gl\/maps/i.test(s)) {
+    const at = s.match(/@(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/)
+    if (at) { const lat = parseFloat(at[1]); const lng = parseFloat(at[2]); if (inRange(lat, lng)) return { lat, lng } }
+    const q = s.match(/[?&]q=(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/)
+    if (q) { const lat = parseFloat(q[1]); const lng = parseFloat(q[2]); if (inRange(lat, lng)) return { lat, lng } }
+  }
+  // Fallback: first "lat,lng" pair anywhere in the string
+  const any = s.match(/(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)/)
+  if (any) { const lat = parseFloat(any[1]); const lng = parseFloat(any[2]); if (inRange(lat, lng)) return { lat, lng } }
+  return null
+}
+
 interface Props {
   user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
   pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
@@ -126,6 +151,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [jobLat, setJobLat] = useState(null)
   const [jobLng, setJobLng] = useState(null)
   const [jobPlaceSelected, setJobPlaceSelected] = useState(false)
+  const [jobMapsPaste, setJobMapsPaste] = useState("")
+  const [jobMapsPasteStatus, setJobMapsPasteStatus] = useState<"" | "ok" | "fail">("")
+  const [editJobMapsPaste, setEditJobMapsPaste] = useState("")
+  const [editJobMapsPasteStatus, setEditJobMapsPasteStatus] = useState<"" | "ok" | "fail">("")
   const [editJobPlaceSelected, setEditJobPlaceSelected] = useState(false)
   const [editJobLat, setEditJobLat] = useState(null)
   const [editJobStatus, setEditJobStatus] = useState("")
@@ -1616,6 +1645,23 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   )}
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-600 mb-1">Or paste a Google Maps link or coordinates</label>
+                  <input
+                    value={jobMapsPaste}
+                    onChange={e => {
+                      const v = e.target.value
+                      setJobMapsPaste(v)
+                      const coords = parseCoordsFromInput(v)
+                      if (coords) { setJobLat(coords.lat as any); setJobLng(coords.lng as any); setJobPlaceSelected(true); setJobMapsPasteStatus("ok") }
+                      else setJobMapsPasteStatus(v.trim() ? "fail" : "")
+                    }}
+                    placeholder="e.g. 50.9102,-2.1616 or maps.app.goo.gl/..."
+                    className={inp}
+                  />
+                  {jobMapsPasteStatus === "ok" && <div className="mt-1 text-xs font-semibold text-teal-500">✓ Coordinates set</div>}
+                  {jobMapsPasteStatus === "fail" && <div className="mt-1 text-xs font-semibold text-red-400">✗ Could not parse</div>}
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Distance from site (km)</label>
                   <input type="number" min="0" step="0.1" inputMode="decimal" value={jobDistanceKm} onChange={e => setJobDistanceKm(e.target.value)} placeholder="Optional - for remote sites with no address" className={inp}/>
                 </div>
@@ -1755,6 +1801,23 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             <div className={"absolute right-3 top-3 text-xs font-semibold " + (editJobPlaceSelected ? "text-teal-500" : "text-red-400")}>
                               {editJobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
                             </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-600 mb-1">Or paste a Google Maps link or coordinates</label>
+                            <input
+                              value={editJobMapsPaste}
+                              onChange={e => {
+                                const v = e.target.value
+                                setEditJobMapsPaste(v)
+                                const coords = parseCoordsFromInput(v)
+                                if (coords) { setEditJobLat(coords.lat as any); setEditJobLng(coords.lng as any); setEditJobPlaceSelected(true); setEditJobMapsPasteStatus("ok") }
+                                else setEditJobMapsPasteStatus(v.trim() ? "fail" : "")
+                              }}
+                              placeholder="e.g. 50.9102,-2.1616 or maps.app.goo.gl/..."
+                              className={inp}
+                            />
+                            {editJobMapsPasteStatus === "ok" && <div className="mt-1 text-xs font-semibold text-teal-500">✓ Coordinates set</div>}
+                            {editJobMapsPasteStatus === "fail" && <div className="mt-1 text-xs font-semibold text-red-400">✗ Could not parse</div>}
                           </div>
                           {editJobLat != null && editJobLng != null && (
                             <div>
