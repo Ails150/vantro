@@ -115,6 +115,7 @@ export async function POST(request: Request) {
             alertType: sev === 'critical' ? 'blocker' : 'issue',
             summary: description,
             loggedBy: installer?.name || 'Installer',
+            triggeredBy: userId,
             photoUrls: photoUrl ? [photoUrl] : [],
           })
         } catch (emailErr) {

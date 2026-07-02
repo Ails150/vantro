@@ -131,6 +131,7 @@ export async function POST(request: Request) {
           alertType: finalSeverity as "blocker" | "issue",
           summary: entryText?.trim() || aiSummary || "Diary entry",
           loggedBy: loggerRow?.name || "Installer",
+          triggeredBy: payload.userId,
           photoUrls: Array.isArray(photoUrls) ? photoUrls : []
         })
       } catch (e) {

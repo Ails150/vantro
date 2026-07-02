@@ -8,6 +8,7 @@ interface SendDiaryAlertEmailArgs {
   alertType: AlertType
   summary: string
   loggedBy: string
+  triggeredBy: string
   photoUrls?: string[]
 }
 
@@ -15,13 +16,19 @@ interface SendDiaryAlertEmailArgs {
  * Send email alert to all admins and foremen of a company who have
  * email_alert_prefs.enabled = true AND email_alert_prefs[alertType] = true.
  *
- * Rate-limited: max 1 email per recipient per job per hour.
- * Logs every send to email_alert_sends for audit + rate-limit lookup.
+ * Rate limiting is per-company and configurable via
+ * companies.alert_email_rate_limit_minutes:
+ *   - 0  => no throttling; every eligible recipient receives every alert.
+ *   - >0 => max 1 email per recipient per job per triggering installer
+ *           within that many minutes. Keying on triggered_by means two
+ *           different installers raising blockers on the same job both send.
+ *
+ * Logs every send to email_alert_sends for audit.
  *
  * Returns count of emails actually sent (after pref + rate-limit filtering).
  */
 export async function sendDiaryAlertEmail(args: SendDiaryAlertEmailArgs): Promise<number> {
-  const { companyId, jobId, alertType, summary, loggedBy, photoUrls } = args
+  const { companyId, jobId, alertType, summary, loggedBy, triggeredBy, photoUrls } = args
 
   if (!process.env.RESEND_API_KEY) {
     console.warn("[email-alerts] RESEND_API_KEY not set, skipping")
@@ -37,6 +44,15 @@ export async function sendDiaryAlertEmail(args: SendDiaryAlertEmailArgs): Promis
     .eq("id", jobId)
     .single()
   const jobName = job?.name || "Unknown job"
+
+  // 1b. Look up this company's configurable rate-limit window (minutes).
+  //     0 (or missing) = no throttling.
+  const { data: company } = await service
+    .from("companies")
+    .select("alert_email_rate_limit_minutes")
+    .eq("id", companyId)
+    .single()
+  const rateLimitMinutes = Number(company?.alert_email_rate_limit_minutes) || 0
 
   // 2. Look up eligible recipients
   const { data: recipients } = await service
@@ -59,20 +75,26 @@ export async function sendDiaryAlertEmail(args: SendDiaryAlertEmailArgs): Promis
 
   if (eligible.length === 0) return 0
 
-  // 4. Rate limit: who has received an alert for this job in the last hour?
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
-  const { data: recent } = await service
-    .from("email_alert_sends")
-    .select("recipient_email")
-    .eq("job_id", jobId)
-    .gte("sent_at", oneHourAgo)
+  // 4. Rate limit (only if this company has a window configured).
+  //    Keyed per recipient + job + triggering installer, so two different
+  //    installers raising alerts on the same job both send.
+  let toSend = eligible
+  if (rateLimitMinutes > 0) {
+    const cutoff = new Date(Date.now() - rateLimitMinutes * 60 * 1000).toISOString()
+    const { data: recent } = await service
+      .from("email_alert_sends")
+      .select("recipient_email")
+      .eq("job_id", jobId)
+      .eq("triggered_by", triggeredBy)
+      .gte("sent_at", cutoff)
 
-  const rateLimited = new Set((recent || []).map((r: any) => r.recipient_email))
-  const toSend = eligible.filter((r: any) => !rateLimited.has(r.email))
+    const rateLimited = new Set((recent || []).map((r: any) => r.recipient_email))
+    toSend = eligible.filter((r: any) => !rateLimited.has(r.email))
 
-  if (toSend.length === 0) {
-    console.log("[email-alerts] All recipients rate-limited for job", jobId)
-    return 0
+    if (toSend.length === 0) {
+      console.log("[email-alerts] All recipients rate-limited for job", jobId, "installer", triggeredBy)
+      return 0
+    }
   }
 
   // 5. Build email
@@ -127,7 +149,8 @@ export async function sendDiaryAlertEmail(args: SendDiaryAlertEmailArgs): Promis
           recipient_email: r.email,
           company_id: companyId,
           job_id: jobId,
-          alert_type: alertType
+          alert_type: alertType,
+          triggered_by: triggeredBy
         })
       } else {
         const errText = await res.text().catch(() => "")
@@ -138,12 +161,12 @@ export async function sendDiaryAlertEmail(args: SendDiaryAlertEmailArgs): Promis
     }
   }
 
-  // 7. Bulk log rate-limit entries
+  // 7. Bulk log sends for audit
   if (logRows.length > 0) {
     await service.from("email_alert_sends").insert(logRows)
   }
 
-  console.log("[email-alerts] Sent " + sent + " of " + eligible.length + " eligible (" + rateLimited.size + " rate-limited)")
+  console.log("[email-alerts] Sent " + sent + " of " + eligible.length + " eligible")
   return sent
 }
 
