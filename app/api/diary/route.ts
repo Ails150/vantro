@@ -1,7 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { verifyInstallerToken } from "@/lib/auth"
-import Anthropic from "@anthropic-ai/sdk"
 import { sendDiaryAlertEmail } from "@/lib/email-alerts"
 import { checkRateLimit } from "@/lib/rate-limit"
 
@@ -18,10 +17,6 @@ const createServiceClient = () => {
     }
   )
 }
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY!,
-})
 
 const severityRank: Record<string, number> = { normal: 1, issue: 2, blocker: 3 }
 
@@ -78,96 +73,24 @@ export async function POST(request: Request) {
 
     if (diaryError) throw diaryError
 
-    // Build multimodal prompt: text + up to 5 photos + video flag.
-    const safePhotos: string[] = Array.isArray(photoUrls) ? photoUrls.slice(0, 5) : []
-
-    const userContent: any[] = []
-    userContent.push({
-      type: "text",
-      text: `An installer has just submitted a diary entry on a construction site.
-
-Their text: ${entryText || "(no text)"}
-Photos attached: ${safePhotos.length}
-Video attached: ${videoUrl ? "yes" : "no"}
-
-Look at everything they sent (text and any photos below). Decide if this is:
-- "blocker": work has stopped or cannot continue. Examples: no materials, site unsafe, access denied, equipment failure, injury, flooding, structural damage, key trade did not finish, can't proceed.
-- "issue": a problem that may slow things or needs attention. Examples: delay, defect, missing item, weather concern, partial supply, snag, complaint.
-- "normal": routine progress update with nothing wrong.
-
-ALSO decide separately: is this entry describing a VARIATION? A variation is work outside the original contracted scope, typically requested by the client during the job, that should be priced separately and invoiced. Strong variation signals: "client asked", "they want", "they decided", "swap to", "instead of", "additional", "extra", "on top of", "not in spec", "not on drawings", "upgrade to", client name + "requested". Negative signals (NOT variations even if language overlaps): defect rectification, snagging, internal team coordination, missing materials being chased, weather delays.
-
-Be strict on variations. Only flag if the language clearly indicates client-requested scope change.
-
-Photos can change the verdict on their own — a photo of a flooded floor or unfinished work is a blocker even if the text is bland.
-
-Return ONLY valid JSON, no preamble, no markdown:
-{"summary":"<one sentence under 20 words>","severity":"normal|issue|blocker","reason":"<one short sentence why>","is_variation":<true|false>,"variation_confidence":"<high|medium|low|null>","variation_summary":"<brief description of what changed, or null>"}`
-    })
-
-    for (const url of safePhotos) {
-      if (typeof url === "string" && url.startsWith("http")) {
-        userContent.push({
-          type: "image",
-          source: { type: "url", url }
-        })
-      }
-    }
-
-    let aiSummary = (entryText || "").slice(0, 80) || "Diary entry"
-    let aiSeverity: "normal" | "issue" | "blocker" = "normal"
-    let aiReason = ""
-    let aiVariationDetected = false
-    let aiVariationConfidence: "high" | "medium" | "low" | null = null
-    let aiVariationSummary: string | null = null
-
-    try {
-      const completion = await anthropic.messages.create({
-        model: "claude-sonnet-4-5",
-        max_tokens: 400,
-        messages: [{ role: "user", content: userContent }]
-      })
-
-      const raw = completion.content[0].type === "text" ? completion.content[0].text.trim() : ""
-      const cleaned = raw.replace(/^```json\s*/i, "").replace(/```$/i, "").trim()
-      const parsed = JSON.parse(cleaned)
-
-      if (parsed.summary) aiSummary = String(parsed.summary).trim().replace(/^["']|["']$/g, "")
-      if (parsed.severity && ["normal", "issue", "blocker"].includes(parsed.severity)) {
-        aiSeverity = parsed.severity
-      }
-      if (parsed.reason) aiReason = String(parsed.reason).trim()
-
-      // Variation detection
-      if (parsed.is_variation === true) {
-        aiVariationDetected = true
-        aiVariationConfidence = ["high","medium","low"].includes(parsed.variation_confidence) ? parsed.variation_confidence : "low"
-        aiVariationSummary = parsed.variation_summary ? String(parsed.variation_summary).trim().slice(0, 300) : aiSummary
-      }
-    } catch (aiErr) {
-      console.error("[diary] AI classify failed, falling back to tap-only:", aiErr)
-    }
-
-    // Video pending review safety net: if video uploaded but we have no analysis yet, raise to issue.
-    if (videoUrl && severityRank[aiSeverity] < severityRank["issue"]) {
-      aiSeverity = "issue"
-      if (!aiReason) aiReason = "Video pending review"
-    }
-
-    // Tap-based severity from installer's button choice.
-    const statusToAlert: Record<string, string> = {
+    // Tap-based severity only — no AI override. Installer's button choice is authoritative.
+    const statusToAlert: Record<string, "normal" | "issue" | "blocker"> = {
       carrying_on: "normal",
       paused: "issue",
       stopped: "blocker"
     }
-    const tapSeverity = statusToAlert[workStatus || "carrying_on"] || "normal"
+    let finalSeverity: "normal" | "issue" | "blocker" =
+      statusToAlert[workStatus || "carrying_on"] || "normal"
 
-    // Take the MORE SEVERE of tap and AI.
-    const finalSeverity =
-      severityRank[aiSeverity] > severityRank[tapSeverity] ? aiSeverity : tapSeverity
+    // Video pending review safety net: if a video was uploaded, raise to at least issue.
+    if (videoUrl && severityRank[finalSeverity] < severityRank["issue"]) {
+      finalSeverity = "issue"
+    }
 
+    const aiSummary = (entryText || "").trim().slice(0, 80) || "Diary entry"
+    const aiVariationDetected = false
     const urgency = finalSeverity === "blocker" ? 5 : finalSeverity === "issue" ? 3 : 1
-    console.log("[diary] tap=", tapSeverity, "ai=", aiSeverity, "final=", finalSeverity, "reason=", aiReason)
+    console.log("[diary] tap-only severity=", finalSeverity)
 
     await service
       .from("diary_entries")
@@ -178,27 +101,6 @@ Return ONLY valid JSON, no preamble, no markdown:
         ai_variation_detected: aiVariationDetected
       })
       .eq("id", diary.id)
-
-    // If variation detected, create a row in variations register
-    if (aiVariationDetected) {
-      const { error: varError } = await service
-        .from("variations")
-        .insert({
-          company_id: payload.companyId,
-          job_id: jobId,
-          diary_entry_id: diary.id,
-          raised_by: payload.userId,
-          description: aiVariationSummary || aiSummary,
-          ai_detected: true,
-          ai_confidence: aiVariationConfidence,
-          status: "pending"
-        })
-      if (varError) {
-        console.error("[diary] variation insert failed (non-fatal):", varError.message)
-      } else {
-        console.log("[diary] variation auto-created for diary", diary.id, "confidence:", aiVariationConfidence)
-      }
-    }
 
     if (finalSeverity === "blocker" || finalSeverity === "issue") {
       const { error: alertError } = await service
