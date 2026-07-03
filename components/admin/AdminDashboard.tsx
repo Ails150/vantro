@@ -229,6 +229,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [showResolved, setShowResolved] = useState(false)
   const [expandedJobGroups, setExpandedJobGroups] = useState<Set<string>>(new Set())
   const [diaryFilter, setDiaryFilter] = useState<'all'|'blocker'|'issue'|'variation'|'photos'|'videos'|'today'|'7d'|'30d'>('all')
+  const [diaryJobFilter, setDiaryJobFilter] = useState('all')
   const [diarySearch, setDiarySearch] = useState('')
   const [resolutionNote, setResolutionNote] = useState("")
   const [replyingDiary, setReplyingDiary] = useState<string|null>(null)
@@ -2444,6 +2445,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   placeholder="Search installer, job, or note..."
                   className="flex-1 min-w-[200px] bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-teal-400"
                 />
+                <select
+                  value={diaryJobFilter}
+                  onChange={e => setDiaryJobFilter(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 focus:outline-none focus:border-teal-400"
+                >
+                  <option value="all">All jobs</option>
+                  {Array.from(new Set(diaryEntries.map((d: any) => d.jobs?.name).filter(Boolean))).sort().map((name: any) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
                 {(['all','blocker','issue','variation','photos','videos','today','7d','30d'] as const).map(f => {
                   const label = f === 'all' ? 'All' : f === 'blocker' ? 'Blockers' : f === 'issue' ? 'Issues' : f === 'variation' ? 'Variations' : f === 'photos' ? 'With photos' : f === 'videos' ? 'With videos' : f === 'today' ? 'Today' : f === '7d' ? 'Last 7d' : 'Last 30d'
                   return (
@@ -2462,6 +2473,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               const now = Date.now()
               const q = diarySearch.trim().toLowerCase()
               const filtered = diaryEntries.filter((d: any) => {
+                if (diaryJobFilter !== 'all' && (d.jobs?.name || '') !== diaryJobFilter) return false
                 if (diaryFilter === 'blocker' && d.ai_alert_type !== 'blocker') return false
                 if (diaryFilter === 'issue' && d.ai_alert_type !== 'issue') return false
                 if (diaryFilter === 'variation' && !d.ai_variation_detected) return false
