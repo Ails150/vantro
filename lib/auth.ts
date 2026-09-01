@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken'
 
 // Every token in the system is signed with this. There is deliberately no
 // fallback: a literal default is public in the repo and would let anyone forge
-// an installer or client token for any company, and falling back to the
+// a field or client token for any company, and falling back to the
 // service role key would make one leak compromise both. Missing config must
 // stop the process, not quietly downgrade it.
 if (!process.env.JWT_SECRET) {
@@ -45,10 +45,12 @@ export function verifyFieldToken(request: Request): FieldPayload | null {
       exp: decoded.exp
     }
   } catch {
-    try {
-      const payload = JSON.parse(Buffer.from(auth.slice(7), 'base64').toString())
-      if (payload.exp < Date.now()) return null
-      return { ...payload, subcontractorId: payload.subcontractorId ?? null }
-    } catch { return null }
+    // No fallback, deliberately. This used to base64-decode the token body
+    // and trust it, to carry over the unsigned pre-JWT tokens minted before
+    // 600b293 (2026-04-14). Those carried an 8h expiry, so the last valid one
+    // died on 2026-04-15; after that this branch only ever admitted forgeries,
+    // since an attacker authors the JSON themselves and picks any userId and
+    // companyId. A token we cannot verify is not a token. Reject it.
+    return null
   }
 }
