@@ -64,7 +64,7 @@ export async function GET(request: Request) {
     const jobIds = jobs.map((j: any) => j.id)
     const { data: allChecklists } = await service
       .from('job_checklists')
-      .select('id, job_id, template_id, checklist_templates(name), checklist_items(id, label, item_type, mandatory, sort_order)')
+      .select('id, job_id, template_id, checklist_templates(name), checklist_items(id, label, item_type, is_mandatory, sort_order)')
       .in('job_id', jobIds)
     for (const cl of allChecklists || []) {
       const jid = (cl as any).job_id
