@@ -2,8 +2,8 @@ import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken"
+import { JWT_SECRET } from "@/lib/auth"
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback'
 
 export async function POST(request: Request) {
   const { action, email, password, token } = await request.json()

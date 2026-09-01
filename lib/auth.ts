@@ -1,6 +1,17 @@
 import jwt from 'jsonwebtoken'
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'fallback-change-me'
+// Every token in the system is signed with this. There is deliberately no
+// fallback: a literal default is public in the repo and would let anyone forge
+// an installer or client token for any company, and falling back to the
+// service role key would make one leak compromise both. Missing config must
+// stop the process, not quietly downgrade it.
+if (!process.env.JWT_SECRET) {
+  throw new Error(
+    'JWT_SECRET is not set. Set it in the environment before starting. ' +
+    'It must not fall back to a literal or to SUPABASE_SERVICE_ROLE_KEY.'
+  )
+}
+export const JWT_SECRET: string = process.env.JWT_SECRET
 
 interface InstallerPayload {
   userId: string
