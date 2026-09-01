@@ -37,6 +37,12 @@ export async function POST(request: Request) {
   if (!job)
     return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
+  // The job id arrives in the request body. Without this the token would
+  // authorise work on any company's job. 404 rather than 403: a 403 would
+  // confirm the id exists.
+  if (job.company_id !== installer.companyId)
+    return NextResponse.json({ error: "Job not found" }, { status: 404 })
+
   const { data: company } = await service
     .from("companies")
     .select("geofence_radius_metres")

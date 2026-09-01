@@ -44,6 +44,11 @@ export async function POST(request: Request) {
   const { data: job } = await service.from('jobs').select('company_id').eq('id', jobId).single()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
+  // The job id arrives in the request body. Without this the token would
+  // authorise work on any company's job. 404 rather than 403: a 403 would
+  // confirm the id exists.
+  if (job.company_id !== installer.companyId) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
   const { data: existing } = await service.from('qa_submissions').select('id')
     .eq('job_id', jobId).eq('user_id', installer.userId).eq('checklist_item_id', itemId).maybeSingle()
 

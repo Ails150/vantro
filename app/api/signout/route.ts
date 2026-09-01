@@ -22,6 +22,11 @@ export async function POST(request: Request) {
   const { data: job } = await service.from('jobs').select('lat, lng, name, company_id, geofence_radius_metres, address, distance_from_site_km').eq('id', jobId).single()
   if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
+  // The job id arrives in the request body. Without this the token would
+  // authorise work on any company's job. 404 rather than 403: a 403 would
+  // confirm the id exists.
+  if (job.company_id !== installer.companyId) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+
   // Effective radius incl. smart geofence for remote sites (mirrors sign-in)
   const { data: company } = await service.from('companies').select('geofence_radius_metres').eq('id', job.company_id).single()
   const radius = await resolveGeofenceRadius(job, company)
