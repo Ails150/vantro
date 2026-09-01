@@ -21,6 +21,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import PaywallOverlay from '@/components/billing/PaywallOverlay' // paywall_wired_v2
 import SitesTab from "./SitesTab"
+import { setupTabs, operationsTabs, tabBadge, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
 import TradesTab from "./TradesTab"
 import TradeMultiSelect from "./TradeMultiSelect"
 import CsvImportModal from "./CsvImportModal"
@@ -1120,32 +1121,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     return teamMembers.filter((m: any) => ids.includes(m.id))
   }
 
-  const setupTabs: Array<{ id: string; label: string; badge?: number }> = [
-    { id: "team", label: "Team" },
-    { id: "subcontractors", label: "Subcontractors" },
-    { id: "trades", label: "Trades" },
-    { id: "jobs", label: "Jobs" },
-    { id: "checklists", label: "Checklist Templates" },
-    { id: "schedule", label: "Scheduler" }, // schedule_link_added
-    { id: "calendar", label: "Calendar" }, // calendar_sidebar_marker
-    { id: "settings", label: "Settings" },
-    { id: "support", label: "Support" },
-  ]
-
-  const operationsTabs: Array<{ id: string; label: string; badge?: number }> = [
-    { id: "overview", label: "Overview" },
-    { id: "alerts", label: "Alerts", badge: alerts.length },
-    { id: "approvals", label: "QA Reviews", badge: pendingQA.length },
-    { id: "diary", label: "Diary" },
-    { id: "progress", label: "Progress" },
-    { id: "defects", label: "Defects" },
-    { id: "walkthroughs", label: "Walk & Talks" },
-    { id: "map", label: "Map" },
-    { id: "analytics", label: "Analytics" },
-    { id: "performance", label: "Performance" },
-    { id: "payroll", label: "Payroll" },
-    { id: "audit", label: "Audit" },
-  ]
+  // Tab config lives in nav/tabs.ts as data. Only the live counts that fill in
+  // each tab's badgeKey are resolved here.
+  const tabBadgeCounts: TabBadgeCounts = { alerts: alerts.length, pendingQA: pendingQA.length }
+  const badgeFor = (tab: AdminTab) => tabBadge(tab, tabBadgeCounts)
 
   const inp = "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
   const card = "bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm"
@@ -1272,7 +1251,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     }`}
                   >
                     <span title={sidebarCollapsed ? tab.label : undefined}>{sidebarCollapsed ? tabInitials(tab.label) : tab.label}</span>
-                    {tab.badge ? <span className={sidebarCollapsed ? "absolute top-1 right-1 w-2 h-2 bg-teal-500 rounded-full" : "bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full"}>{sidebarCollapsed ? "" : tab.badge}</span> : null}
+                    {badgeFor(tab) ? <span className={sidebarCollapsed ? "absolute top-1 right-1 w-2 h-2 bg-teal-500 rounded-full" : "bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full"}>{sidebarCollapsed ? "" : badgeFor(tab)}</span> : null}
                   </button>
                 ))}
               </nav>
@@ -1300,7 +1279,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     }`}
                   >
                     <span title={sidebarCollapsed ? tab.label : undefined}>{sidebarCollapsed ? tabInitials(tab.label) : tab.label}</span>
-                    {tab.badge ? <span className={sidebarCollapsed ? "absolute top-1 right-1 w-2 h-2 bg-teal-500 rounded-full" : "bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full"}>{sidebarCollapsed ? "" : tab.badge}</span> : null}
+                    {badgeFor(tab) ? <span className={sidebarCollapsed ? "absolute top-1 right-1 w-2 h-2 bg-teal-500 rounded-full" : "bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full"}>{sidebarCollapsed ? "" : badgeFor(tab)}</span> : null}
                   </button>
                 ))}
               </nav>
