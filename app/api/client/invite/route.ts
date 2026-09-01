@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import crypto from "crypto"
+import { assertJobBelongsToCaller } from "@/lib/tenant"
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -14,7 +15,12 @@ export async function POST(request: Request) {
   const { name, email, jobId } = await request.json()
   if (!name || !email || !jobId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
 
-  const { data: job } = await service.from('jobs').select('name').eq('id', jobId).single()
+  // The invite grants a portal token scoped to this job. Without this check an
+  // admin could invite an outside email to another company's job, and the
+  // portal would then serve that company's diary, sign-ins and QA to them.
+  const owned = await assertJobBelongsToCaller<{ name: string }>(jobId, u.company_id, 'id, name')
+  if (!owned.ok) return owned.response
+  const job = owned.job
   const inviteToken = crypto.randomBytes(32).toString('hex')
 
   const { data: existing } = await service.from('client_users').select('id').eq('email', email.toLowerCase()).eq('job_id', jobId).single()
