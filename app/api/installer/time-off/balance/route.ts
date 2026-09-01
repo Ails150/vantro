@@ -7,7 +7,7 @@
 // Counts approved annual_leave days within the active leave year window.
 
 import { NextResponse } from "next/server"
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 import { createServiceClient } from "@/lib/supabase/server"
 
 function daysBetween(start: string, end: string, isHalfDay: boolean): number {
@@ -18,7 +18,7 @@ function daysBetween(start: string, end: string, isHalfDay: boolean): number {
 }
 
 export async function GET(request: Request) {
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 

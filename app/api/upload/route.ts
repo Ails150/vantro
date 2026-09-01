@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
   const auth = request.headers.get("authorization")
   if (!auth?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {

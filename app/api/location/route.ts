@@ -1,6 +1,6 @@
 ﻿import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { verifyInstallerToken } from '@/lib/auth'
+import { verifyFieldToken } from '@/lib/auth'
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000
@@ -11,7 +11,7 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 export async function POST(request: Request) {
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { lat, lng, accuracy, source } = await request.json()

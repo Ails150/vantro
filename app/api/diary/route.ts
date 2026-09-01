@@ -1,6 +1,6 @@
 ﻿import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 import { sendDiaryAlertEmail } from "@/lib/email-alerts"
 import { checkRateLimit } from "@/lib/rate-limit"
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const installer = verifyInstallerToken(request)
+    const installer = verifyFieldToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     const payload = { userId: installer.userId, companyId: installer.companyId }
 
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const installer = verifyInstallerToken(request)
+    const installer = verifyFieldToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url)

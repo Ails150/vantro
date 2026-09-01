@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 
 const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
 const CF_STREAM_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN
@@ -7,7 +7,7 @@ const CF_STREAM_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN
 export async function POST(request: Request) {
   const auth = request.headers.get("authorization")
   if (!auth?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {

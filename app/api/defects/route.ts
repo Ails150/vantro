@@ -1,4 +1,4 @@
-import { verifyInstallerToken } from '@/lib/auth'
+import { verifyFieldToken } from '@/lib/auth'
 import { sendDiaryAlertEmail } from '@/lib/email-alerts'
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   // Check if installer token or admin session
   let userId, companyId
   if (auth?.startsWith('Bearer ')) {
-    const installer = verifyInstallerToken(request)
+    const installer = verifyFieldToken(request)
     if (!installer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     userId = installer.userId
     const { data: u } = await service.from('users').select('company_id').eq('id', userId).single()

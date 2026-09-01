@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import crypto from "crypto"
 import { createServiceClient } from "@/lib/supabase/server"
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 import { uploadReceipt } from "@/lib/expense-upload"
 import { assertJobBelongsToCaller } from "@/lib/tenant"
 
@@ -23,7 +23,7 @@ const ALLOWED_CATEGORIES = new Set(["fuel", "materials", "food", "parking", "too
 
 export async function POST(request: Request) {
   try {
-    const installer = verifyInstallerToken(request)
+    const installer = verifyFieldToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const form = await request.formData()
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    const installer = verifyInstallerToken(request)
+    const installer = verifyFieldToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const { searchParams } = new URL(request.url)

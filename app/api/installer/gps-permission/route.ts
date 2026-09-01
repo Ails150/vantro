@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server"
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 import { createServiceClient } from "@/lib/supabase/server"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
 export async function POST(request: Request) {
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await request.json().catch(() => ({}))

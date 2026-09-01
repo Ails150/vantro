@@ -1,11 +1,11 @@
 ﻿import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 
 // Returns the data needed to render the installer's schedule + calendar.
 // Single endpoint that aggregates schedule, balance, entries, holidays, team context.
 export async function GET(request: Request) {
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { searchParams } = new URL(request.url)

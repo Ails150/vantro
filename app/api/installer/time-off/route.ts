@@ -7,7 +7,7 @@
 // Sick leave honours company.sick_auto_approve setting.
 
 import { NextResponse } from "next/server"
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 import { createServiceClient } from "@/lib/supabase/server"
 
 const VALID_TYPES = [
@@ -21,7 +21,7 @@ const VALID_TYPES = [
 ] as const
 
 export async function GET(request: Request) {
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 

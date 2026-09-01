@@ -13,14 +13,14 @@ if (!process.env.JWT_SECRET) {
 }
 export const JWT_SECRET: string = process.env.JWT_SECRET
 
-interface InstallerPayload {
+interface FieldPayload {
   userId: string
   companyId: string
   subcontractorId: string | null
   exp: number
 }
 
-export function createInstallerToken(
+export function createFieldToken(
   userId: string,
   companyId: string,
   subcontractorId: string | null = null
@@ -32,7 +32,7 @@ export function createInstallerToken(
   )
 }
 
-export function verifyInstallerToken(request: Request): InstallerPayload | null {
+export function verifyFieldToken(request: Request): FieldPayload | null {
   const auth = request.headers.get('authorization')
   if (!auth?.startsWith('Bearer ')) return null
   try {

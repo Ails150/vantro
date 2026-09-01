@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { createInstallerToken } from '@/lib/auth'
+import { createFieldToken } from '@/lib/auth'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
   const matchedUser = user
   await service.from('users').update({ pin_attempts: 0, pin_locked_until: null }).eq('id', matchedUser.id)
 
-  const token = createInstallerToken(matchedUser.id, matchedUser.company_id, matchedUser.subcontractor_id || null)
+  const token = createFieldToken(matchedUser.id, matchedUser.company_id, matchedUser.subcontractor_id || null)
 
   return NextResponse.json({
     token,

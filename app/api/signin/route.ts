@@ -3,7 +3,7 @@
 // Installer sign-in. Uses the scheduling resolver as the single source of
 // truth for expected sign-out time. GPS / orphan-close logic unchanged.
 
-import { verifyInstallerToken } from "@/lib/auth"
+import { verifyFieldToken } from "@/lib/auth"
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { isInstallerWorking } from "@/lib/scheduling/resolver"
@@ -23,7 +23,7 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
 }
 
 export async function POST(request: Request) {
-  const installer = verifyInstallerToken(request)
+  const installer = verifyFieldToken(request)
   if (!installer)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
