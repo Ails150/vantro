@@ -3,6 +3,7 @@ import crypto from "crypto"
 import { createServiceClient } from "@/lib/supabase/server"
 import { verifyInstallerToken } from "@/lib/auth"
 import { uploadReceipt } from "@/lib/expense-upload"
+import { assertJobBelongsToCaller } from "@/lib/tenant"
 
 /**
  * POST /api/expenses
@@ -52,6 +53,15 @@ export async function POST(request: Request) {
     const vatAmount = vatRaw ? parseFloat(vatRaw) : null
     if (vatAmount !== null && (isNaN(vatAmount) || vatAmount < 0)) {
       return NextResponse.json({ error: "Invalid VAT amount" }, { status: 400 })
+    }
+
+    // job_id is supplied by the client. The expense row itself is stamped with
+    // the caller's company, so an unchecked id could not leak another tenant's
+    // data, but it would attach the claim to their job and surface that job's
+    // name back through the admin view.
+    if (jobId) {
+      const owned = await assertJobBelongsToCaller(jobId, installer.companyId)
+      if (!owned.ok) return owned.response
     }
 
     const fileBuffer = Buffer.from(await file.arrayBuffer())
