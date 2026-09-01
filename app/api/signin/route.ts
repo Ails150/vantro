@@ -74,6 +74,9 @@ export async function POST(request: Request) {
         {
           error: `You are ${distanceMetres}m from ${job.name}. You must be within ${radius}m to sign in.`,
           distanceMetres,
+          // The enforced radius can differ from the job's own column (remote
+          // sites widen it), so return it and let the client word the refusal.
+          radiusMetres: radius,
           withinRange: false,
         },
         { status: 400 }
