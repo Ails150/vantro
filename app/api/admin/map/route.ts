@@ -27,6 +27,7 @@ export async function GET() {
     const { data: locs } = await service
       .from("location_logs")
       .select("user_id, lat, lng, logged_at, within_range, distance_from_site_metres")
+      .eq("company_id", u.company_id)
       .in("user_id", installerIds)
       .order("logged_at", { ascending: false })
 

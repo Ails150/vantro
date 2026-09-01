@@ -57,6 +57,7 @@ export async function GET(request: Request) {
       const { data: signins } = await service
         .from("signins")
         .select("signed_in_at, signed_out_at, hours_worked")
+        .eq("company_id", companyId)
         .eq("job_id", job.id)
 
       let totalHours = 0
@@ -74,6 +75,7 @@ export async function GET(request: Request) {
       const { data: lastDiary } = await service
         .from("diary_entries")
         .select("created_at, entry_text, ai_alert_type")
+        .eq("company_id", companyId)
         .eq("job_id", job.id)
         .order("created_at", { ascending: false })
         .limit(5)
@@ -85,6 +87,7 @@ export async function GET(request: Request) {
       const { data: openBlockers } = await service
         .from("alerts")
         .select("id, message, created_at")
+        .eq("company_id", companyId)
         .eq("job_id", job.id)
         .eq("alert_type", "blocker")
         .eq("is_read", false)
