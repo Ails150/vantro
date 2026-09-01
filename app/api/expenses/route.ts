@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import crypto from "crypto"
 import { createServiceClient } from "@/lib/supabase/server"
 import { verifyInstallerToken } from "@/lib/auth"
 import { uploadReceipt } from "@/lib/expense-upload"
@@ -53,8 +54,35 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid VAT amount" }, { status: 400 })
     }
 
-    // Upload to R2
     const fileBuffer = Buffer.from(await file.arrayBuffer())
+
+    // Idempotency: the same receipt image, for the same amount, on the same
+    // job is the same expense. A double tap or a retry after a flaky upload
+    // used to land as two rows (the demo tenant showed one £859.14 Materials
+    // at 08:33 and again at 08:48). Scoped to the user so two people
+    // photographing one receipt still each get their own claim.
+    const receiptHash = crypto.createHash("sha256").update(fileBuffer).digest("hex")
+    const idempotencyKey = [
+      installer.userId,
+      receiptHash,
+      amount.toFixed(2),
+      jobId || "no-job",
+    ].join(":")
+
+    const service = await createServiceClient()
+
+    const { data: duplicate } = await service
+      .from("expenses")
+      .select("id, amount, vat_amount, category, note, receipt_url, status, submitted_at, paid_at, job_id, review_note")
+      .eq("idempotency_key", idempotencyKey)
+      .maybeSingle()
+
+    if (duplicate) {
+      console.log("[expenses] Duplicate rejected:", idempotencyKey, "existing", duplicate.id)
+      return NextResponse.json({ success: true, duplicate: true, expense: duplicate })
+    }
+
+    // Upload to R2 only once we know this is a new receipt.
     const uploaded = await uploadReceipt({
       companyId: installer.companyId,
       userId: installer.userId,
@@ -63,9 +91,7 @@ export async function POST(request: Request) {
       fileName: file.name,
     })
 
-    // Insert DB row
-    const service = await createServiceClient()
-    const { data, error } = await service.from("expenses").insert({
+    const row: any = {
       company_id: installer.companyId,
       user_id: installer.userId,
       job_id: jobId || null,
@@ -75,7 +101,27 @@ export async function POST(request: Request) {
       note: note || null,
       receipt_url: uploaded.publicUrl,
       receipt_mime: file.type || "image/jpeg",
-    }).select().single()
+      idempotency_key: idempotencyKey,
+    }
+
+    let { data, error } = await service.from("expenses").insert(row).select().single()
+
+    // Two submissions can race past the read above; the partial unique index
+    // is the real guard, so treat its violation as the duplicate it is.
+    if (error && (error.code === "23505" || /idempotency_key/.test(error.message || ""))) {
+      const { data: existing } = await service
+        .from("expenses")
+        .select("id, amount, vat_amount, category, note, receipt_url, status, submitted_at, paid_at, job_id, review_note")
+        .eq("idempotency_key", idempotencyKey)
+        .maybeSingle()
+      if (existing) {
+        console.log("[expenses] Duplicate rejected on insert:", idempotencyKey, "existing", existing.id)
+        return NextResponse.json({ success: true, duplicate: true, expense: existing })
+      }
+      // Column not migrated yet - save the expense rather than lose it.
+      delete row.idempotency_key
+      ;({ data, error } = await service.from("expenses").insert(row).select().single())
+    }
 
     if (error) {
       console.error("[expenses] Insert failed:", error)
