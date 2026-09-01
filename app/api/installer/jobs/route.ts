@@ -16,7 +16,10 @@ export async function GET(request: Request) {
     service.from('job_assignments').select('job_id').eq('user_id', installer.userId),
     service.from('users').select('company_id, companies!users_company_id_fkey(background_gps_enabled)').eq('id', installer.userId).single(),
     service.from('signins').select('job_id').eq('user_id', installer.userId).gte('signed_in_at', today.toISOString()).is('signed_out_at', null),
-    service.from('visit_assignments').select('visit_id, start_at, job_visits!inner(job_id)').eq('user_id', installer.userId).gte('start_at', today.toISOString()),
+    // start_at is read off job_visits, where it is NOT NULL. visit_assignments
+    // has a start_at column too, but no write path populates it, so selecting
+    // and filtering it here compared against null and dropped every visit.
+    service.from('visit_assignments').select('visit_id, job_visits!inner(job_id, start_at)').eq('user_id', installer.userId).gte('job_visits.start_at', today.toISOString()),
   ])
 
   // installer-jobs-debug-2026-05-20
@@ -35,7 +38,7 @@ export async function GET(request: Request) {
 
   const todaysJobIds = new Set<string>(
     upcomingVisits
-      .filter((v: any) => v.start_at && new Date(v.start_at) < tomorrow)
+      .filter((v: any) => v.job_visits?.start_at && new Date(v.job_visits.start_at) < tomorrow)
       .map((v: any) => v.job_visits?.job_id)
       .filter(Boolean)
   )
