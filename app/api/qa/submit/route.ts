@@ -1,6 +1,7 @@
 import { verifyInstallerToken } from '@/lib/auth'
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
+import { assertJobBelongsToCaller } from "@/lib/tenant"
 
 export async function POST(request: Request) {
   const installer = verifyInstallerToken(request)
@@ -9,8 +10,9 @@ export async function POST(request: Request) {
   const { jobId } = await request.json()
   const service = await createServiceClient()
 
-  const { data: job } = await service.from("jobs").select("company_id").eq("id", jobId).single()
-  if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 })
+  const owned = await assertJobBelongsToCaller<{ company_id: string }>(jobId, installer.companyId)
+  if (!owned.ok) return owned.response
+  const job = owned.job
 
   // Check if approval already exists
   const { data: existing } = await service

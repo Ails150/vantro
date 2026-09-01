@@ -1,6 +1,7 @@
 import { verifyInstallerToken } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
+import { assertJobBelongsToCaller } from '@/lib/tenant'
 import { resolveGeofenceRadius } from '@/lib/geofence-server'
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -19,13 +20,11 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
 
   // Get job location for distance check
-  const { data: job } = await service.from('jobs').select('lat, lng, name, company_id, geofence_radius_metres, address, distance_from_site_km').eq('id', jobId).single()
-  if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
-
-  // The job id arrives in the request body. Without this the token would
-  // authorise work on any company's job. 404 rather than 403: a 403 would
-  // confirm the id exists.
-  if (job.company_id !== installer.companyId) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+  const owned = await assertJobBelongsToCaller<any>(
+    jobId, installer.companyId,
+    'lat, lng, name, company_id, geofence_radius_metres, address, distance_from_site_km')
+  if (!owned.ok) return owned.response
+  const job = owned.job
 
   // Effective radius incl. smart geofence for remote sites (mirrors sign-in)
   const { data: company } = await service.from('companies').select('geofence_radius_metres').eq('id', job.company_id).single()
