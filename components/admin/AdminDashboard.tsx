@@ -28,6 +28,7 @@ import PayrollExportModal from "./PayrollExportModal"
 import SettingsMenu from "./SettingsMenu"
 import { analyzeAllJobs, jobsNeedingAttention, summarizeJobStaffing } from "@/lib/staffing"
 import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
+import { FIELD_FOREMAN_SUBBIE, isFieldOrSupervisor, isFieldRole } from '@/lib/roles'
 
 // Parse lat/lng out of a pasted Google Maps link or a raw "lat,lng" / "lat lng" string.
 function parseCoordsFromInput(raw: string): { lat: number; lng: number } | null {
@@ -959,7 +960,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           .from("users")
           .select("*", { count: "exact", head: true })
           .eq("company_id", userData.company_id)
-          .in("role", ["installer", "foreman", "subcontractor"])
+          .in("role", FIELD_FOREMAN_SUBBIE)
           .eq("is_active", true)
         if (activeCount !== null && activeCount >= limit) {
           setFormError(`You've reached your plan limit of ${limit} installers. Upgrade your plan to add more, or remove an existing user first.`)
@@ -1113,7 +1114,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     setScheduleDays(m.working_days || ["mon","tue","wed","thu","fri"])
   }
 
-  const installers = teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor" || m.role === "subcontractor")
+  const installers = teamMembers.filter((m: any) => isFieldOrSupervisor(m.role))
   const getAssigned = (jobId: string) => {
     const ids = localAssignments.filter((a: any) => a.job_id === jobId).map((a: any) => a.user_id)
     return teamMembers.filter((m: any) => ids.includes(m.id))
@@ -1174,8 +1175,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     superadmin: "Superadmin",
     support: "Support",
   } as Record<string, string>)[role] || role)
-  // Field roles that use the PIN app / installer mobile view and can be assigned to jobs.
-  const isFieldRole = (role: string) => role === "installer" || role === "foreman" || role === "subcontractor"
+  // Field roles use the PIN app and can be assigned to jobs. See lib/roles.ts.
   // The viewer is a superadmin if their role says so OR their own member record
   // carries the is_superadmin flag (transferred superadmins keep role 'admin').
   const viewerIsSuperadmin = userData?.role === "superadmin" || teamMembers.some((m: any) => m.id === userData?.id && m.is_superadmin === true)
@@ -1495,7 +1495,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 </div>
                 {(() => {
                   const people = (teamMembers || [])
-                    .filter((m: any) => ["installer", "foreman", "subcontractor"].includes(m.role) && m.is_active !== false)
+                    .filter((m: any) => isFieldOrSupervisor(m.role) && m.is_active !== false)
                     .map((m: any) => ({ name: m.name, hours: overviewData.installerHoursThisWeek[m.id] || 0 }))
                     .sort((a: any, b: any) => b.hours - a.hours)
                   if (people.length === 0) return <div className={"text-sm py-6 text-center " + sub}>No team members</div>
@@ -1687,11 +1687,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <input type="time" value={jobSignOutTime} onChange={e => setJobSignOutTime(e.target.value)} className={inp}/>
                 </div>
                   <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
-                  {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor").length === 0 ? (
+                  {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).length === 0 ? (
                     <p className="text-sm text-gray-400">No team yet - <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
                   ) : (
                     <div className="space-y-2 mt-1">
-                      {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor").map((m: any) => (
+                      {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).map((m: any) => (
                         <label key={m.id} className="flex items-center gap-2 cursor-pointer">
                           <input type="checkbox" checked={jobAssignedMembers?.includes(m.id) || false} onChange={e => setJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="w-4 h-4 accent-teal-500"/>
                           <span className="text-sm text-gray-700">{m.name}</span>
@@ -1860,11 +1860,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
-                            {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor").length === 0 ? (
+                            {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).length === 0 ? (
                               <p className="text-sm text-gray-400">No team yet - <button type="button" onClick={() => { setEditingJobId(null); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
                             ) : (
                               <div className="space-y-2 mt-1">
-                                {teamMembers.filter((m: any) => m.role === "installer" || m.role === "foreman" || m.role === "subcontractor").map((m: any) => (
+                                {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).map((m: any) => (
                                   <label key={m.id} className="flex items-center gap-2 cursor-pointer">
                                     <input type="checkbox" checked={editJobAssignedMembers?.includes(m.id) || false} onChange={e => setEditJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="w-4 h-4 accent-teal-500"/>
                                     <span className="text-sm text-gray-700">{m.name}</span>
@@ -1944,7 +1944,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
             {(() => {
               const limit = (company as any)?.installer_limit
-              const active = teamMembers.filter((m: any) => ["installer","foreman"].includes(m.role) && m.is_active !== false).length
+              const active = teamMembers.filter((m: any) => (isFieldRole(m.role) || m.role === 'foreman') && m.is_active !== false).length
               if (limit && active > limit) {
                 const over = active - limit
                 return (
@@ -2185,7 +2185,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
                     {filteredTeamMembers.map((m: any) => {
                       const isActive = m.is_active !== false
-                      const isInstFm = m.role === "installer" || m.role === "foreman" || m.role === "subcontractor"
+                      const isInstFm = isFieldOrSupervisor(m.role)
                       const memberTrades = Array.isArray(m.trades) ? m.trades : []
                       const tradeLabels = memberTrades.map((tk: string) => {
                         const t = companyTrades.find((ct: any) => ct.trade_key === tk)
@@ -2196,7 +2196,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       return (
                         <React.Fragment key={m.id}>
                         <div
-                          className={"relative border rounded-2xl p-4 transition-colors flex flex-col min-h-[180px] " + (!isActive ? "bg-gray-50 border-gray-200 opacity-75" : (!m.pin_hash && m.role === "installer") ? "bg-red-50 border-red-200 hover:border-red-300" : "bg-white border-gray-200 hover:border-teal-300")}
+                          className={"relative border rounded-2xl p-4 transition-colors flex flex-col min-h-[180px] " + (!isActive ? "bg-gray-50 border-gray-200 opacity-75" : (!m.pin_hash && isFieldRole(m.role)) ? "bg-red-50 border-red-200 hover:border-red-300" : "bg-white border-gray-200 hover:border-teal-300")}
                         >
                           <div className="flex items-start gap-3 mb-3">
                             <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0 " + (isActive ? "bg-gray-100 text-gray-900" : "bg-gray-100 text-gray-400")}>
@@ -2209,14 +2209,14 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             <span className={"text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 " + roleBadgeCls}>{roleLabel(m.role)}</span>
                           </div>
 
-                          {(!isActive || (!m.pin_hash && m.role === "installer")) && (
+                          {(!isActive || (!m.pin_hash && isFieldRole(m.role))) && (
                             <div className="flex flex-wrap gap-1.5 mb-3">
                               {!isActive && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">Suspended</span>}
-                              {!m.pin_hash && m.role === "installer" && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-medium">PIN not set</span>}
+                              {!m.pin_hash && isFieldRole(m.role) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-medium">PIN not set</span>}
                             </div>
                           )}
 
-                          {multiTradeEnabled && (m.role === "installer" || m.role === "foreman" || m.role === "subcontractor") && (
+                          {multiTradeEnabled && (isFieldOrSupervisor(m.role)) && (
                             <div className="flex flex-wrap gap-1 mb-3">
                               {tradeLabels.length > 0 ? (
                                 tradeLabels.map((label: string, idx: number) => (

@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { VISIT_ROLE_DEFAULT } from '@/lib/roles'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
       company_id: admin.company_id,
       visit_id,
       user_id,
-      role: assignmentRole || "installer",
+      role: assignmentRole || VISIT_ROLE_DEFAULT,
     })
     .select("id, visit_id, user_id, role")
     .single()

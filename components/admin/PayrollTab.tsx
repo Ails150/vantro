@@ -1,6 +1,7 @@
 ﻿"use client"
 import { useState, useEffect } from "react"
 import { PayrollExpenseRow } from "@/components/admin/PayrollExpenseRow"
+import { isFieldRole } from '@/lib/roles'
 
 interface Props { teamMembers: any[] }
 
@@ -23,7 +24,7 @@ function getMonthRange() {
 }
 
 export default function PayrollTab({ teamMembers }: Props) {
-  const installers = teamMembers.filter((m: any) => m.role === "installer")
+  const installers = teamMembers.filter((m: any) => isFieldRole(m.role))
   const [mode, setMode] = useState("this_week")
   const [customFrom, setCustomFrom] = useState("")
   const [customTo, setCustomTo] = useState("")

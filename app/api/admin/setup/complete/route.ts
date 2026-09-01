@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { FIELD_AND_FOREMAN } from '@/lib/roles'
 
 export async function POST() {
   const supabase = await createClient()
@@ -19,7 +20,7 @@ export async function POST() {
 
   const [jobs, team, assignments, schedules] = await Promise.all([
     service.from("jobs").select("id", { count: "exact", head: true }).eq("company_id", u.company_id),
-    service.from("users").select("id", { count: "exact", head: true }).eq("company_id", u.company_id).in("role", ["installer", "foreman"]),
+    service.from("users").select("id", { count: "exact", head: true }).eq("company_id", u.company_id).in("role", FIELD_AND_FOREMAN),
     service.from("job_assignments").select("id", { count: "exact", head: true }).eq("company_id", u.company_id),
     service.from("user_shifts").select("id", { count: "exact", head: true }).eq("company_id", u.company_id),
   ])

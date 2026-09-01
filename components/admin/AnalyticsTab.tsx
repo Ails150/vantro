@@ -1,12 +1,13 @@
 ﻿"use client"
 import { useState, useEffect } from "react"
+import { isFieldRole } from '@/lib/roles'
 
 interface Props { companyId: string; teamMembers: any[]; jobs: any[] }
 
 export default function AnalyticsTab({ companyId, teamMembers, jobs }: Props) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const installers = teamMembers.filter((m: any) => m.role === "installer")
+  const installers = teamMembers.filter((m: any) => isFieldRole(m.role))
   const activeJobs = jobs.filter((j: any) => j.status === "active")
   const completedJobs = jobs.filter((j: any) => j.status === "completed")
 

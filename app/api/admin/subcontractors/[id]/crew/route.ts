@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { FIELD_ROLE } from "@/lib/roles"
 
 async function getCallingAdmin() {
   const supabase = await createClient()
@@ -63,7 +64,7 @@ export async function POST(request: Request, { params }: Params) {
     email,
     name,
     initials,
-    role: "installer",
+    role: FIELD_ROLE,
     is_active: true,
   }).select().single()
 
@@ -81,7 +82,7 @@ export async function POST(request: Request, { params }: Params) {
         "Content-Type": "application/json",
         cookie: request.headers.get("cookie") || "",
       },
-      body: JSON.stringify({ email, name, role: "installer" }),
+      body: JSON.stringify({ email, name, role: FIELD_ROLE }),
     })
   } catch (e) {
     console.error("[subcontractors/crew] invite email failed:", e)

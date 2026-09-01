@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import DefaultHoursSetup from '@/components/admin/setup/DefaultHoursSetup'
+import { FIELD_AND_FOREMAN } from '@/lib/roles'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -23,7 +24,7 @@ export default async function HoursPage() {
     .from('users')
     .select('*', { count: 'exact', head: true })
     .eq('company_id', userData.company_id)
-    .in('role', ['installer', 'foreman'])
+    .in('role', FIELD_AND_FOREMAN)
     .eq('is_active', true)
 
   return <DefaultHoursSetup teamCount={teamCount || 0} />

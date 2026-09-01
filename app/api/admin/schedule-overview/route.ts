@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { FIELD_AND_FOREMAN } from '@/lib/roles'
 
 function daysBetween(start: string, end: string, isHalfDay: boolean): number {
   if (isHalfDay) return 0.5
@@ -75,7 +76,7 @@ export async function GET() {
       .from("users")
       .select("id", { count: "exact", head: true })
       .eq("company_id", admin.company_id)
-      .in("role", ["installer", "foreman"])
+      .in("role", FIELD_AND_FOREMAN)
       .or("is_active.is.null,is_active.eq.true"),
     service
       .from("time_off_entries")

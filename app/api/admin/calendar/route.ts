@@ -8,6 +8,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { FIELD_AND_FOREMAN } from '@/lib/roles'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
     .from("users")
     .select("id, name, initials")
     .eq("company_id", admin.company_id)
-    .in("role", ["installer", "foreman"])
+    .in("role", FIELD_AND_FOREMAN)
     .or("is_active.is.null,is_active.eq.true")
     .order("name", { ascending: true })
 

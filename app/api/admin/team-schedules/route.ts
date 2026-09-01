@@ -6,6 +6,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { isFieldRole } from '@/lib/roles'
 
 const DAY_KEYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"] as const
 
@@ -121,7 +122,7 @@ export async function GET() {
 
   // Filter installers + foreman only (not admins)
   const teamUsers = users.filter((u: any) =>
-    ["installer", "foreman"].includes(u.role)
+    (isFieldRole(u.role) || u.role === 'foreman')
   )
 
   const userIds = teamUsers.map((u: any) => u.id)

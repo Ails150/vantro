@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { FIELD_ROLES } from '@/lib/roles'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   const { data: installers } = await service.from("users")
     .select("id")
     .eq("company_id", u.company_id)
-    .eq("role", "installer")
+    .in("role", FIELD_ROLES)
 
   if (!installers || installers.length === 0) {
     return NextResponse.json({ error: "No installers found" }, { status: 400 })

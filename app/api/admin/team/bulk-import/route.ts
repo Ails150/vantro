@@ -1,13 +1,15 @@
 ﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { FIELD_FOREMAN_SUBBIE, FIELD_ROLE, FIELD_ROLES, normaliseRole } from '@/lib/roles'
 
 // Bulk import installers/foremen via CSV.
 //   POST /api/admin/team/bulk-import
-//   body: { rows: [{ name: string, email: string, role: "installer" | "foreman" }] }
+//   body: { rows: [{ name: string, email: string, role: "field" | "foreman" }] }
 //
 // Returns per-row results so the UI can show which succeeded and which didn't.
 
-const VALID_ROLES = ["installer", "foreman"] as const
+// "installer" still accepted on input for one release; stored as "field".
+const VALID_ROLES = [...FIELD_ROLES, "foreman"]
 
 interface CsvRow {
   name: string
@@ -66,7 +68,7 @@ export async function POST(request: Request) {
       .from("users")
       .select("*", { count: "exact", head: true })
       .eq("company_id", admin.company_id)
-      .in("role", ["installer", "foreman", "subcontractor"])
+      .in("role", FIELD_FOREMAN_SUBBIE)
       .eq("is_active", true)
     if (currentCount !== null && currentCount + rows.length > company.installer_limit) {
       return NextResponse.json(
@@ -95,7 +97,8 @@ export async function POST(request: Request) {
     const rowNum = i + 1
     const name = (r?.name || "").trim()
     const email = (r?.email || "").trim().toLowerCase()
-    const role = (r?.role || "installer").trim().toLowerCase()
+    // A CSV may still say "installer". Validate either, store the new value.
+    const role = normaliseRole(r?.role || FIELD_ROLE)
 
     if (!name) {
       results.push({ row: rowNum, name: "", email, status: "error", message: "Missing name" })

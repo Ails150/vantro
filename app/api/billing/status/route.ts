@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { TIERS } from '@/lib/billing'
+import { FIELD_ROLES } from '@/lib/roles'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -34,7 +35,7 @@ export async function GET() {
     .from('users')
     .select('*', { count: 'exact', head: true })
     .eq('company_id', company.id)
-    .in('role', ['installer', 'subcontractor'])
+    .in('role', [...FIELD_ROLES, 'subcontractor'])
     .eq('is_active', true)
 
   let subscription: any = null

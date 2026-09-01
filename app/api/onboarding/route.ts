@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { FIELD_ROLE, normaliseRole } from '@/lib/roles'
 
 /**
  * POST /api/onboarding
@@ -156,8 +157,8 @@ export async function POST(request: Request) {
     // Defence in depth: never allow superadmin to be assigned via this step.
     // Only the company creator gets superadmin (set in STEP 1).
     const insertData = valid.map(inst => {
-      const requestedRole = (inst.role || 'installer').trim()
-      const safeRole = requestedRole === 'superadmin' ? 'installer' : requestedRole
+      const requestedRole = (inst.role || FIELD_ROLE).trim()
+      const safeRole = normaliseRole(requestedRole === 'superadmin' ? FIELD_ROLE : requestedRole)
       return {
         company_id: userData.company_id,
         email: inst.email.trim().toLowerCase(),

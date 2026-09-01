@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { FIELD_ROLES } from '@/lib/roles'
 
 type Step = 'team' | 'done'
 
@@ -40,7 +41,7 @@ function OnboardingInner() {
         .from('users')
         .select('id', { count: 'exact', head: true })
         .eq('company_id', data.company_id)
-        .eq('role', 'installer')
+        .in('role', FIELD_ROLES)
 
       if ((count || 0) > 0) {
         router.push('/admin')

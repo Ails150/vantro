@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { FIELD_AND_FOREMAN } from '@/lib/roles'
 
 const DAYS = [
   { key: "mon", dow: 1 },
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     .from("users")
     .select("id")
     .eq("company_id", u.company_id)
-    .in("role", ["installer", "foreman"])
+    .in("role", FIELD_AND_FOREMAN)
     .eq("is_active", true)
 
   if (!teamMembers?.length) {

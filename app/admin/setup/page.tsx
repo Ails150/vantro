@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import SetupWizard from '@/components/admin/setup/SetupWizard'
+import { FIELD_AND_FOREMAN } from '@/lib/roles'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -38,7 +39,7 @@ export default async function SetupPage() {
     .from('users')
     .select('*', { count: 'exact', head: true })
     .eq('company_id', userData.company_id)
-    .in('role', ['installer', 'foreman'])
+    .in('role', FIELD_AND_FOREMAN)
 
   const { count: assignmentsCount } = await supabase
     .from('job_assignments')

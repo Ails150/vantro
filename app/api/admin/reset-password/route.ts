@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
+import { isFieldRole } from '@/lib/roles'
 
 export async function POST(request: Request) {
   const { email } = await request.json()
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ success: true })
 
   // Only admin/foreman roles can use password reset (installers use PIN reset)
-  if (user.role === 'installer') return NextResponse.json({ success: true })
+  if (isFieldRole(user.role)) return NextResponse.json({ success: true })
 
   const token = crypto.randomBytes(32).toString('hex')
   const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1 hour

@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatTrialDaysRemaining, type TierKey, TIERS, getNextTier } from '@/lib/billing'
+import { FIELD_ROLES } from '@/lib/roles'
 
 export type BillingState = {
   loading: boolean
@@ -71,7 +72,7 @@ export function useBillingGate(companyId: string | null): BillingState {
         .from('users')
         .select('id', { count: 'exact', head: true })
         .eq('company_id', companyId!)
-        .in('role', ['installer', 'subcontractor'])
+        .in('role', [...FIELD_ROLES, 'subcontractor'])
         .neq('status', 'removed')
 
       const activeInstallers = installerCount || 0

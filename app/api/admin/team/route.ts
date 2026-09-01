@@ -1,8 +1,10 @@
 ﻿import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { getCallerContext } from "@/lib/company-context"
+import { FIELD_ROLE, FIELD_ROLES, normaliseRole } from '@/lib/roles'
 
-const VALID_ROLES = ["installer", "foreman", "admin"]
+// Accepts the legacy word on input for one release, stores the new one.
+const VALID_ROLES = [...FIELD_ROLES, "foreman", "admin"]
 const CAN_LIST = ["admin", "foreman", "superadmin", "support"]
 const CAN_ADD = ["admin", "superadmin", "support"]
 const CAN_ADD_ADMINS = ["superadmin"]
@@ -30,11 +32,12 @@ export async function POST(request: Request) {
 
   const name = (body.name || "").trim()
   const email = (body.email || "").trim().toLowerCase()
-  const role = (body.role || "installer").trim()
+  const role = (body.role || FIELD_ROLE).trim()
 
   if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 })
   if (!email || !email.includes("@")) return NextResponse.json({ error: "Valid email required" }, { status: 400 })
   if (!VALID_ROLES.includes(role)) return NextResponse.json({ error: "Invalid role" }, { status: 400 })
+  const storedRole = normaliseRole(role)
 
   if (role === "admin" && !CAN_ADD_ADMINS.includes(u.role)) {
     return NextResponse.json({ error: "Only the superadmin can add admins" }, { status: 403 })
@@ -47,7 +50,7 @@ export async function POST(request: Request) {
     company_id: u.company_id,
     email,
     name,
-    role,
+    role: storedRole,
     is_active: true,
   }).select().single()
 

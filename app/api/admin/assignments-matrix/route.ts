@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { FIELD_AND_FOREMAN } from '@/lib/roles'
 
 // GET: returns jobs[], installers[], and assignments matrix (job_id, user_id pairs)
 export async function GET() {
@@ -20,7 +21,7 @@ export async function GET() {
 
   const [jobs, team, assignments] = await Promise.all([
     service.from("jobs").select("id, name, address").eq("company_id", u.company_id).eq("status", "active").order("name"),
-    service.from("users").select("id, name, role").eq("company_id", u.company_id).in("role", ["installer", "foreman"]).eq("is_active", true).order("name"),
+    service.from("users").select("id, name, role").eq("company_id", u.company_id).in("role", FIELD_AND_FOREMAN).eq("is_active", true).order("name"),
     service.from("job_assignments").select("job_id, user_id").eq("company_id", u.company_id),
   ])
 
