@@ -108,3 +108,5 @@ settings-page.txt
 
 # Auto-backups from edit scripts
 *.backup-*
+.vercel
+.env*
