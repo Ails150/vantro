@@ -1,7 +1,8 @@
 -- 20260902_companies_vertical.sql  -  Vantro
 -- companies.vertical: which industry a company is in.
 --
--- Vantro is one product serving install, cleaning, security, grounds and pest.
+-- Vantro is one product serving install, cleaning, security, facilities,
+-- grounds and pest.
 -- Until now the app assumed construction everywhere: the wizard, the tab list
 -- and every noun in the UI. This column is the single stored fact the whole
 -- vertical layer branches on. lib/vertical.ts reads it and nothing else
@@ -28,20 +29,23 @@ begin;
 alter table public.companies
   add column if not exists vertical text not null default 'install';
 
--- The five verticals from VANTRO-ADMIN-V1.md section 3.1. Constrained rather
--- than left free text so a typo in a wizard payload fails at the write
--- instead of silently producing a company that matches no config and falls
--- back to install forever.
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint where conname = 'companies_vertical_check'
-  ) then
-    alter table public.companies
-      add constraint companies_vertical_check
-      check (vertical in ('install', 'cleaning', 'security', 'grounds', 'pest'));
-  end if;
-end $$;
+-- The five verticals from VANTRO-ADMIN-V1.md section 3.1, plus 'facilities'
+-- from VANTRO-VERTICALS-V1.md section 2. Constrained rather than left free
+-- text so a typo in a wizard payload fails at the write instead of silently
+-- producing a company that matches no config and falls back to install
+-- forever.
+--
+-- Dropped and re-added rather than added if absent: this file has already
+-- changed its value list once, and a guard that skips when the constraint
+-- exists would leave an older list in place on a database where an earlier
+-- version of this migration was already run. Drop-then-add converges from
+-- either state.
+alter table public.companies
+  drop constraint if exists companies_vertical_check;
+
+alter table public.companies
+  add constraint companies_vertical_check
+  check (vertical in ('install', 'cleaning', 'security', 'facilities', 'grounds', 'pest'));
 
 commit;
 

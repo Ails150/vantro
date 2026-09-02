@@ -12,10 +12,12 @@
 // in migrations/20260902_companies_vertical.sql. Nothing else.
 
 /** The stored values of companies.vertical. Matches the check constraint. */
-export type Vertical = "install" | "cleaning" | "security" | "grounds" | "pest"
+export type Vertical =
+  | "install" | "cleaning" | "security" | "facilities" | "grounds" | "pest"
 
 /** Picker order. Install first: it is the default and the largest tenant set. */
-export const VERTICALS: readonly Vertical[] = ["install", "cleaning", "security", "grounds", "pest"]
+export const VERTICALS: readonly Vertical[] =
+  ["install", "cleaning", "security", "facilities", "grounds", "pest"]
 
 /**
  * What an unknown, missing or not-yet-migrated vertical resolves to. Install
@@ -86,6 +88,18 @@ export const VERTICAL_CONFIG: Record<Vertical, VerticalConfig> = {
     workersLower: "officers",
     hiddenTabs: ["trades"],
   },
+  facilities: {
+    value: "facilities",
+    label: "Facilities management",
+    sublabel: "Maintenance, reactive callouts, planned works",
+    // Engineer is the noun in VANTRO-VERTICALS-V1.md section 5, alongside
+    // Visits and Faults. Only the worker noun is this file's to own.
+    worker: "Engineer",
+    workers: "Engineers",
+    workerLower: "engineer",
+    workersLower: "engineers",
+    hiddenTabs: ["trades"],
+  },
   grounds: {
     value: "grounds",
     label: "Grounds and landscaping",
@@ -127,7 +141,7 @@ export function verticalConfig(value: unknown): VerticalConfig {
   return VERTICAL_CONFIG[toVertical(value)]
 }
 
-/** The five options in picker order, for rendering step one. */
+/** The six options in picker order, for rendering step one. */
 export const VERTICAL_OPTIONS: readonly VerticalConfig[] = VERTICALS.map(v => VERTICAL_CONFIG[v])
 
 /** Whether a tab id is shown to a given vertical. */
