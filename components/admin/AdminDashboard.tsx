@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation"
 import PaywallOverlay from '@/components/billing/PaywallOverlay' // paywall_wired_v2
 import SitesTab from "./SitesTab"
 import { setupTabs, operationsTabs, tabBadge, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
+import { filterTabsByVertical, isTabVisible, toVertical } from "@/lib/vertical"
 import TradesTab from "./TradesTab"
 import TradeMultiSelect from "./TradeMultiSelect"
 import CsvImportModal from "./CsvImportModal"
@@ -63,24 +64,37 @@ interface Props {
 }
 
 export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid }: Props) {
-  const [activeTab, setActiveTab] = useState(defaultTab)
+  // Which tabs this company sees. The nav arrays are data in nav/tabs.ts and
+  // the hide list is data in lib/vertical.ts, so the render below stays a map
+  // over an array and nothing here knows why a tab is missing.
+  const vertical = toVertical(company?.vertical)
+  const visibleSetupTabs = useMemo(() => filterTabsByVertical(setupTabs, vertical), [vertical])
+  const visibleOperationsTabs = useMemo(() => filterTabsByVertical(operationsTabs, vertical), [vertical])
+
+  // A hidden tab must never reach activeTab: its nav entry is gone, so there
+  // would be no way back out of it. Each of the four ways in is filtered here
+  // rather than corrected afterwards -- ?tab=, the stored tab, the navigate
+  // event, and switchTab below.
+  const [activeTab, setActiveTab] = useState(() => isTabVisible(defaultTab, vertical) ? defaultTab : "overview")
   // optimistic-assign-2026-05-20 - mirror jobAssignments prop in local state so pill toggles instantly
   const [localAssignments, setLocalAssignments] = useState<any[]>(jobAssignments)
   // Sync from server when prop updates (router.refresh, page nav, etc)
   useEffect(() => { setLocalAssignments(jobAssignments) }, [jobAssignments])
   useEffect(() => {
     const handler = (e: any) => {
-      if (e?.detail?.tab) setActiveTab(e.detail.tab)
+      if (e?.detail?.tab && isTabVisible(e.detail.tab, vertical)) setActiveTab(e.detail.tab)
     }
     window.addEventListener("vantro:navigate-tab", handler)
     return () => window.removeEventListener("vantro:navigate-tab", handler)
-  }, [])
+  }, [vertical])
   useEffect(() => {
     try {
+      // A tab stored before the company's vertical changed can be one this
+      // company no longer has. Ignore it and stay on the default.
       const stored = localStorage.getItem("vantro_tab")
-      if (stored) setActiveTab(stored)
+      if (stored && isTabVisible(stored, vertical)) setActiveTab(stored)
     } catch {}
-  }, [])
+  }, [vertical])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [setupExpanded, setSetupExpanded] = useState(true)
   const [operationsExpanded, setOperationsExpanded] = useState(true)
@@ -726,6 +740,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   }, [editJobLat, editJobLng])
 
   function switchTab(tab: string) {
+    if (!isTabVisible(tab, vertical)) return
     setActiveTab(tab)
     try { localStorage.setItem("vantro_tab", tab) } catch {}
   }
@@ -1240,7 +1255,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 </button>
               )}
               <nav className="space-y-1">
-                {(sidebarCollapsed || setupExpanded) && setupTabs.map(tab => (
+                {(sidebarCollapsed || setupExpanded) && visibleSetupTabs.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => switchTab(tab.id)}
@@ -1268,7 +1283,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 </button>
               )}
               <nav className="space-y-1">
-                {(sidebarCollapsed || operationsExpanded) && operationsTabs.map(tab => (
+                {(sidebarCollapsed || operationsExpanded) && visibleOperationsTabs.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => switchTab(tab.id)}
