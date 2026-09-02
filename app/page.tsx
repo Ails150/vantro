@@ -7,12 +7,28 @@ export default function Home() {
 
   useEffect(() => {
     const hash = window.location.hash
-    if (!hash || !hash.includes('access_token')) return
+
+    // This route exists only to catch magic-link callbacks, whose tokens arrive
+    // in the URL hash and are therefore never sent to the server -- which is why
+    // the decision has to be made here rather than in a server redirect. Anyone
+    // arriving without them (the bare domain, a bookmark, a shared link) has
+    // nothing to render, so send them to the login page instead of leaving them
+    // on a blank screen. replace() rather than assign() so the empty root does
+    // not sit in history behind the login page.
+    if (!hash || !hash.includes('access_token')) {
+      window.location.replace('/login')
+      return
+    }
 
     const params = new URLSearchParams(hash.replace(/^#/, ''))
     const access_token = params.get('access_token')
     const refresh_token = params.get('refresh_token')
-    if (!access_token || !refresh_token) return
+    // A hash that mentions access_token but is missing either half is a
+    // malformed or truncated link. Nothing to sign in with, same destination.
+    if (!access_token || !refresh_token) {
+      window.location.replace('/login')
+      return
+    }
 
     setSigningIn(true)
     const supabase = createClient()
