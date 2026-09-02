@@ -55,6 +55,7 @@ export default async function SetupPage() {
     <SetupWizard
       companyName={company?.name || 'Your company'}
       userName={userData.name || 'there'}
+      vertical={company?.vertical}
       jobsCount={jobsCount || 0}
       teamCount={teamCount || 0}
       assignmentsCount={assignmentsCount || 0}

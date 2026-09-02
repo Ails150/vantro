@@ -2,10 +2,14 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import VerticalStep from "./VerticalStep"
+import { toVertical, verticalConfig, type Vertical } from "@/lib/vertical"
 
 type Props = {
   companyName: string
   userName: string
+  /** companies.vertical. Anything unrecognised falls back to install. */
+  vertical: string | null | undefined
   jobsCount: number
   teamCount: number
   assignmentsCount: number
@@ -15,6 +19,7 @@ type Props = {
 export default function SetupWizard({
   companyName,
   userName,
+  vertical,
   jobsCount,
   teamCount,
   assignmentsCount,
@@ -24,18 +29,26 @@ export default function SetupWizard({
   const [completing, setCompleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const step1Done = jobsCount > 0
-  const step2Done = teamCount > 0
-  const step3Done = assignmentsCount > 0
-  const step4Done = schedulesCount > 0
+  // Step one. Held locally so the steps below re-word the moment it is picked,
+  // without waiting for a server round trip to re-render the page.
+  const [activeVertical, setActiveVertical] = useState<Vertical>(toVertical(vertical))
+  const terms = verticalConfig(activeVertical)
+
+  // Step one is not in this list: the column has a value from the day the
+  // company row exists, so there is nothing to complete and nothing to lock
+  // behind. Steps two to five are the ones that need data.
+  const step2Done = jobsCount > 0
+  const step3Done = teamCount > 0
+  const step4Done = assignmentsCount > 0
+  const step5Done = schedulesCount > 0
 
   const currentStep =
-    !step1Done ? 1 :
     !step2Done ? 2 :
     !step3Done ? 3 :
-    !step4Done ? 4 : 5
+    !step4Done ? 4 :
+    !step5Done ? 5 : 6
 
-  const allDone = step1Done && step2Done && step3Done && step4Done
+  const allDone = step2Done && step3Done && step4Done && step5Done
 
   async function completeOnboarding() {
     setCompleting(true)
@@ -56,57 +69,62 @@ export default function SetupWizard({
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Welcome, {userName}.</h1>
           <p className="text-gray-600 mt-2">
-            Let&apos;s get {companyName} set up. Four quick steps and you&apos;re ready to go.
+            Let&apos;s get {companyName} set up. Five quick steps and you&apos;re ready to go.
           </p>
         </div>
 
         <div className="space-y-4">
-          <StepCard
+          <VerticalStep
             number={1}
-            title="Add your job sites"
-            description="Where do your installers work? Upload a CSV or add them one by one."
-            count={jobsCount}
-            countLabel="job site"
-            isCurrent={currentStep === 1}
-            isDone={step1Done}
-            isLocked={false}
-            actionLabel={step1Done ? "Add more or continue" : "Add jobs"}
-            onAction={() => router.push("/admin?tab=jobs&from=setup")}
+            vertical={activeVertical}
+            onChange={setActiveVertical}
           />
           <StepCard
             number={2}
+            title="Add your job sites"
+            description={`Where do your ${terms.workersLower} work? Upload a CSV or add them one by one.`}
+            count={jobsCount}
+            countLabel="job site"
+            isCurrent={currentStep === 2}
+            isDone={step2Done}
+            isLocked={false}
+            actionLabel={step2Done ? "Add more or continue" : "Add jobs"}
+            onAction={() => router.push("/admin?tab=jobs&from=setup")}
+          />
+          <StepCard
+            number={3}
             title="Add your team"
             description="Who's on the team? Upload a CSV or add people manually."
             count={teamCount}
             countLabel="team member"
-            isCurrent={currentStep === 2}
-            isDone={step2Done}
-            isLocked={!step1Done}
-            actionLabel={step2Done ? "Add more or continue" : "Add team"}
-            onAction={() => router.push("/admin?tab=team&from=setup")}
-          />
-          <StepCard
-            number={3}
-            title="Who works where"
-            description="Link installers to job sites — they'll only see jobs they're assigned to."
-            count={assignmentsCount}
-            countLabel="assignment"
             isCurrent={currentStep === 3}
             isDone={step3Done}
             isLocked={!step2Done}
-            actionLabel={step3Done ? "Edit assignments" : "Assign installers"}
-            onAction={() => router.push("/admin/setup/assignments")}
+            actionLabel={step3Done ? "Add more or continue" : "Add team"}
+            onAction={() => router.push("/admin?tab=team&from=setup")}
           />
           <StepCard
             number={4}
+            title="Who works where"
+            description={`Link ${terms.workersLower} to job sites — they'll only see jobs they're assigned to.`}
+            count={assignmentsCount}
+            countLabel="assignment"
+            isCurrent={currentStep === 4}
+            isDone={step4Done}
+            isLocked={!step3Done}
+            actionLabel={step4Done ? "Edit assignments" : `Assign ${terms.workersLower}`}
+            onAction={() => router.push("/admin/setup/assignments")}
+          />
+          <StepCard
+            number={5}
             title="Default working hours"
             description="Set the standard Mon–Fri hours for your team. Customise per person later."
             count={schedulesCount}
             countLabel="schedule set"
-            isCurrent={currentStep === 4}
-            isDone={step4Done}
-            isLocked={!step3Done}
-            actionLabel={step4Done ? "Edit hours" : "Set hours"}
+            isCurrent={currentStep === 5}
+            isDone={step5Done}
+            isLocked={!step4Done}
+            actionLabel={step5Done ? "Edit hours" : "Set hours"}
             onAction={() => router.push("/admin/setup/hours")}
           />
         </div>
