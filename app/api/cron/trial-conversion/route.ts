@@ -17,7 +17,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { TIERS } from '@/lib/billing'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured')
+  return new Stripe(key)
+}
 
 export async function GET(request: Request) {
   const auth = request.headers.get('authorization')
@@ -100,7 +104,7 @@ export async function GET(request: Request) {
     const tier = TIERS[c.current_plan as keyof typeof TIERS]
 
     try {
-      const subscription = await stripe.subscriptions.create({
+      const subscription = await getStripe().subscriptions.create({
         customer: c.stripe_customer_id,
         items: [{ price: tier.priceId }],
         metadata: {

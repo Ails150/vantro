@@ -4,7 +4,11 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import Stripe from 'stripe'
 import { TIERS, type TierKey } from '@/lib/billing'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) throw new Error('STRIPE_SECRET_KEY is not configured')
+  return new Stripe(key)
+}
 
 /**
  * POST /api/signup/initiate
@@ -91,7 +95,7 @@ export async function POST(request: Request) {
   const authUserId = authData.user.id
 
   // Step 2: Create Stripe customer immediately so we can attach metadata
-  const customer = await stripe.customers.create({
+  const customer = await getStripe().customers.create({
     email: email.toLowerCase().trim(),
     name: companyName.trim(),
     metadata: {
@@ -105,7 +109,7 @@ export async function POST(request: Request) {
 
   // Step 3: Create Stripe Checkout session with 30-day trial
   try {
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
       customer: customer.id,
