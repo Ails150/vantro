@@ -145,7 +145,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
       const r = await fetch("/api/audit/v2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jobId: selectedJob, from: from || null, to: to || null }),
+        body: JSON.stringify({ jobId: selectedJob, from: from || null, to: to || null, regenerate: true }),
       })
       const d = await r.json()
       setReportV2(d)
