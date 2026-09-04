@@ -23,7 +23,10 @@
 -- reader as capture-time evidence unless its event is 'created'.
 --
 -- SCOPE OF THIS FILE
--- Row hashes for the eight evidential tables, on insert. Deliberately NOT here:
+-- Hashes for the eight evidential tables: a hash per row on insert for seven of
+-- them, and for location_logs a hash per sign-in over the whole GPS trail,
+-- written at sign-out. See the location_logs section for why that one differs
+-- and exactly what the batch cannot prove. Deliberately NOT here:
 --   * append-only enforcement (rejecting UPDATE) -- next migration. Doing it in
 --     the same step would be reckless: the obvious reading of "reject UPDATE on
 --     evidential fields" would break QA approval, defect resolution, variation
@@ -50,6 +53,12 @@ create table if not exists public.evidence_hashes (
   -- thing being proved -- each capture appends its own row.
   event           text not null default 'created'
                   check (event in ('created', 'signed_out', 'backfill')),
+
+  -- Number of source rows behind this hash. 1 for a row hash. For the
+  -- location_logs batch below it is the ping count, which is what stops a
+  -- truncated trail from being presented as a complete one: the count is inside
+  -- the hashed payload as well as here, so the two must agree.
+  row_count       integer not null default 1 check (row_count >= 0),
 
   sha256          text not null check (sha256 ~ '^[0-9a-f]{64}$'),
   algorithm       text not null default 'sha256',
@@ -194,19 +203,95 @@ create trigger signins_evidence_hash_signout
     'expected_sign_out_time'
   );
 
--- location_logs: nothing is excluded. Every column is capture evidence,
+-- location_logs is hashed as a BATCH PER SIGN-IN, on sign-out -- the spec's own
+-- proposal, taken deliberately over a hash per ping. It is the highest-volume
+-- table in the schema (6 MB of index on user_id alone) and a hash per ping
+-- would roughly double the cost of the hottest write path in the product, for
+-- evidence nobody reads a single row of: the GPS trail is only ever argued
+-- about as a trail.
+--
+-- What it costs, stated plainly so the pack does not overclaim:
+--   * a single ping cannot be proved in isolation, only the trail it belongs
+--     to. Tampering with one ping still breaks the batch hash, so nothing
+--     becomes undetectable -- it becomes less precisely locatable.
+--   * pings for an OPEN sign-in are unhashed until that sign-in closes. A trail
+--     still in progress has no integrity claim, and the pack must not make one
+--     for it.
+--   * a ping written after sign-out falls outside the batch. row_count and the
+--     count inside the payload make that visible on recomputation rather than
+--     silent.
+--
+-- Nothing is excluded from a ping's payload. Every column is capture evidence,
 -- including within_range and distance_from_site_metres -- those record what the
 -- app decided at the time, which is itself the thing an auditor questions.
--- This is the highest-volume table in the schema (6 MB of index on user_id
--- alone), so one evidence_hashes row per ping is the cost being accepted here.
--- If that proves too expensive the spec's own answer is to hash the batch per
--- sign-in on sign-out instead; that is a payload_version bump, not a redesign.
-drop trigger if exists location_logs_evidence_hash on public.location_logs;
-create trigger location_logs_evidence_hash
-  after insert on public.location_logs
-  for each row execute function public.record_evidence_hash(
-    'created', '1', 'user_id'
+create or replace function public.record_location_batch_hash()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $fn$
+declare
+  pings   jsonb;
+  n       integer;
+  payload jsonb;
+begin
+  -- Ordered by (logged_at, id) so the same trail always renders the same bytes.
+  -- logged_at is nullable, hence nulls last; id breaks any tie and is unique,
+  -- so the ordering is total.
+  select coalesce(jsonb_agg(to_jsonb(l) order by l.logged_at nulls last, l.id), '[]'::jsonb),
+         count(*)
+    into pings, n
+    from public.location_logs l
+   where l.signin_id = new.id;
+
+  -- The count is inside the hashed payload as well as in row_count. Dropping
+  -- trailing pings therefore has to defeat both, and they are checked against
+  -- each other on recomputation.
+  payload := jsonb_build_object(
+    'signin_id', new.id,
+    'count',     n,
+    'pings',     pings
   );
+
+  insert into public.evidence_hashes
+    (company_id, entity_type, entity_id, event, sha256, payload_version,
+     hashed_by, row_count)
+  values (
+    new.company_id,
+    'location_logs_batch',
+    new.id,                      -- keyed by the sign-in the trail belongs to
+    'signed_out',
+    encode(sha256(convert_to(payload::text, 'UTF8')), 'hex'),
+    1,
+    new.user_id,
+    n
+  );
+
+  return null;
+end;
+$fn$;
+
+comment on function public.record_location_batch_hash() is
+  'Trigger: hashes a sign-in''s whole ordered GPS trail as one evidence_hashes row at sign-out. entity_type=location_logs_batch, entity_id=the signin id.';
+
+drop trigger if exists location_logs_evidence_hash on public.location_logs;
+drop trigger if exists signins_location_batch_hash on public.signins;
+create trigger signins_location_batch_hash
+  after update of signed_out_at on public.signins
+  for each row
+  when (old.signed_out_at is null and new.signed_out_at is not null)
+  execute function public.record_location_batch_hash();
+
+-- The gap batching opens, closed. location_logs.signin_id is nullable, and a
+-- ping that belongs to no sign-in would otherwise be hashed by nothing at all
+-- -- evidence silently outside the scheme, which is the failure this whole
+-- phase exists to prevent. Those pings, and only those, keep a per-row hash.
+drop trigger if exists location_logs_orphan_evidence_hash on public.location_logs;
+create trigger location_logs_orphan_evidence_hash
+  after insert on public.location_logs
+  for each row
+  when (new.signin_id is null)
+  execute function public.record_evidence_hash('created', '1', 'user_id');
 
 drop trigger if exists diary_entries_evidence_hash on public.diary_entries;
 create trigger diary_entries_evidence_hash
@@ -295,8 +380,11 @@ from (
                'hours_worked','expected_sign_out_time'] as excluded
     from public.signins s
   union all
+  -- Only orphan pings are hashed per row; the rest are covered by the batch
+  -- backfill below, which mirrors the trigger.
   select 'location_logs', to_jsonb(l), 'user_id', array[]::text[]
     from public.location_logs l
+   where l.signin_id is null
   union all
   select 'diary_entries', to_jsonb(d), 'user_id',
          array['ai_alert_type','ai_processed','ai_summary','ai_variation_detected',
@@ -337,6 +425,47 @@ where not exists (
      and h.entity_id = (t.row_json ->> 'id')::uuid
 );
 
+-- The GPS trails, one hash per sign-in that has any pings. Must build exactly
+-- the payload record_location_batch_hash() builds -- same wrapper keys, same
+-- ordering -- or every backfilled trail will look tampered with the first time
+-- it is recomputed.
+--
+-- Scoped to sign-ins that have already signed out. An open sign-in is still
+-- collecting pings, so hashing its trail now would freeze an incomplete one and
+-- the trigger would never fire for it again. Those get their batch when they
+-- close, like any other.
+insert into public.evidence_hashes
+  (company_id, entity_type, entity_id, event, sha256, payload_version,
+   hashed_by, row_count)
+select
+  s.company_id,
+  'location_logs_batch',
+  s.id,
+  'backfill',
+  encode(sha256(convert_to(
+    jsonb_build_object(
+      'signin_id', s.id,
+      'count',     b.n,
+      'pings',     b.pings
+    )::text, 'UTF8')), 'hex'),
+  1,
+  s.user_id,
+  b.n
+from public.signins s
+join lateral (
+  select coalesce(jsonb_agg(to_jsonb(l) order by l.logged_at nulls last, l.id), '[]'::jsonb) as pings,
+         count(*) as n
+    from public.location_logs l
+   where l.signin_id = s.id
+) b on true
+where s.signed_out_at is not null
+  and b.n > 0
+  and not exists (
+    select 1 from public.evidence_hashes h
+     where h.entity_type = 'location_logs_batch'
+       and h.entity_id = s.id
+  );
+
 -- ---------------------------------------------------------------------------
 -- 5. RLS
 -- ---------------------------------------------------------------------------
@@ -353,3 +482,23 @@ notify pgrst, 'reload schema';
 --    group by 1,2 order by 1,2;      -> all 'backfill' immediately after
 --   select count(*) from evidence_hashes where sha256 !~ '^[0-9a-f]{64}$';  -> 0
 --   select relrowsecurity from pg_class where relname = 'evidence_hashes';  -> t
+--
+--   -- No ping is outside the scheme: every location_log is either in a batch
+--   -- for a closed sign-in, or orphaned and hashed on its own, or belongs to a
+--   -- sign-in still open. Nothing should fall through.
+--   select count(*) from location_logs l
+--    where l.signin_id is not null
+--      and not exists (select 1 from evidence_hashes h
+--                       where h.entity_type = 'location_logs_batch'
+--                         and h.entity_id = l.signin_id)
+--      and exists (select 1 from signins s
+--                   where s.id = l.signin_id and s.signed_out_at is not null);
+--     -> 0
+--
+--   -- row_count agrees with the trail it claims to cover.
+--   select count(*) from evidence_hashes h
+--    where h.entity_type = 'location_logs_batch'
+--      and h.row_count <> (select count(*) from location_logs l
+--                           where l.signin_id = h.entity_id);
+--     -> 0 at backfill time; a later non-zero means pings arrived after
+--        sign-out, which is a fact to look at, not a bug to hide

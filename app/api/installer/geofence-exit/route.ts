@@ -3,9 +3,11 @@
 // Mobile fires this when iOS Region Monitoring detects the installer has
 // crossed the site boundary leaving the geofence. We:
 // 1. Find the installer's open signin for this job
-// 2. Close it with signed_out_at = exitedAt (the moment they crossed)
-// 3. Capture lat/lng of the exit point
-// 4. Flag as auto_signed_out so admin can distinguish from manual sign-out
+// 2. Log the exit breadcrumb, while the signin is still open -- closing it
+//    seals the GPS trail into one hash, and this ping has to be inside it
+// 3. Close it with signed_out_at = exitedAt (the moment they crossed)
+// 4. Capture lat/lng of the exit point
+// 5. Flag as auto_signed_out so admin can distinguish from manual sign-out
 //
 // This is the ONLY background-fired endpoint - all other sign-outs are
 // manual (installer taps "Sign Out") and go through the regular sign-out
@@ -79,6 +81,44 @@ export async function POST(request: Request) {
     (signedOutAt.getTime() - signedInAt.getTime()) / 3600000
   )
 
+  // Log the breadcrumb for the exit event BEFORE closing the signin.
+  //
+  // Order matters now: closing a signin fires signins_location_batch_hash,
+  // which hashes that signin's whole GPS trail as one piece of evidence. A ping
+  // written after the update falls outside the batch -- and this is the single
+  // most evidential ping in the trail, the one that records them crossing the
+  // boundary. See supabase/migrations/20260904010000_evidence_hashes.sql.
+  //
+  // This insert has also never once succeeded. It omitted job_id, which is NOT
+  // NULL on location_logs, so every call failed on a not-null violation and the
+  // bare `catch {}` threw the error away. There is no geofence exit breadcrumb
+  // anywhere in the table. signin_id was missing too, which would have left
+  // every exit ping outside the batch even once job_id was fixed.
+  //
+  // Still best-effort: a missing breadcrumb must not stop someone being signed
+  // out. But the failure is logged now rather than swallowed.
+  const { error: breadcrumbErr } = await service
+    .from("location_logs")
+    .insert({
+      signin_id: signin.id,
+      user_id: installer.userId,
+      company_id: signin.company_id,
+      job_id: signin.job_id,
+      lat,
+      lng,
+      accuracy_metres: 0,
+      // Definitional: this endpoint only fires because they crossed out of the
+      // geofence. distance_from_site_metres is left null -- we know they are
+      // outside, not by how far, and the job coordinates are not loaded here.
+      within_range: false,
+      source: "geofence-exit",
+      logged_at: signedOutAt.toISOString(),
+    })
+
+  if (breadcrumbErr) {
+    console.error("[geofence-exit] breadcrumb insert failed", breadcrumbErr)
+  }
+
   // Close the signin
   const { error: updateErr } = await service
     .from("signins")
@@ -96,21 +136,6 @@ export async function POST(request: Request) {
   if (updateErr) {
     return NextResponse.json({ error: updateErr.message }, { status: 500 })
   }
-
-  // Log the breadcrumb for the exit event (best-effort, non-blocking)
-  try {
-    await service
-      .from("location_logs")
-      .insert({
-        user_id: installer.userId,
-        company_id: signin.company_id,
-        lat,
-        lng,
-        accuracy_metres: 0,
-        source: "geofence-exit",
-        logged_at: signedOutAt.toISOString(),
-      })
-  } catch {}
 
   return NextResponse.json({
     success: true,
