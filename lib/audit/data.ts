@@ -123,9 +123,16 @@ export async function fetchAuditData(
 ): Promise<AuditData | null> {
   const ttl = options.signedUrlTtl ?? SIGNED_URL_TTL
   const walkthroughView = options.walkthroughView ?? "internal"
+  // `select("*")` on purpose, not laziness. PostgREST fails the WHOLE select on
+  // a single unknown column, so an explicit list turns any schema drift on
+  // `jobs` into "Job not found" for every audit surface at once. It bit us
+  // already: `completed_by` is written by the mark_complete action but does not
+  // exist on the live table (see migrations/20260901_baseline_existing_tables
+  // .sql, generated from the live PostgREST schema), so naming it explicitly
+  // took down the entire pack. One row, so the over-fetch costs nothing.
   const { data: job } = await service
     .from("jobs")
-    .select("id, name, address, contractor, lat, lng, company_id, required_trades, status, completed_at, completed_by, geofence_radius_metres, gps_source, distance_from_site_km, site_id")
+    .select("*")
     .eq("id", jobId).eq("company_id", companyId).single()
   if (!job) return null
 
