@@ -67,6 +67,7 @@ export async function POST(request: Request) {
     signedUrlTtl: SIGNED_URL_TTL,
     includeWalkthroughs: true,
     walkthroughView: view,
+    includeAdminLog: true,
   })
   if (!data) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
@@ -440,6 +441,8 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, geofenceRadiusMetres, fullLog: signins },
     issues: { blockers, issues, openDefects, allDefects: defects },
     fullEvidence: { qa: qaRows, diary, defects, walkthroughs, signins },
+    // Phase 1.4: the human half of the chain of custody.
+    adminLog: data.adminLog,
     aiAuditActive,
     execSummary,
     redFlags,

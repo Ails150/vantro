@@ -92,6 +92,10 @@ export interface AuditData {
   variations: AnyRow[]
   /** Empty unless options.includeWalkthroughs is set. */
   walkthroughs: AnyRow[]
+  /** Phase 1.4. Empty unless options.includeAdminLog is set. The human half of
+   *  the chain of custody: who approved, resolved, edited or attempted to
+   *  delete, and when. */
+  adminLog: AnyRow[]
 }
 
 export interface FetchAuditDataOptions {
@@ -99,6 +103,8 @@ export interface FetchAuditDataOptions {
   signedUrlTtl?: number
   /** Walk & Talks are only queried when a caller asks for them. */
   includeWalkthroughs?: boolean
+  /** Phase 1.4: fetch the admin audit_log entries for this job and period. */
+  includeAdminLog?: boolean
   /**
    * client/external see approved walkthroughs only; internal sees everything
    * that finished processing, so an admin can approve from the audit screen.
@@ -310,5 +316,41 @@ export async function fetchAuditData(
     }))
   }
 
-  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs }
+  // -------------------------------------------------------------------------
+  // Phase 1.4: the admin audit log for this job and period.
+  // -------------------------------------------------------------------------
+  // Everything above records what happened on site. This records what happened
+  // to that evidence afterwards -- who approved a QA item, who resolved a
+  // defect, who tried to delete something. Without it the pack shows evidence
+  // and its current state but not the human decisions in between, which is the
+  // half an assessor actually questions.
+  let adminLog: AnyRow[] = []
+  if (options.includeAdminLog) {
+    // Scoped by the entities this job actually owns, so a busy company's log
+    // does not leak other jobs' activity into this pack.
+    const subjectIds = new Set<string>([jobId])
+    for (const r of [...signins, ...qa, ...diary, ...defects, ...variations]) {
+      if (r?.id) subjectIds.add(r.id)
+    }
+
+    let q = service
+      .from("audit_log")
+      .select("id, action, entity_type, entity_id, details, created_at, user_id, users(name, initials)")
+      .eq("company_id", companyId)
+      .in("entity_id", [...subjectIds])
+      .order("created_at", { ascending: true })
+    if (from) q = q.gte("created_at", from)
+    if (to) q = q.lte("created_at", to + "T23:59:59.999Z")
+
+    const { data: logRows } = await q
+
+    // DENYLIST, for the same reason the hash payloads use one: an allowlist of
+    // "evidential actions" would silently drop any action added later, and a
+    // decision nobody listed is exactly what an audit trail must not lose. Only
+    // actions that are plainly reads are excluded.
+    const NOISE = /^(view|read|open|list|search|export_view|page_view|login|logout)(_|$)/i
+    adminLog = (logRows || []).filter((r: AnyRow) => !NOISE.test(r.action || ""))
+  }
+
+  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, adminLog }
 }

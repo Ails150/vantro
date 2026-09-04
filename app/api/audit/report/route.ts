@@ -292,6 +292,41 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   const refId = integrity?.reference
     || `VTR-UNREGISTERED-${job.name.replace(/\s+/g, "").toUpperCase().slice(0, 8)}-${Date.now().toString().slice(-8)}`
 
+  // Phase 1.4: the human chain of custody. Everything else in this report says
+  // what happened on site; this says what happened to that evidence afterwards
+  // -- who approved, resolved, edited or tried to delete, and when. An assessor
+  // questions that half at least as often as the capture itself.
+  const adminLog: AnyRow[] = data.adminLog || []
+  const adminLogRows = adminLog.map((r: AnyRow) => `
+    <tr>
+      <td>${escapeHtml(fmtDateTime(r.created_at))}</td>
+      <td>${escapeHtml((r.users as any)?.name || "—")}</td>
+      <td>${escapeHtml(String(r.action || "").replace(/_/g, " "))}</td>
+      <td>${escapeHtml(r.entity_type || "—")}</td>
+    </tr>`).join("")
+
+  const adminLogSection = `
+<!-- APPENDIX: Administrative actions -->
+<section class="page">
+  <h2>Appendix &mdash; Administrative actions</h2>
+  <p class="muted">
+    Every recorded action taken on this job's evidence during the period, in order.
+    Read-only activity is excluded. This is the human half of the chain of custody:
+    the records above show what was captured, this shows what was done with it.
+  </p>
+  ${adminLog.length === 0
+    ? `<p class="muted"><em>No administrative actions were recorded against this job in this period. That means none were logged, not that none occurred &mdash; logging covers the actions the application records, and is not a complete account of database access.</em></p>`
+    : `<table class="tbl">
+        <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Record type</th></tr></thead>
+        <tbody>${adminLogRows}</tbody>
+      </table>`}
+  <div class="footer">
+    <span>Vantro &middot; getvantro.com &middot; Ref ${refId}</span>
+    <span>End of appendix</span>
+  </div>
+</section>
+`
+
   // Page 1 integrity block. Every line is either printed from the manifest or
   // is a statement the manifest backs up. Nothing is asserted in prose that is
   // not computed -- that was the failure of the old chain-of-custody section.
@@ -658,6 +693,14 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     h2 { page-break-after: avoid; }
     .card { page-break-inside: avoid; }
   }
+  /* Phase 1.4 appendix. The report is otherwise all cards; the administrative
+     log is genuinely tabular and reads far worse as cards. */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 12px; }
+  .tbl th { text-align: left; font-weight: 600; font-size: 10px; text-transform: uppercase;
+            letter-spacing: .06em; color: var(--muted); padding: 6px 8px;
+            border-bottom: 1px solid var(--line); }
+  .tbl td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .tbl tr:last-child td { border-bottom: 0; }
 </style>
 </head>
 <body>
@@ -765,6 +808,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   </div>
 </section>
 
+${adminLogSection}
 </body>
 </html>`
 }
@@ -854,7 +898,7 @@ export async function GET(request: Request) {
 
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
 
-  const data = await fetchAuditData(service, companyId, jobId, from, to)
+  const data = await fetchAuditData(service, companyId, jobId, from, to, { includeAdminLog: true })
   if (!data) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
   const aiEnabled = !!data.company?.ai_audit_enabled
