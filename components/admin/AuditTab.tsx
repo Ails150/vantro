@@ -675,7 +675,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="font-bold text-gray-900 mb-1">🎙 Walk &amp; Talks ({reportV2.fullEvidence.walkthroughs.length})</h3>
-                      <p className="text-xs text-gray-500">Voice-narrated site walkthroughs with AI-structured documentation. Approved walkthroughs appear in client and compliance audit reports.</p>
+                      <p className="text-xs text-gray-500">Voice-narrated site walkthroughs with AI-structured documentation. Internal view only — walkthroughs are not yet included in the client or compliance pack.</p>
                     </div>
                   </div>
                   <div className="space-y-3">
@@ -958,102 +958,6 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   </div>
                 )}
               </div>
-            </>
-          )}
-
-          {/* CLIENT VIEW */}
-          {false && (
-            <>
-              <div className={card + " p-8 bg-gradient-to-br from-teal-50 via-white to-white"}>
-                <h2 className="text-2xl font-bold text-gray-900">{reportV2.job?.name}</h2>
-                <p className="text-sm text-gray-600 mt-1">{reportV2.job?.address}</p>
-                {reportV2.job?.contractor && <p className="text-sm text-gray-600">Contractor: {reportV2.job.contractor}</p>}
-                <p className="text-xs text-gray-400 mt-2">Status report · Generated {new Date(reportV2.generated || Date.now()).toLocaleDateString("en-GB")}</p>
-                {(() => {
-                  const totalDeliverables = reportV2.deliverables?.length || 0
-                  const completedDeliverables = reportV2.deliverables?.filter((d: any) => d.status === "completed").length || 0
-                  const overallPct = totalDeliverables > 0 ? Math.round((reportV2.deliverables.reduce((s: number, d: any) => s + (d.totalItems > 0 ? (d.approvedItems / d.totalItems) : 0), 0) / totalDeliverables) * 100) : 0
-                  return (
-                    <div className="grid grid-cols-3 gap-3 mt-6 pt-6 border-t border-gray-100">
-                      <div>
-                        <div className="text-2xl font-bold text-gray-900">{reportV2.health?.metrics?.hoursThisPeriod ?? 0}h</div>
-                        <div className="text-xs text-gray-500">Logged on site</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-gray-900">{completedDeliverables}/{totalDeliverables}</div>
-                        <div className="text-xs text-gray-500">Deliverables complete</div>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-teal-600">{overallPct}%</div>
-                        <div className="text-xs text-gray-500">Overall progress</div>
-                      </div>
-                    </div>
-                  )
-                })()}
-              </div>
-
-              {reportV2.execSummary && (
-                <div className={card + " p-6"}>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">At a glance</h3>
-                  <p className="text-base text-gray-700 leading-relaxed">{reportV2.execSummary}</p>
-                </div>
-              )}
-
-              {reportV2.deliverables && reportV2.deliverables.length > 0 && (
-                <div className={card + " p-6"}>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Progress</h3>
-                  <div className="space-y-3">
-                    {reportV2.deliverables.map((d: any) => {
-                      const pct = d.totalItems > 0 ? Math.round((d.approvedItems / d.totalItems) * 100) : 0
-                      return (
-                        <div key={d.id}>
-                          <div className="flex items-center justify-between mb-1">
-                            <div className="text-sm font-semibold text-gray-900">{d.name}</div>
-                            <div className="text-xs text-gray-500">{pct}% complete</div>
-                          </div>
-                          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                            <div className="h-full bg-teal-500" style={{ width: pct + "%" }}></div>
-                          </div>
-                          {d.aiNarrative && <p className="text-xs text-gray-600 mt-1">{d.aiNarrative}</p>}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {(() => {
-                const allPhotos: { url: string; date: string; source: string }[] = []
-                if (report?.qa) {
-                  report.qa.forEach((q: any) => {
-                    if (q.photo_url) allPhotos.push({ url: q.photo_url, date: q.created_at, source: "QA" })
-                  })
-                }
-                if (reportV2?.fullEvidence?.diary) {
-                  reportV2.fullEvidence.diary.forEach((e: any) => {
-                    if (e.photo_urls && Array.isArray(e.photo_urls)) {
-                      e.photo_urls.forEach((u: string) => {
-                        if (u) allPhotos.push({ url: u, date: e.created_at, source: "Diary" })
-                      })
-                    }
-                  })
-                }
-                allPhotos.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                if (allPhotos.length === 0) return null
-                return (
-                  <div className={card + " p-6"}>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Photos from site ({allPhotos.length})</h3>
-                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                      {allPhotos.slice(0, 36).map((p, i) => (
-                        <a key={i} href={p.url} target="_blank" rel="noopener noreferrer">
-                          <img src={p.url} alt="" className="w-full h-24 object-cover rounded-lg border border-gray-200 hover:opacity-80" />
-                        </a>
-                      ))}
-                    </div>
-                    {allPhotos.length > 36 && <p className="text-xs text-gray-400 mt-2">+ {allPhotos.length - 36} more photos available</p>}
-                  </div>
-                )
-              })()}
             </>
           )}
 
