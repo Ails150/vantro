@@ -15,10 +15,14 @@ document it is built from. Moved and committed on 2026-09-04 at your request.
 
 | Item | State |
 |------|-------|
-| 1.1 Content hashing at write time | Written, **not applied** — needs `db push` |
-| 1.2 Pack manifest and signature | Not started; signing key is provisioned |
-| 1.3 Permanent evidence | Not started |
-| 1.4 Admin audit log in the pack | Not started |
+| 1.1 Content hashing at write time | Done. Migrations **applied** |
+| 1.2 Pack manifest and signature | Done. Migration `20260904030000` **not applied** |
+| 1.3 Permanent evidence | Archive done. **Server-side PDF not done** — see below |
+| 1.4 Admin audit log in the pack | Done |
+
+Migrations, in order: `20260904010000_evidence_hashes`,
+`20260904020000_evidence_append_only`, `20260904030000_audit_packs_manifest`.
+The third is unapplied at the time of writing.
 
 ---
 
@@ -160,7 +164,58 @@ That is the second silent write-failure of the same shape in two days, after
 
 ---
 
-## 1.2 Pack manifest and signature — key provisioning
+## 1.2 Pack manifest and signature
+
+Replaces the browser-computed SHA-256 in `AuditTab.tsx` entirely. That hash is
+deleted, along with its dead state.
+
+Both producers register a pack: `/api/audit/v2` (Compliance and the in-app
+views) and `/api/audit/report` (client HTML and share links). The report used to
+mint its own reference — `VTR-<jobname>-<8 digits of Date.now()>` — which was
+never stored and resolvable by nothing. It now prints the registered reference.
+
+Choices worth stating, because each is somewhere Merkle work commonly goes
+wrong:
+
+- **Leaves bind identity to content**, not content alone: entity type, subject,
+  event, hash. Otherwise two rows with identical payloads collapse into one
+  leaf, and a hash re-pointed at another entity goes unnoticed.
+- **Leaves are sorted before pairing.** A root that depends on the order
+  Postgres happened to return rows in is not reproducible.
+- **An odd node is promoted, never duplicated.** Duplicating is the
+  CVE-2012-2459 shape, where two different leaf sets yield one root.
+- **Canonical JSON sorts keys.** A signature over a manifest re-serialised from
+  `jsonb` has to reproduce byte for byte.
+- **`/verify` runs three independent checks**, not one: signature over the
+  manifest, stored root against the manifest's own, and the root recomputed from
+  the evidence rows. They fail differently — the third is the one that catches
+  evidence altered *after* the pack was issued.
+- **Amendment hashes are included**, not filtered out. Hiding superseded rows
+  would hide exactly the corrections 1.1 exists to make visible.
+- **Nothing here can fail a pack.** No signing key yields an unsigned pack that
+  says so; a failed registration yields a pack that says its reference will not
+  resolve. Refusing to render because the integrity layer had a bad day is worse
+  than rendering and being honest.
+
+`/verify` returns nothing about the job, site, people or company. A pack
+reference travels in insurers' files and assessors' reports, and checking one
+must not leak what it was for. Rate limited by IP, shape-checked before it
+touches the database.
+
+### `audit_packs` was not a new table
+
+The spec calls it new. It already existed, holding `ai_audit_used`,
+`exec_summary`, `red_flags` plus seven columns that are exactly what the spec
+asks for, under the same names. Extended rather than replaced — a rival table
+would leave two registers of generated packs and the older would rot.
+
+The three extra columns are **kept**. Nothing in the app reads them, but
+`audit_packs_job_id_idx` shows 116 index scans, so something reads this table
+that a repo grep cannot see. `audit_report_log` is a second, entirely unused
+table with a `report_ref` column covering similar ground; left alone, and worth
+a deliberate decision rather than a passing one.
+
+### Key provisioning
 
 Done ahead of the work, since it needed a credential:
 
@@ -183,10 +238,76 @@ by a project owner; treat that as the backup and do not rotate casually.
 
 ---
 
+---
+
+## 1.3 Permanent evidence
+
+Every file a pack references is copied server side into
+
+```
+audit-archive/<companyId>/<packRef>/<sha256>.<ext>
+```
+
+named by the hash of its own bytes, so the filename *is* the integrity claim:
+fetch it, hash it, compare to the name. No index to consult, nothing to trust.
+R2 `CopyObject` does this without the bytes passing through the process, and a
+name that already exists is byte-identical by construction, so it is skipped.
+
+The report then swaps its expiring signed URLs for the archived copies — in one
+place, over the shared data, rather than at each point a photo is drawn. A file
+whose copy failed keeps its signed URL: it expires, but it works today, which
+beats a permanent-looking link to an object that was never written. Failures are
+counted onto the pack row.
+
+**Fixed here:** a share link minted a new pack reference on every view, so a
+client refreshing the page would see a reference that no longer matched the one
+in the email they were sent. A share is one issued pack — the first view fixes
+it, later views reuse it. Evidence added afterwards is deliberately not folded
+in, because a pack is a claim about a point in time.
+
+### Two things 1.3 does not do
+
+**1. The archive is not write-once yet.** The spec asks for a bucket with no
+delete policy for any app role. That is infrastructure, not code: a separate R2
+bucket with a scoped token lacking `DeleteObject`, or an object-lock policy on
+the prefix. The code writes to `CLOUDFLARE_R2_ARCHIVE_BUCKET` when set and falls
+back to the main bucket. **Until that token exists the application can delete
+what it just archived, and the archive is durable by convention, not by
+permission. Do not describe it as write-once to a customer.**
+
+**2. No server-side PDF.** The spec offers "archive URLs that do not expire, or
+(preferred) a PDF generated server side with images embedded". This takes the
+first branch. The preferred branch means headless Chromium on Vercel
+(`puppeteer-core` + `@sparticuz/chromium`), which is the single most likely
+thing to turn the preview red — and `npm run build` cannot be run on this
+machine at all, so it would be taken blind at the end of a phase that is already
+entirely unverified. That is not the safe choice. **This is the one open
+decision in Phase 1.** The alternatives are Chromium, a pure-JS renderer
+(`@react-pdf/renderer`, no binary, but a second renderer to keep in step with
+the HTML one), or leaving it as archive URLs.
+
+---
+
+## 1.4 Administrative actions appendix
+
+Fetched in the shared data layer behind `includeAdminLog`, so the Compliance
+view and the client HTML cannot drift. Scoped by the entities the job owns, not
+just by company, so a busy tenant's log cannot leak another job's activity.
+
+Filtered by denylist, for the same reason the hash payloads are — an allowlist
+of "evidential actions" silently drops any action added later.
+
+Where the log is empty both surfaces say so **and say what that does not mean**:
+nothing was logged, not that nothing happened. `audit_log` records what the
+application chooses to record and is not an account of database access. An empty
+table with no caption reads as proof of no activity, which it is not.
+
+---
+
 ## Needs a human
 
-1. **Push the migrations.** `20260904010000` and `20260904020000` are committed
-   and unapplied. Nothing downstream can be verified until they land.
+1. **Push `20260904030000_audit_packs_manifest.sql`.** The first two landed.
+   Until this one does, every pack will report that it could not be registered.
 2. **`.env.local` still has four lines of pasted prose at the top**, which makes
    the Supabase CLI refuse to parse it. Delete the `notepad ...` line, both
    fences and the "Paste this in" line, leaving the file starting at
