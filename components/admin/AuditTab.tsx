@@ -1291,6 +1291,37 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                     )}
                   </div>
                 ))}
+
+                {/* Sign-off register — every progressive QA approval, chronologically */}
+                <div className="mt-5 pt-4 border-t border-gray-200">
+                  <div className="text-xs font-bold mb-2">
+                    3.{(reportV2.deliverables?.length || 0) + 1} Sign-off register ({reportV2.signoffs?.length || 0})
+                  </div>
+                  {(reportV2.signoffs?.length || 0) === 0 ? (
+                    <div className="text-xs text-gray-500 italic">No items have been signed off in this period.</div>
+                  ) : (
+                    <table className="w-full text-xs border border-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Deliverable</th>
+                          <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Item</th>
+                          <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Signed off by</th>
+                          <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Signed off at</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reportV2.signoffs.map((so: any, i: number) => (
+                          <tr key={i} className="border-b border-gray-100">
+                            <td className="px-2 py-1">{so.deliverable || "—"}</td>
+                            <td className="px-2 py-1">{so.item || "—"}</td>
+                            <td className="px-2 py-1">{so.by || "—"}</td>
+                            <td className="px-2 py-1">{so.at ? new Date(so.at).toLocaleString("en-GB") : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
               </div>
 
               <div className={card + " p-6"}>
