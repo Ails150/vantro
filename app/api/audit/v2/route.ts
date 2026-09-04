@@ -4,6 +4,7 @@ import { fetchAuditData } from "@/lib/audit/data"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { resolveGeofenceRadius } from "@/lib/geofence-server"
+import { createPackRecord } from "@/lib/audit/pack"
 import { createHash } from "crypto"
 
 type AnyRow = Record<string, any>
@@ -411,9 +412,24 @@ Return only the sentence, no JSON, no quotes, no preamble.`
   )
   }
 
+  // Phase 1.2. Register this pack: manifest over the capture-time hashes of
+  // exactly the rows the shared data layer returned, Merkle root, Ed25519
+  // signature, stored in audit_packs under a quotable reference. Never throws —
+  // an integrity record that fails still returns an object carrying the reason,
+  // and §6 prints that instead of an integrity block that means nothing.
+  const integrity = await createPackRecord({
+    service,
+    data,
+    companyId,
+    jobId,
+    viewType: view,
+    generatedBy: appUser.id || null,
+  })
+
   return NextResponse.json({
     job,
     period: { from, to },
+    integrity,
     status: job.status,
     finalSignoff,
     health,

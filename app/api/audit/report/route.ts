@@ -3,6 +3,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 import { fetchAuditData } from "@/lib/audit/data"
+import { createPackRecord, type PackIntegrity } from "@/lib/audit/pack"
 
 type AnyRow = Record<string, any>
 
@@ -282,9 +283,55 @@ Write the executive summary now.`
 
 // ---------------- HTML render ----------------
 
-function renderReport(data: any, narrative: string, narrativeIsAI: boolean): string {
+function renderReport(data: any, narrative: string, narrativeIsAI: boolean, integrity: PackIntegrity | null): string {
   const { job, company, period, signins, qa, diary, defects, variations = [] } = data
-  const refId = `VTR-${job.name.replace(/\s+/g, "").toUpperCase().slice(0, 8)}-${Date.now().toString().slice(-8)}`
+  // Phase 1.2: the reference printed on this report is the one it is registered
+  // under, so a reader who quotes it at /verify gets an answer. It used to be
+  // built here from the job name and a slice of Date.now() -- never stored,
+  // never unique, and resolvable by nothing.
+  const refId = integrity?.reference
+    || `VTR-UNREGISTERED-${job.name.replace(/\s+/g, "").toUpperCase().slice(0, 8)}-${Date.now().toString().slice(-8)}`
+
+  // Page 1 integrity block. Every line is either printed from the manifest or
+  // is a statement the manifest backs up. Nothing is asserted in prose that is
+  // not computed -- that was the failure of the old chain-of-custody section.
+  const cov = integrity?.coverage
+  const captured = cov ? cov.created + cov.signedOut : 0
+  const integrityBlock = !integrity || integrity.error
+    ? `<h3>Evidence integrity</h3>
+  <p class="muted" style="border:1px solid #c48a00;background:#fff8e6;padding:10px;border-radius:6px">
+    <strong>This copy is not registered.</strong>
+    ${escapeHtml(integrity?.error || "No integrity record was produced for this report.")}
+    The reference above cannot be verified.
+  </p>`
+    : `<h3>Evidence integrity</h3>
+  <p class="muted">
+    Every record behind this report was hashed (SHA-256) by the database inside the transaction
+    that wrote it. Records cannot be silently altered: identity fields are immutable, sign-out
+    position and expense receipts are write-once, and any other change appends a new hash linked
+    to the one it replaces. Photos and videos are hashed from their bytes at upload, not from
+    their address.
+  </p>
+  <dl class="meta">
+    <dt>Pack reference</dt><dd>${escapeHtml(refId)}</dd>
+    <dt>Merkle root</dt><dd>${escapeHtml((integrity.merkleRoot || "").slice(0, 16))}… <span class="muted">(${integrity.evidenceCount} record${integrity.evidenceCount === 1 ? "" : "s"}; full root in the appendix below)</span></dd>
+    <dt>Signature</dt><dd>${integrity.signed ? "Ed25519, server-side" : "<strong>Unsigned</strong> — no signing key configured"}</dd>
+    <dt>Verify at</dt><dd>getvantro.com/verify</dd>
+  </dl>
+  ${cov ? `<p class="muted">
+    ${captured} record${captured === 1 ? "" : "s"} hashed at the moment of capture${
+      cov.backfill > 0
+        ? `, ${cov.backfill} hashed later when integrity hashing was introduced — for those this proves no change since then, <strong>not</strong> since capture`
+        : ""
+    }${
+      cov.amended > 0
+        ? `, ${cov.amended} amended after capture and recorded as such`
+        : ""
+    }.
+  </p>` : ""}
+  <p class="muted" style="font-family:ui-monospace,monospace;font-size:9px;word-break:break-all">
+    Root ${escapeHtml(integrity.merkleRoot || "")}${integrity.signature ? `<br/>Signature ${escapeHtml(integrity.signature)}` : ""}
+  </p>`
   const generated = new Date()
   const installerSet = new Set<string>()
   let totalHours = 0
@@ -656,6 +703,8 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean): str
     <div class="kpi"><div class="kpi-num">${diaryShownCount}</div><div class="kpi-label">Diary entries</div></div>
   </div>
 
+  ${integrityBlock}
+
   <div class="footer">
     <span>Vantro · getvantro.com · CNNCTD Ltd (NI695071)</span>
     <span>${refId}</span>
@@ -728,6 +777,10 @@ export async function GET(request: Request) {
   const shareToken = searchParams.get("shareToken")
 
   let companyId: string
+  // Who issued this copy, and on which share link if any. Both go into the pack
+  // record so an issued report can be traced back to the link it went out on.
+  let shareId: string | null = null
+  let generatedBy: string | null = null
   let jobId = searchParams.get("jobId")
   let from = searchParams.get("from")
   let to = searchParams.get("to")
@@ -749,6 +802,7 @@ export async function GET(request: Request) {
       return new NextResponse("This audit link has expired.", { status: 410, headers: { "Content-Type": "text/plain" } })
     }
     companyId = share.company_id
+    shareId = share.id
     jobId = share.job_id
     if (share.date_from) from = String(share.date_from).slice(0, 10)
     if (share.date_to) to = String(share.date_to).slice(0, 10)
@@ -760,6 +814,7 @@ export async function GET(request: Request) {
     const { data: appUser } = await service.from("users").select("id, company_id").eq("auth_user_id", user.id).single()
     if (!appUser) return NextResponse.json({ error: "User not found" }, { status: 403 })
     companyId = appUser.company_id
+    generatedBy = appUser.id || null
   }
 
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
@@ -779,7 +834,20 @@ export async function GET(request: Request) {
   }
   if (!narrative) narrative = buildTemplatedNarrative(data)
 
-  const html = renderReport(data, narrative, narrativeIsAI)
+  // Phase 1.2: register this pack before rendering, so the reference printed on
+  // page 1 resolves at /verify. shareId is set when this was reached through a
+  // share link, which is what ties an issued copy to the link it went out on.
+  const integrity = await createPackRecord({
+    service,
+    data,
+    companyId,
+    jobId,
+    viewType: shareToken ? "client" : "compliance",
+    generatedBy,
+    shareId,
+  })
+
+  const html = renderReport(data, narrative, narrativeIsAI, integrity)
   return new NextResponse(html, {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8" },
