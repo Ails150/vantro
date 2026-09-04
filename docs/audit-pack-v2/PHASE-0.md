@@ -1,7 +1,8 @@
 # Phase 0 — Fix what is broken
 
-Branch: `audit-pack-v2-phase-0` (8 commits, one per spec item, off `master` at 15cca75).
-Not deployed. Not merged.
+Branch: `audit-pack-v2-phase-0` (8 commits, one per spec item, off `master` at
+15cca75, plus three follow-ups). Pushed to `origin`; a Vercel **preview** is
+built from it. Not merged, not in production.
 
 Spec: `docs/VANTRO_AUDIT_PACK_V2_SPEC.md`. Note the spec lives at that path, not
 `docs/audit-pack-v2/SPEC.md`. This summary is written to the path the spec's own
@@ -13,8 +14,19 @@ here, as it is your file.
 
 ## Build status — read this first
 
-`npm run build` **fails on this repo at `master`, before any Phase 0 change**.
-It is not something Phase 0 introduced and not something Phase 0 fixes:
+**Vercel builds this branch green.** Preview
+`dpl_ERH96hi7fE5Zu6mTmeGSUbisEXVp`, target preview, status Ready, 355 output
+items, from commit `656b12d`. Alias:
+`https://vantro-git-audit-pack-v2-phase-0-ails150s-projects.vercel.app`.
+
+So the local failure below is **environment only** — a Windows/babel-loader
+crash on this machine, not a defect in the repo or in Phase 0. CI is the
+authority; the local `npm run build` is not.
+
+<details>
+<summary>The local crash, for the record</summary>
+
+`npm run build` fails on this machine at `master`, before any Phase 0 change:
 
 ```
 Error: Node.js subprocess crashed while evaluating loaders [next/dist/build/babel/loader]
@@ -22,21 +34,18 @@ Node.js process exited with exit code: 0xc0000409     (stack buffer overrun)
 Import traces: ./components/admin/UpgradeAIAuditPack.tsx -> AuditTab -> AdminDashboard -> app/admin/page.tsx
 ```
 
-Reproduced twice at baseline. So the spec's "build passes after every commit"
-could not be honoured literally. The gate used instead, after every commit:
+Reproduced twice at baseline.
+</details>
 
-```
-NODE_OPTIONS=--max-old-space-size=8192 npx tsc --noEmit
-```
+The per-commit gate was therefore
+`NODE_OPTIONS=--max-old-space-size=8192 npx tsc --noEmit` — clean at baseline
+and after every commit. (The raised heap is required; plain `npx tsc --noEmit`
+dies with a V8 OOM on this repo.)
 
-Clean at baseline and clean after all 8 commits. (The raised heap is required —
-plain `npx tsc --noEmit` dies with a V8 OOM on this repo.)
-
-**This means Phase 0 has had no runtime verification.** Type checking will not
-catch a wrong Supabase column name, a missing embed, or a null shape, and 0.8
-moved every audit query. Before merging, this branch needs a Vercel preview
-deploy and one real job generated through all four views. See "Needs a human"
-below.
+**A green build is not runtime verification, and that distinction cost us
+once already.** `tsc` and the Vercel build both passed while 0.8 carried a
+select that would have failed on every request — see "The `completed_by`
+near miss" below. The pack has still never been generated against real data.
 
 ---
 
@@ -57,9 +66,8 @@ Now the single producer for every audit surface.
   depended on which route you came through. Map styling is now the report
   route's (zoom 17, scale 2, teal marker, 320x200); v2's old styling (zoom 16,
   red, 400x200) is gone.
-- Job select gains `status`, `completed_at`, `completed_by`,
-  `geofence_radius_metres`, `gps_source`, `distance_from_site_km`, `site_id` —
-  what v2 previously got from `select *`.
+- Job select: briefly an explicit column list, now back to `select("*")` —
+  see "The `completed_by` near miss" below for why that is deliberate.
 - Company select gains `ai_audit_trial_ends_at`, `geofence_radius_metres`.
 - QA select gains `template_id`, `reviewed_by`, `reviewed_at`. The layer now
   also resolves `checklist_templates` (name) and `reviewed_by_name`.
@@ -137,33 +145,71 @@ choosing a counting rule; it now matches the HTML report
 
 ---
 
+## The `completed_by` near miss
+
+0.8 replaced v2's `select("*")` on `jobs` with an explicit column list, and put
+`completed_by` in it — the field the existing `finalSignoff` code reads.
+
+**`jobs.completed_by` does not exist.**
+`migrations/20260901_baseline_existing_tables.sql` was generated from the
+project's own PostgREST OpenAPI description with the service role key on
+2026-09-01, which is authoritative for column names, and lists every `jobs`
+column. `completed_by` is not among them. The three columns flagged as risky in
+the first draft of this document — `site_id`, `gps_source`,
+`distance_from_site_km` — are all present. The danger was somewhere else.
+
+PostgREST rejects the **whole** select on one unknown column, so
+`fetchAuditData` would have returned null and every audit surface — all four
+in-app views and the client share link — would have answered "Job not found".
+Under `select("*")` the field was merely `undefined`, which is why it had never
+surfaced. Fixed in `c517aea` by returning to `select("*")` for jobs, with a
+comment recording why that is deliberate rather than lazy.
+
+Two things this exposed that are **not fixed**, because they are outside Phase 0:
+
+- **`mark_complete` is broken in production.** `app/api/audit/v2/action/route.ts`
+  writes `completed_by: userId`. That write fails against the live schema, so
+  the "Mark complete" button in the actions panel returns a 500.
+- **`finalSignoff.by` has always been null.** The Compliance §1 "Final sign-off"
+  row can therefore only ever say Completed/Pending, never who completed it.
+
+Both need the same decision: add `completed_by uuid references users(id)` to
+`jobs`, or drop the write and the lookup. Adding the column fixes both and is
+what the code clearly intends.
+
+The general lesson, worth carrying into Phase 1: an explicit select over a table
+whose schema is not in version control converts silent drift into total
+failure. Five of these tables (`sites`, `job_visits`, `visit_assignments`,
+`signins`, `jobs`) were created by hand in the Supabase editor and only
+back-documented on 2026-09-01.
+
+---
+
 ## Needs a human
 
-1. **Runtime verification before merge.** The local build is broken (above), so
-   nothing here has been executed. 0.8 rewrote every audit query. Deploy this
-   branch to a Vercel preview and generate one real job in Daily, Progress,
-   Iteration and Compliance, plus one share link. Highest-risk items, all
-   invisible to `tsc`:
-   - `checklist_templates`, `reviewed_by` and `reviewed_at` actually existing
-     and being selectable on `qa_submissions` in production;
-   - the job select's new columns (`site_id`, `gps_source`,
-     `distance_from_site_km`) existing on every company's `jobs` table — if any
-     is missing, PostgREST fails the whole select and the pack returns "Job not
-     found";
-   - walkthroughs still resolving through the shared layer's embed syntax.
+1. **Runtime verification before merge — still outstanding.** Nothing here has
+   been generated against real data. Attempted and blocked:
+   - the browser test could not run: the Claude Chrome extension is not
+     connected, and the preview sits behind Vercel SSO;
+   - a direct read-only schema probe against Supabase was blocked by the
+     permission classifier (it reads `SUPABASE_SERVICE_ROLE_KEY` from
+     `.env.local` and queries production). The probe script is still at
+     `<scratchpad>/probe.mjs` and needs one approval to run.
 
-2. **The broken build itself.** Worth its own fix before Phase 1 — Phase 1 adds
-   Postgres triggers, an Ed25519 signing path and a PDF generator, none of which
-   can be trusted behind a build you cannot run. It is a Windows/babel-loader
-   crash, so it may not reproduce in CI; check whether Vercel builds `master`
-   green today.
+   Remaining risks, all invisible to `tsc` and to a green build:
+   - `checklist_templates`, `reviewed_by`, `reviewed_at` on `qa_submissions`
+     (each was already selected explicitly pre-0.8, so these are low risk);
+   - walkthroughs resolving through the shared layer's embed syntax;
+   - the `companies` select's `ai_audit_trial_ends_at` and
+     `geofence_radius_metres` (both selected explicitly elsewhere in the repo,
+     so also low risk).
 
-3. **Map styling is now the report route's.** v2's red-marker 400×200 maps are
+2. **Map styling is now the report route's.** v2's red-marker 400×200 maps are
    gone in favour of the teal 320×200 ones. Cosmetic, and nobody had seen
    either since neither was ever rendered — flagging it only because it is a
    silent choice that 1.3 will bake into the archive.
 
-4. **Spec vs summary path** — see the note at the top.
+3. **Spec vs summary path** — see the note at the top.
 
 ---
 
@@ -187,7 +233,9 @@ aa6411a  chore(audit): delete the dead Client view, correct walkthrough copy   0
 56ec9d1  fix(audit): sworn statement reads the job's real geofence radius      0.6
 2b4cb4b  feat(audit): render sign-in location maps in the Compliance view      0.7
 a73ff32  refactor(audit): one data layer for every audit producer, delete v1   0.8
-         (2b4cb4b later reverted — see below)
+1985f1a  docs(audit): Phase 0 summary
+656b12d  Revert "feat(audit): render sign-in location maps..."             (0.7 undone)
+c517aea  fix(audit): don't let one missing job column kill every pack      (0.8 followup)
 ```
 
 ### 0.7 revisited
