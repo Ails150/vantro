@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { verifyFieldToken } from "@/lib/auth"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { recordFileHash, sha256Hex } from "@/lib/evidence"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -48,8 +49,21 @@ export async function POST(request: Request) {
       ContentType: file.type || "image/jpeg",
     }))
 
+    // Phase 1.1: hash the bytes, not the URL. This is the only point in the
+    // system where the file exists as bytes -- everything downstream sees a
+    // string. Recorded after the put, so a hash never claims a file that was
+    // never stored. Every QA photo, diary photo and defect photo/video in the
+    // product comes through here.
+    const sha256 = sha256Hex(buffer)
+    await recordFileHash({
+      companyId: installer.companyId,
+      storagePath: path,
+      sha256,
+      hashedBy: installer.userId,
+    })
+
     const url = `${process.env.CLOUDFLARE_R2_PUBLIC_URL}/${path}`
-    return NextResponse.json({ url, path })
+    return NextResponse.json({ url, path, sha256 })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

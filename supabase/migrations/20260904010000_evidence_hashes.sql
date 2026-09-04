@@ -44,15 +44,28 @@ create table if not exists public.evidence_hashes (
   id              uuid primary key default gen_random_uuid(),
   company_id      uuid references public.companies(id),
   entity_type     text not null,
-  entity_id       uuid not null,
+
+  -- Null for a file hash. A photo or video is hashed by the upload handler, at
+  -- the only moment its bytes exist in the process, and that is before any row
+  -- references it -- a QA submission is written after its photo is uploaded, so
+  -- there is no entity to point at yet. Files are keyed by storage_path
+  -- instead, and the row that later stores that path is itself hashed, which is
+  -- what ties the two together.
+  entity_id       uuid,
+  storage_path    text,
+  constraint evidence_hashes_subject
+    check (entity_id is not null or storage_path is not null),
 
   -- Why a row can be hashed more than once. The spec's model is one hash per
   -- row, but signins capture evidence in two moments: when someone arrives and
   -- again when they leave, and the second write is the one carrying sign-out
   -- GPS. Rather than overwrite the arrival hash -- which would destroy the
   -- thing being proved -- each capture appends its own row.
+  -- 'amended' is written by the append-only migration that follows this one,
+  -- when an evidential field legitimately changes. Listed here so the two
+  -- migrations can be applied together without an intervening constraint drop.
   event           text not null default 'created'
-                  check (event in ('created', 'signed_out', 'backfill')),
+                  check (event in ('created', 'signed_out', 'backfill', 'amended')),
 
   -- Number of source rows behind this hash. 1 for a row hash. For the
   -- location_logs batch below it is the ping count, which is what stops a
@@ -90,6 +103,12 @@ create index if not exists evidence_hashes_entity_idx
 -- 1.2 builds a pack manifest from every hash in a company and period.
 create index if not exists evidence_hashes_company_time_idx
   on public.evidence_hashes (company_id, hashed_at);
+
+-- Resolving a photo_path or receipt_url back to the hash of its bytes, which is
+-- what 2.3's photo evidence table prints and what 1.3 names archive files by.
+create index if not exists evidence_hashes_storage_path_idx
+  on public.evidence_hashes (storage_path)
+  where storage_path is not null;
 
 -- ---------------------------------------------------------------------------
 -- 2. The trigger function

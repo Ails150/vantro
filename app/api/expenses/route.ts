@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { verifyFieldToken } from "@/lib/auth"
 import { uploadReceipt } from "@/lib/expense-upload"
 import { assertJobBelongsToCaller } from "@/lib/tenant"
+import { recordFileHash } from "@/lib/evidence"
 
 /**
  * POST /api/expenses
@@ -99,6 +100,18 @@ export async function POST(request: Request) {
       fileBuffer,
       mimeType: file.type || "image/jpeg",
       fileName: file.name,
+    })
+
+    // Phase 1.1: the receipt bytes were already hashed above, for idempotency.
+    // Record that same hash as evidence, keyed by the R2 object key, so a
+    // reader can check the archived image against what was submitted rather
+    // than trusting the URL. Expenses is the one place a file hash already
+    // existed; it was just never kept.
+    await recordFileHash({
+      companyId: installer.companyId,
+      storagePath: uploaded.key,
+      sha256: receiptHash,
+      hashedBy: installer.userId,
     })
 
     const row: any = {
