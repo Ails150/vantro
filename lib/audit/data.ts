@@ -4,14 +4,22 @@
  * unsigned, Supabase storage paths get a 1-hour signed URL).
  *
  * Used by:
- *   - app/api/audit/report/route.ts (HTML report endpoint)
+ *   - app/api/audit/report/route.ts (HTML report / client share link)
+ *   - app/api/audit/v2/route.ts     (in-app Internal + Compliance views)
  *
- * Future:
- *   - app/api/audit/route.ts (when AuditTab is refactored to consume same shape)
- *   - any further audit-related endpoints
+ * These were three producers running three different sets of queries against
+ * the same tables, which is how the Compliance view ended up rendering columns
+ * the API never selected. Everything audit-related goes through here now.
  */
 
-const MAPS_KEY = process.env.GOOGLE_MAPS_STATIC_KEY || ""
+// Both key names are in use across the codebase: the audit/report path was
+// written against GOOGLE_MAPS_STATIC_KEY, the v2 path against
+// GOOGLE_MAPS_API_KEY. Accept either so a map renders whichever is configured.
+const MAPS_KEY =
+  process.env.GOOGLE_MAPS_STATIC_KEY ||
+  process.env.GOOGLE_MAPS_API_KEY ||
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+  ""
 const SIGNED_URL_TTL = 60 * 60 // 1 hour
 
 type AnyRow = Record<string, any>
@@ -32,7 +40,11 @@ export function staticMapUrl(lat: any, lng: any): string | null {
  *  - Bare paths -> signed
  *  - Anything else -> returned unchanged
  */
-export async function signOne(service: any, value: string | null | undefined): Promise<string | null> {
+export async function signOne(
+  service: any,
+  value: string | null | undefined,
+  ttl: number = SIGNED_URL_TTL
+): Promise<string | null> {
   if (!value) return null
   if (value.includes(".r2.dev/") || value.includes(".r2.cloudflarestorage.com/")) return value
   const marker = "/vantro-media/"
@@ -45,7 +57,7 @@ export async function signOne(service: any, value: string | null | undefined): P
   if (path?.startsWith("/")) path = path.substring(1)
   if (!path) return value
   try {
-    const { data, error } = await service.storage.from("vantro-media").createSignedUrl(path, SIGNED_URL_TTL)
+    const { data, error } = await service.storage.from("vantro-media").createSignedUrl(path, ttl)
     if (error || !data) return value
     return data.signedUrl
   } catch {
@@ -53,11 +65,15 @@ export async function signOne(service: any, value: string | null | undefined): P
   }
 }
 
-export async function signMany(service: any, values: any): Promise<string[]> {
+export async function signMany(
+  service: any,
+  values: any,
+  ttl: number = SIGNED_URL_TTL
+): Promise<string[]> {
   if (!Array.isArray(values)) return []
   const out: string[] = []
   for (const v of values) {
-    const s = await signOne(service, v)
+    const s = await signOne(service, v, ttl)
     if (s) out.push(s)
   }
   return out
@@ -74,31 +90,48 @@ export interface AuditData {
   diary: AnyRow[]
   defects: AnyRow[]
   variations: AnyRow[]
+  /** Empty unless options.includeWalkthroughs is set. */
+  walkthroughs: AnyRow[]
+}
+
+export interface FetchAuditDataOptions {
+  /** Lifetime of signed media URLs, seconds. Default 1 hour. */
+  signedUrlTtl?: number
+  /** Walk & Talks are only queried when a caller asks for them. */
+  includeWalkthroughs?: boolean
+  /**
+   * client/external see approved walkthroughs only; internal sees everything
+   * that finished processing, so an admin can approve from the audit screen.
+   */
+  walkthroughView?: "internal" | "client" | "external"
 }
 
 /**
  * Pulls the full audit dataset for a job from Supabase.
  * Returns null if the job doesn't exist for the given company.
  *
- * This is the single source of truth — every audit-related route should
- * call this rather than repeating the queries.
+ * This is the single source of truth — every audit-related route calls this
+ * rather than repeating the queries.
  */
 export async function fetchAuditData(
   service: any,
   companyId: string,
   jobId: string,
   from: string | null,
-  to: string | null
+  to: string | null,
+  options: FetchAuditDataOptions = {}
 ): Promise<AuditData | null> {
+  const ttl = options.signedUrlTtl ?? SIGNED_URL_TTL
+  const walkthroughView = options.walkthroughView ?? "internal"
   const { data: job } = await service
     .from("jobs")
-    .select("id, name, address, contractor, lat, lng, company_id, required_trades")
+    .select("id, name, address, contractor, lat, lng, company_id, required_trades, status, completed_at, completed_by, geofence_radius_metres, gps_source, distance_from_site_km, site_id")
     .eq("id", jobId).eq("company_id", companyId).single()
   if (!job) return null
 
   const { data: company } = await service
     .from("companies")
-    .select("id, name, multi_trade_enabled, ai_audit_enabled")
+    .select("id, name, multi_trade_enabled, ai_audit_enabled, ai_audit_trial_ends_at, geofence_radius_metres")
     .eq("id", companyId).single()
 
   let signinsQ = service.from("signins")
@@ -115,7 +148,7 @@ export async function fetchAuditData(
   }))
 
   let qaQ = service.from("qa_submissions")
-    .select("id, submitted_at, created_at, state, value, notes, rejection_note, photo_url, video_url, video_ai_summary, checklist_item_id, users!user_id(id, name)")
+    .select("id, submitted_at, created_at, state, value, notes, rejection_note, photo_url, video_url, video_ai_summary, checklist_item_id, template_id, reviewed_by, reviewed_at, users!user_id(id, name)")
     .eq("job_id", jobId).order("created_at", { ascending: true })
   if (from) qaQ = qaQ.gte("created_at", from)
   if (to) qaQ = qaQ.lte("created_at", to + "T23:59:59Z")
@@ -126,17 +159,39 @@ export async function fetchAuditData(
   const itemIds = Array.from(new Set((qaRaw || []).map((q: AnyRow) => q.checklist_item_id).filter(Boolean)))
   const itemMap: Record<string, AnyRow> = {}
   if (itemIds.length > 0) {
-    const { data: items, error: itemsErr } = await service.from("checklist_items").select("id, label, trade").in("id", itemIds)
+    const { data: items, error: itemsErr } = await service.from("checklist_items").select("id, label, trade, template_id, sort_order").in("id", itemIds)
     if (itemsErr) console.error("[audit] checklist_items error:", itemsErr.message)
     for (const it of items || []) itemMap[it.id] = it
   }
+
+  // Checklist template names — deliverables are grouped by these
+  const templateIds = Array.from(new Set((qaRaw || []).map((q: AnyRow) => q.template_id).filter(Boolean)))
+  const templateMap: Record<string, AnyRow> = {}
+  if (templateIds.length > 0) {
+    const { data: templates, error: tplErr } = await service.from("checklist_templates").select("id, name").in("id", templateIds)
+    if (tplErr) console.error("[audit] checklist_templates error:", tplErr.message)
+    for (const t of templates || []) templateMap[t.id] = t
+  }
+
+  // Reviewer names for QA sign-offs (reviewed_by is a second FK to users, so
+  // it cannot be resolved by the embed above)
+  const reviewerIds = Array.from(new Set((qaRaw || []).map((q: AnyRow) => q.reviewed_by).filter(Boolean)))
+  const reviewerMap: Record<string, string> = {}
+  if (reviewerIds.length > 0) {
+    const { data: rs, error: rsErr } = await service.from("users").select("id, name").in("id", reviewerIds)
+    if (rsErr) console.error("[audit] reviewers error:", rsErr.message)
+    for (const r of rs || []) reviewerMap[r.id] = r.name
+  }
+
   const qa: AnyRow[] = []
   for (const q of qaRaw || []) {
     qa.push({
       ...q,
-      photo_url: await signOne(service, q.photo_url),
-      video_url: await signOne(service, q.video_url),
+      photo_url: await signOne(service, q.photo_url, ttl),
+      video_url: await signOne(service, q.video_url, ttl),
       checklist_items: q.checklist_item_id ? itemMap[q.checklist_item_id] : null,
+      checklist_templates: q.template_id ? templateMap[q.template_id] || null : null,
+      reviewed_by_name: q.reviewed_by ? reviewerMap[q.reviewed_by] || null : null,
     })
   }
 
@@ -151,8 +206,8 @@ export async function fetchAuditData(
   for (const d of diaryRaw || []) {
     diary.push({
       ...d,
-      photo_urls: await signMany(service, d.photo_urls),
-      video_url: await signOne(service, d.video_url),
+      photo_urls: await signMany(service, d.photo_urls, ttl),
+      video_url: await signOne(service, d.video_url, ttl),
     })
   }
 
@@ -165,7 +220,7 @@ export async function fetchAuditData(
   if (defectsErr) console.error("[audit] defects error:", defectsErr.message)
   const defects: AnyRow[] = []
   for (const d of defectsRaw || []) {
-    defects.push({ ...d, photo_url: await signOne(service, d.photo_url) })
+    defects.push({ ...d, photo_url: await signOne(service, d.photo_url, ttl) })
   }
 
   // Variations: fetched after defects so we have diary in scope for evidence linking
@@ -190,5 +245,63 @@ export async function fetchAuditData(
     })
   }
 
-  return { job, company, period: { from, to }, signins, qa, diary, defects, variations }
+  // Walk & Talks — voice-narrated walkthroughs with AI structuring. Only
+  // queried when asked for, so the client HTML report pays nothing for them
+  // until it renders them.
+  let walkthroughs: AnyRow[] = []
+  if (options.includeWalkthroughs) {
+    let walkQ = service.from("walkthroughs").select(`
+      id,
+      job_id,
+      installer_id,
+      recorded_at,
+      created_at,
+      ai_summary,
+      ai_themes,
+      ai_sentiment,
+      ai_flags,
+      ai_sections,
+      transcript_full,
+      approval_status,
+      processing_status,
+      duration_seconds,
+      clips:walkthrough_clips(stream_video_id, transcript, sequence_number, duration_seconds),
+      installer:users!installer_id(id, name)
+    `).eq("company_id", companyId).eq("job_id", jobId).order("created_at", { ascending: true })
+    if (from) walkQ = walkQ.gte("created_at", from)
+    if (to) walkQ = walkQ.lte("created_at", to + "T23:59:59Z")
+    const { data: walkRaw, error: walkErr } = await walkQ
+    if (walkErr) console.error("[audit] walkthroughs error:", walkErr.message)
+
+    const filtered = (walkRaw || []).filter((w: AnyRow) =>
+      walkthroughView === "client" || walkthroughView === "external"
+        ? w.approval_status === "approved"
+        : w.processing_status === "ready"
+    )
+
+    walkthroughs = filtered.map((w: AnyRow) => ({
+      id: w.id,
+      created_at: w.created_at,
+      recorded_at: w.recorded_at,
+      summary: w.ai_summary,
+      themes: w.ai_themes || [],
+      sentiment: w.ai_sentiment,
+      flags: w.ai_flags || [],
+      sections: w.ai_sections || [],
+      transcript: w.transcript_full,
+      approval_status: w.approval_status,
+      duration_seconds: w.duration_seconds,
+      clips: (w.clips || [])
+        .sort((a: AnyRow, b: AnyRow) => a.sequence_number - b.sequence_number)
+        .map((c: AnyRow) => ({
+          stream_video_id: c.stream_video_id,
+          transcript: c.transcript,
+          sequence_number: c.sequence_number,
+          duration_seconds: c.duration_seconds,
+        })),
+      installer: w.installer || null,
+    }))
+  }
+
+  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs }
 }

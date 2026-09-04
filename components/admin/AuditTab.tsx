@@ -30,7 +30,6 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
   const [loading, setLoading] = useState(false)
-  const [report, setReport] = useState<any>(null)
   const [reportV2, setReportV2] = useState<any>(null)
   const [error, setError] = useState("")
   const [shareLink, setShareLink] = useState("")
@@ -115,20 +114,15 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
   async function generate() {
     if (!selectedJob) return
-    setLoading(true); setError(""); setReport(null); setReportV2(null); setShareLink("")
+    setLoading(true); setError(""); setReportV2(null); setShareLink("")
     try {
-      const params = new URLSearchParams({ jobId: selectedJob })
-      if (from) params.set("from", from)
-      if (to) params.set("to", to)
-      const v1Promise = fetch(`/api/audit?${params}`).then(r => r.json())
-      const v2Promise = fetch("/api/audit/v2", {
+      const res = await fetch("/api/audit/v2", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jobId: selectedJob, from: from || null, to: to || null }),
-      }).then(r => r.json())
-      const [v1Data, v2Data] = await Promise.all([v1Promise, v2Promise])
-      if (v1Data.error) throw new Error(v1Data.error)
-      setReport(v1Data)
+      })
+      const v2Data = await res.json()
+      if (v2Data.error) throw new Error(v2Data.error)
       setReportV2(v2Data)
       loadShareLinks(selectedJob)
     } catch (err: any) {
@@ -270,12 +264,10 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
   const card = "bg-white border border-gray-200 rounded-2xl shadow-sm"
   const inp = "w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
 
-  // Computed values from v1 report (for evidence section)
-  const totalHours = report ? report.signins.reduce((sum: number, s: any) => {
-    if (!s.signed_out_at) return sum
-    const hrs = (new Date(s.signed_out_at).getTime() - new Date(s.signed_in_at).getTime()) / 3600000
-    return sum + hrs
-  }, 0) : 0
+  // Evidence section figures, straight off the shared data layer
+  const evidenceSignins: any[] = reportV2?.onSite?.fullLog || []
+  const evidenceQa: any[] = reportV2?.fullEvidence?.qa || []
+  const totalHours: number = Number(reportV2?.onSite?.totalHours ?? 0)
 
   // Health colour
   const healthColour = reportV2?.health?.status === "in_trouble" ? "red" :
@@ -855,17 +847,17 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <div className="text-sm font-semibold text-gray-900">Full evidence</div>
                   <div className="text-xs text-gray-400">{evidenceOpen ? "Hide" : "Show"} sign-ins · diary · QA · defects</div>
                 </button>
-                {evidenceOpen && report && (
+                {evidenceOpen && reportV2 && (
                   <div className="px-6 pb-6 space-y-4 border-t border-gray-100 pt-4">
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Sign-ins ({report.signins.length})</h4>
-                      {report.signins.length === 0 ? <p className="text-xs text-gray-400">None</p> :
-                        <div className="text-xs text-gray-600">{report.signins.length} sign-in events · {totalHours.toFixed(1)}h total</div>}
+                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Sign-ins ({evidenceSignins.length})</h4>
+                      {evidenceSignins.length === 0 ? <p className="text-xs text-gray-400">None</p> :
+                        <div className="text-xs text-gray-600">{evidenceSignins.length} sign-in events · {totalHours.toFixed(1)}h total</div>}
                     </div>
                     <div>
                       {(() => {
                         // Use signed-URL diary from v2, fallback to v1
-                        const diary = reportV2?.fullEvidence?.diary || report?.diary || []
+                        const diary = reportV2?.fullEvidence?.diary || []
                         const isNoise = (txt: string | null | undefined) => {
                           if (!txt) return false
                           const t = txt.trim().toLowerCase()
@@ -952,8 +944,8 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                       })()}
                     </div>
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">QA ({report.qa?.length || 0})</h4>
-                      <div className="text-xs text-gray-600">{(report.qa || []).filter((q: any) => q.result === "pass").length} pass · {(report.qa || []).filter((q: any) => q.result === "fail").length} fail</div>
+                      <h4 className="text-xs font-semibold text-gray-700 mb-2">QA ({evidenceQa.length})</h4>
+                      <div className="text-xs text-gray-600">{evidenceQa.filter((q: any) => q.state === "approved" || q.value === "pass").length} pass · {evidenceQa.filter((q: any) => q.state === "rejected" || q.value === "fail").length} fail</div>
                     </div>
                   </div>
                 )}

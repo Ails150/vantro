@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { fetchAuditData } from "@/lib/audit/data"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { resolveGeofenceRadius } from "@/lib/geofence-server"
@@ -8,41 +9,6 @@ import { createHash } from "crypto"
 type AnyRow = Record<string, any>
 
 const SIGNED_URL_TTL = 60 * 60 * 24 // 24h
-
-function staticMapUrl(lat: number | null | undefined, lng: number | null | undefined): string | null {
-  if (lat == null || lng == null) return null
-  const key = process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
-  if (!key) return null
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=16&size=400x200&markers=color:red%7C${lat},${lng}&key=${key}`
-}
-
-async function signOne(service: any, value: string | null | undefined): Promise<string | null> {
-  if (!value) return null
-  let path = value
-  if (value.startsWith("http")) {
-    const m = value.match(/\/vantro-media\/(.+)$/)
-    if (m) path = m[1]
-    else return value
-  }
-  if (path?.startsWith("/")) path = path.substring(1)
-  if (!path) return value
-  try {
-    const { data } = await service.storage.from("vantro-media").createSignedUrl(path, SIGNED_URL_TTL)
-    return data?.signedUrl || value
-  } catch {
-    return value
-  }
-}
-
-async function signMany(service: any, values: any): Promise<string[]> {
-  if (!Array.isArray(values)) return []
-  const out: string[] = []
-  for (const v of values) {
-    const s = await signOne(service, v)
-    if (s) out.push(s)
-  }
-  return out
-}
 
 interface DeliverableItem {
   id: string
@@ -92,10 +58,18 @@ export async function POST(request: Request) {
   const { jobId, from, to } = body
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 })
 
-  const { data: job } = await service.from("jobs").select("*").eq("id", jobId).eq("company_id", companyId).single()
-  if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 })
+  // Walk & Talks: client/external show approved only, internal shows anything
+  // that finished processing so an admin can approve from the audit screen.
+  const view = (body && body.view) || "internal"
 
-  const { data: company } = await service.from("companies").select("id, name, ai_audit_enabled, ai_audit_trial_ends_at, multi_trade_enabled, geofence_radius_metres").eq("id", companyId).single()
+  const data = await fetchAuditData(service, companyId, jobId, from, to, {
+    signedUrlTtl: SIGNED_URL_TTL,
+    includeWalkthroughs: true,
+    walkthroughView: view,
+  })
+  if (!data) return NextResponse.json({ error: "Job not found" }, { status: 404 })
+
+  const { job, company, signins, qa: qaRows, diary, defects, walkthroughs } = data
   const aiAuditActive = !!company?.ai_audit_enabled
 
   // The radius sign-ins on this job were actually measured against — per-job
@@ -114,42 +88,17 @@ export async function POST(request: Request) {
     finalSignoff = { by: completedByName, at: job.completed_at }
   }
 
-  // Pull QA submissions joined with checklist items + templates
-  let qaQuery = service.from("qa_submissions").select("id, submitted_at, created_at, state, value, notes, photo_url, video_url, video_ai_summary, checklist_item_id, template_id, reviewed_by, reviewed_at, users!user_id(id, name)").eq("job_id", jobId).order("created_at", { ascending: true })
-  if (from) qaQuery = qaQuery.gte("created_at", from)
-  if (to) qaQuery = qaQuery.lte("created_at", to + "T23:59:59Z")
-  const { data: qaRaw } = await qaQuery
+  // Build deliverables grouped by checklist template. The shared data layer
+  // has already resolved item labels, template names and reviewer names, and
+  // signed the media URLs.
+  const templateIds = Array.from(new Set(qaRows.map((q: AnyRow) => q.template_id).filter(Boolean)))
 
-  // Pull all checklist items + templates for grouping
-  const itemIds = Array.from(new Set((qaRaw || []).map((q: AnyRow) => q.checklist_item_id).filter(Boolean)))
-  const templateIds = Array.from(new Set((qaRaw || []).map((q: AnyRow) => q.template_id).filter(Boolean)))
-
-  const itemMap: Record<string, AnyRow> = {}
-  if (itemIds.length > 0) {
-    const { data: items } = await service.from("checklist_items").select("id, label, template_id, sort_order").in("id", itemIds)
-    for (const it of items || []) itemMap[it.id] = it
-  }
-
-  const templateMap: Record<string, AnyRow> = {}
-  if (templateIds.length > 0) {
-    const { data: templates } = await service.from("checklist_templates").select("id, name").in("id", templateIds)
-    for (const t of templates || []) templateMap[t.id] = t
-  }
-
-  // Resolve reviewer names for sign-offs
-  const reviewerIds = Array.from(new Set((qaRaw || []).map((q: AnyRow) => q.reviewed_by).filter(Boolean)))
-  const reviewerMap: Record<string, string> = {}
-  if (reviewerIds.length > 0) {
-    const { data: rs } = await service.from("users").select("id, name").in("id", reviewerIds)
-    for (const r of rs || []) reviewerMap[r.id] = r.name
-  }
-
-  // Build deliverables grouped by template
   const deliverablesMap: Record<string, Deliverable> = {}
-  for (const tplId of templateIds) {
+  for (const tplId of templateIds as string[]) {
+    const named = qaRows.find((q: AnyRow) => q.template_id === tplId)
     deliverablesMap[tplId] = {
       id: tplId,
-      name: templateMap[tplId]?.name || "Unnamed checklist",
+      name: named?.checklist_templates?.name || "Unnamed checklist",
       totalItems: 0,
       completedItems: 0,
       approvedItems: 0,
@@ -158,22 +107,18 @@ export async function POST(request: Request) {
     }
   }
 
-  for (const q of qaRaw || []) {
+  for (const q of qaRows) {
     if (!q.template_id || !deliverablesMap[q.template_id]) continue
-    const item = q.checklist_item_id ? itemMap[q.checklist_item_id] : null
-    const photoSigned = await signOne(service, q.photo_url)
-    const videoSigned = await signOne(service, q.video_url)
-    const submittedByName = (q.users as any)?.name || null
     deliverablesMap[q.template_id].items.push({
       id: q.id,
-      label: item?.label || "(item)",
+      label: q.checklist_items?.label || "(item)",
       state: q.state,
-      submittedBy: submittedByName,
+      submittedBy: (q.users as any)?.name || null,
       submittedAt: q.submitted_at || q.created_at,
-      photoUrl: photoSigned,
-      videoUrl: videoSigned,
+      photoUrl: q.photo_url,
+      videoUrl: q.video_url,
       videoAiSummary: q.video_ai_summary || null,
-      signedOffBy: q.reviewed_by ? reviewerMap[q.reviewed_by] : null,
+      signedOffBy: q.reviewed_by_name || null,
       signedOffAt: q.reviewed_at || null,
       notes: q.notes || null
     })
@@ -192,98 +137,23 @@ export async function POST(request: Request) {
   const deliverables = Object.values(deliverablesMap).sort((a, b) => a.name.localeCompare(b.name))
 
   // Sign-offs (progressive QA approvals)
-  const progressiveSignoffs = (qaRaw || []).filter((q: AnyRow) => q.state === "approved" && q.reviewed_by).map((q: AnyRow) => ({
+  const progressiveSignoffs = qaRows.filter((q: AnyRow) => q.state === "approved" && q.reviewed_by).map((q: AnyRow) => ({
     type: "qa_approval",
-    deliverable: templateMap[q.template_id]?.name || "Unknown",
-    item: itemMap[q.checklist_item_id]?.label || "(item)",
-    by: reviewerMap[q.reviewed_by] || "Unknown",
+    deliverable: q.checklist_templates?.name || "Unknown",
+    item: q.checklist_items?.label || "(item)",
+    by: q.reviewed_by_name || "Unknown",
     at: q.reviewed_at || q.submitted_at
   })).sort((a: any, b: any) => (b.at || "").localeCompare(a.at || ""))
 
-  // Sign-ins / on-site stats
-  let signinsQuery = service.from("signins").select("id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_from_site_metres, sign_out_distance_metres, hours_worked, within_range, users!user_id(id, name)").eq("job_id", jobId).order("signed_in_at", { ascending: true })
-  if (from) signinsQuery = signinsQuery.gte("signed_in_at", from)
-  if (to) signinsQuery = signinsQuery.lte("signed_in_at", to + "T23:59:59Z")
-  const { data: signinsRaw } = await signinsQuery
-
-  const signins = (signinsRaw || []).map((s: AnyRow) => ({ ...s, map_in_url: staticMapUrl(s.lat, s.lng), map_out_url: staticMapUrl(s.sign_out_lat, s.sign_out_lng) }))
-  const installerCount = new Set((signinsRaw || []).map((s: AnyRow) => s.users?.id).filter(Boolean)).size
-  const totalHours = (signinsRaw || []).reduce((sum: number, s: AnyRow) => sum + (s.hours_worked || 0), 0)
-  const inRange = (signinsRaw || []).filter((s: AnyRow) => s.within_range).length
-  const total = (signinsRaw || []).length
-  const geofenceCompliance = total > 0 ? Math.round((inRange / total) * 100) : 100
+  // On-site stats
+  const installerCount = new Set(signins.map((s: AnyRow) => s.users?.id).filter(Boolean)).size
+  const totalHours = signins.reduce((sum: number, s: AnyRow) => sum + (s.hours_worked || 0), 0)
+  const inRange = signins.filter((s: AnyRow) => s.within_range).length
+  const geofenceCompliance = signins.length > 0 ? Math.round((inRange / signins.length) * 100) : 100
 
   // Issues — diary entries flagged + open defects
-  let diaryQuery = service.from("diary_entries").select("id, created_at, entry_text, ai_alert_type, ai_summary, photo_urls, video_url, video_ai_summary, users!user_id(id, name)").eq("job_id", jobId).order("created_at", { ascending: true })
-  if (from) diaryQuery = diaryQuery.gte("created_at", from)
-  if (to) diaryQuery = diaryQuery.lte("created_at", to + "T23:59:59Z")
-  const { data: diaryRaw } = await diaryQuery
-
-  const diary: AnyRow[] = await Promise.all((diaryRaw || []).map(async (d: AnyRow): Promise<AnyRow> => ({ ...d, photo_urls: await signMany(service, d.photo_urls), video_url: await signOne(service, d.video_url) })))
-
-  // Walk & Talks (voice-narrated walkthroughs with AI structuring)
-  // For audit pack we include only ready+approved walkthroughs by default.
-  // Internal view via ?view=internal can pass through pending too.
-  const view = (body && body.view) || "internal"
-  let walkQuery = service.from("walkthroughs").select(`
-    id,
-    job_id,
-    installer_id,
-    recorded_at,
-    created_at,
-    ai_summary,
-    ai_themes,
-    ai_sentiment,
-    ai_flags,
-    ai_sections,
-    transcript_full,
-    approval_status,
-    processing_status,
-    duration_seconds,
-    clips:walkthrough_clips(stream_video_id, transcript, sequence_number, duration_seconds),
-    installer:users!installer_id(id, name)
-  `).eq("company_id", companyId).eq("job_id", jobId).order("created_at", { ascending: true })
-  if (from) walkQuery = walkQuery.gte("created_at", from)
-  if (to) walkQuery = walkQuery.lte("created_at", to + "T23:59:59Z")
-  const { data: walkthroughsRaw } = await walkQuery
-
-  // For client/external views, only include approved walkthroughs.
-  // Internal view shows all (including pending) so the admin can approve from audit screen.
-  const walkthroughsFiltered = (walkthroughsRaw || []).filter((w: AnyRow) => {
-    if (view === "client" || view === "external") {
-      return w.approval_status === "approved"
-    }
-    return w.processing_status === "ready"
-  })
-
-  const walkthroughs: AnyRow[] = walkthroughsFiltered.map((w: AnyRow) => ({
-    id: w.id,
-    created_at: w.created_at,
-    recorded_at: w.recorded_at,
-    summary: w.ai_summary,
-    themes: w.ai_themes || [],
-    sentiment: w.ai_sentiment,
-    flags: w.ai_flags || [],
-    sections: w.ai_sections || [],
-    transcript: w.transcript_full,
-    approval_status: w.approval_status,
-    duration_seconds: w.duration_seconds,
-    clips: (w.clips || []).sort((a: any, b: any) => a.sequence_number - b.sequence_number).map((c: any) => ({
-      stream_video_id: c.stream_video_id,
-      transcript: c.transcript,
-      sequence_number: c.sequence_number,
-      duration_seconds: c.duration_seconds,
-    })),
-    installer: w.installer || null,
-  }))
   const blockers = diary.filter(d => d.ai_alert_type === "blocker")
   const issues = diary.filter(d => d.ai_alert_type === "issue")
-
-  let defectsQuery = service.from("defects").select("id, created_at, status, severity, description, photo_url, resolution_note, resolved_at, users!user_id(id, name)").eq("job_id", jobId).order("created_at", { ascending: true })
-  if (from) defectsQuery = defectsQuery.gte("created_at", from)
-  if (to) defectsQuery = defectsQuery.lte("created_at", to + "T23:59:59Z")
-  const { data: defectsRaw } = await defectsQuery
-  const defects: AnyRow[] = await Promise.all((defectsRaw || []).map(async (d: AnyRow): Promise<AnyRow> => ({ ...d, photo_url: await signOne(service, d.photo_url) })))
   const openDefects = defects.filter(d => d.status !== "resolved")
 
   // ===== AI PATH (Path B) =====
@@ -296,10 +166,10 @@ export async function POST(request: Request) {
   const fingerprint = createHash("sha256").update(JSON.stringify({
     status: job.status,
     dlv: deliverables.map(d => [d.id, d.totalItems, d.completedItems, d.approvedItems, d.status]),
-    counts: [ (qaRaw || []).length, (diaryRaw || []).length, (defectsRaw || []).length, (signinsRaw || []).length ],
+    counts: [ qaRows.length, diary.length, defects.length, signins.length ],
     flags: [ blockers.length, issues.length, openDefects.length, progressiveSignoffs.length ],
     finalSignoff: finalSignoff ? finalSignoff.at : null,
-    last: [ _maxTs(qaRaw, "created_at"), _maxTs(diaryRaw, "created_at"), _maxTs(defectsRaw, "created_at"), _maxTs(signinsRaw, "signed_in_at") ],
+    last: [ _maxTs(qaRows, "created_at"), _maxTs(diary, "created_at"), _maxTs(defects, "created_at"), _maxTs(signins, "signed_in_at") ],
   })).digest("hex")
   const cacheKey = `${jobId}:${from || ""}:${to || ""}:${view}`
 
@@ -518,10 +388,10 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     const next = new Date(d); next.setDate(next.getDate() + 1)
     const dayEnd = next.toISOString()
 
-    const signinsThisDay = (signinsRaw || []).filter((s: any) => s.signed_in_at >= dayStart && s.signed_in_at < dayEnd)
-    const diaryThisDay = (diaryRaw || []).filter((e: any) => e.created_at >= dayStart && e.created_at < dayEnd)
-    const qaThisDay = (qaRaw || []).filter((q: any) => (q.submitted_at || q.created_at) >= dayStart && (q.submitted_at || q.created_at) < dayEnd)
-    const defectsThisDay = (defectsRaw || []).filter((df: any) => df.created_at >= dayStart && df.created_at < dayEnd)
+    const signinsThisDay = signins.filter((s: any) => s.signed_in_at >= dayStart && s.signed_in_at < dayEnd)
+    const diaryThisDay = diary.filter((e: any) => e.created_at >= dayStart && e.created_at < dayEnd)
+    const qaThisDay = qaRows.filter((q: any) => (q.submitted_at || q.created_at) >= dayStart && (q.submitted_at || q.created_at) < dayEnd)
+    const defectsThisDay = defects.filter((df: any) => df.created_at >= dayStart && df.created_at < dayEnd)
     const walkthroughsThisDay = walkthroughs.filter((w: any) => w.created_at >= dayStart && w.created_at < dayEnd)
     const blockersThisDay = diaryThisDay.filter((e: any) => e.ai_alert_type === "blocker")
     const photosThisDay = diaryThisDay.reduce((sum: number, e: any) => sum + ((e.photo_urls?.length) || 0), 0) +
@@ -553,7 +423,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     signoffs: progressiveSignoffs,
     onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, geofenceRadiusMetres, fullLog: signins },
     issues: { blockers, issues, openDefects, allDefects: defects },
-    fullEvidence: { qa: qaRaw || [], diary, walkthroughs, signins },
+    fullEvidence: { qa: qaRows, diary, defects, walkthroughs, signins },
     aiAuditActive,
     execSummary,
     redFlags,
