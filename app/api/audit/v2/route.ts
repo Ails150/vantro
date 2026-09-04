@@ -195,7 +195,7 @@ export async function POST(request: Request) {
   })).sort((a: any, b: any) => (b.at || "").localeCompare(a.at || ""))
 
   // Sign-ins / on-site stats
-  let signinsQuery = service.from("signins").select("id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_from_site_metres, hours_worked, within_range, users!user_id(id, name)").eq("job_id", jobId).order("signed_in_at", { ascending: true })
+  let signinsQuery = service.from("signins").select("id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_from_site_metres, sign_out_distance_metres, hours_worked, within_range, users!user_id(id, name)").eq("job_id", jobId).order("signed_in_at", { ascending: true })
   if (from) signinsQuery = signinsQuery.gte("signed_in_at", from)
   if (to) signinsQuery = signinsQuery.lte("signed_in_at", to + "T23:59:59Z")
   const { data: signinsRaw } = await signinsQuery

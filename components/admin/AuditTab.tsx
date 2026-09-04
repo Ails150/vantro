@@ -1250,7 +1250,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                             <td className="px-2 py-1">{s.users?.name || "Unknown"}</td>
                             <td className="px-2 py-1 text-gray-600">{inT.toLocaleString("en-GB")}</td>
                             <td className="px-2 py-1 text-gray-600">{outT ? outT.toLocaleString("en-GB") : "—"}</td>
-                            <td className="px-2 py-1 text-right text-gray-500">{s.distance_metres != null ? s.distance_metres + "m" : "—"}</td>
+                            <td className="px-2 py-1 text-right text-gray-500">{s.distance_from_site_metres != null ? s.distance_from_site_metres + "m" : "—"}</td>
                             <td className="px-2 py-1 text-right text-gray-500">{s.sign_out_distance_metres != null ? s.sign_out_distance_metres + "m" : "—"}</td>
                             <td className="px-2 py-1 text-right font-semibold">{hrs}</td>
                           </tr>
