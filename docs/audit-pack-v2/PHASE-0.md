@@ -177,6 +177,17 @@ Both need the same decision: add `completed_by uuid references users(id)` to
 `jobs`, or drop the write and the lookup. Adding the column fixes both and is
 what the code clearly intends.
 
+**Resolved on 2026-09-04.** `supabase/migrations/20260904000000_jobs_completed_by.sql`
+adds the column and was applied to the linked project (`vantro-dev`,
+`lmobuqxmtkctqqwbspoz`) with `supabase db push`. Verified against the live
+schema: `completed_by` is present and nullable, with FK `jobs_completed_by_fkey`
+to `users(id)`. No code change was needed -- `mark_complete`'s write and the
+`finalSignoff` lookup were already written against this shape. Existing
+completed jobs keep `completed_by` null; there was nowhere to backfill from, so
+only jobs completed after this deploy will name a person. `lib/audit/data.ts`
+stays on `select("*")` -- the column existing removes this instance of drift,
+not the class of it.
+
 The general lesson, worth carrying into Phase 1: an explicit select over a table
 whose schema is not in version control converts silent drift into total
 failure. Five of these tables (`sites`, `job_visits`, `visit_assignments`,

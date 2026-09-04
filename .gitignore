@@ -110,3 +110,7 @@ settings-page.txt
 *.backup-*
 .vercel
 .env*
+
+# supabase cli local state
+/supabase/.temp
+/supabase/.branches
