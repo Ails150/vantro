@@ -1282,8 +1282,8 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                             <tr key={it.id} className="border-b border-gray-100">
                               <td className="px-2 py-1">3.{i+1}.{j+1} {it.label}</td>
                               <td className="px-2 py-1">{it.state || "pending"}</td>
-                              <td className="px-2 py-1">{it.approvedBy || "—"}</td>
-                              <td className="px-2 py-1">{it.approvedAt ? new Date(it.approvedAt).toLocaleString("en-GB") : "—"}</td>
+                              <td className="px-2 py-1">{it.signedOffBy || "—"}</td>
+                              <td className="px-2 py-1">{it.signedOffAt ? new Date(it.signedOffAt).toLocaleString("en-GB") : "—"}</td>
                             </tr>
                           ))}
                         </tbody>
