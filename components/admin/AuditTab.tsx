@@ -1142,6 +1142,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                         <th className="text-right px-2 py-1.5 font-semibold">Dist In</th>
                         <th className="text-right px-2 py-1.5 font-semibold">Dist Out</th>
                         <th className="text-right px-2 py-1.5 font-semibold">Hours</th>
+                        <th className="text-left px-2 py-1.5 font-semibold">Sign-in location</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1157,6 +1158,15 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                             <td className="px-2 py-1 text-right text-gray-500">{s.distance_from_site_metres != null ? s.distance_from_site_metres + "m" : "—"}</td>
                             <td className="px-2 py-1 text-right text-gray-500">{s.sign_out_distance_metres != null ? s.sign_out_distance_metres + "m" : "—"}</td>
                             <td className="px-2 py-1 text-right font-semibold">{hrs}</td>
+                            <td className="px-2 py-1">
+                              {s.map_in_url ? (
+                                <a href={s.map_in_url} target="_blank" rel="noopener noreferrer" title={s.lat != null && s.lng != null ? `${s.lat}, ${s.lng}` : "Sign-in location"}>
+                                  <img src={s.map_in_url} alt="Sign-in location" className="w-28 h-16 object-cover rounded border border-gray-200" />
+                                </a>
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </td>
                           </tr>
                         )
                       })}
