@@ -4,8 +4,9 @@ Branch: `audit-pack-v2-phase-0` (8 commits, one per spec item, off `master` at
 15cca75, plus three follow-ups). Pushed to `origin`; a Vercel **preview** is
 built from it. Not merged, not in production.
 
-Spec: `docs/VANTRO_AUDIT_PACK_V2_SPEC.md`. Note the spec lives at that path, not
-`docs/audit-pack-v2/SPEC.md`. This summary is written to the path the spec's own
+Spec: `docs/audit-pack-v2/SPEC.md`. It lived at `docs/VANTRO_AUDIT_PACK_V2_SPEC.md`,
+untracked, for the whole of Phase 0 and 1.1; moved and committed on 2026-09-04.
+This summary is written to the path the spec's own
 definition of done names (`docs/audit-pack-v2/PHASE-N.md`), so the two now
 disagree. Moving the spec into `docs/audit-pack-v2/` would settle it — not done
 here, as it is your file.

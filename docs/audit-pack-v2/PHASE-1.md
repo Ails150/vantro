@@ -5,11 +5,9 @@ Gate before every commit: `NODE_OPTIONS=--max-old-space-size=8192 npx tsc --noEm
 (clean). `npm run build` still crashes on this machine only; Vercel is the
 authority — see PHASE-0.md.
 
-Spec path note: the instruction refers to `docs/audit-pack-v2/SPEC.md`. No such
-file exists. The spec is `docs/VANTRO_AUDIT_PACK_V2_SPEC.md`, and it is
-**untracked** — it has never been committed, so this branch does not carry the
-document it is built from. Flagged rather than fixed; committing your file is
-your call.
+Spec: `docs/audit-pack-v2/SPEC.md`. It had never been committed — it sat at
+`docs/VANTRO_AUDIT_PACK_V2_SPEC.md`, untracked, so the branch did not carry the
+document it is built from. Moved and committed on 2026-09-04 at your request.
 
 ---
 
