@@ -88,3 +88,16 @@ notify pgrst, 'reload schema';
 --   select count(*) from audit_packs where reference is not null;   -> 0 until
 --        the first pack is generated
 --   select relrowsecurity from pg_class where relname = 'audit_packs';  -> t
+
+-- ---------------------------------------------------------------------------
+-- 3. Phase 1.3: archive bookkeeping
+-- ---------------------------------------------------------------------------
+-- How many of this pack's files could not be copied into the archive prefix.
+-- Zero, or null for packs generated before archiving existed. A pack with a
+-- non-zero count still renders; it just must not claim its evidence is
+-- permanently held, and the UI says so.
+alter table public.audit_packs
+  add column if not exists archive_failed_count integer;
+
+comment on column public.audit_packs.archive_failed_count is
+  'Files that failed to copy into audit-archive/<company>/<ref>/ at generation. Non-zero means this pack has evidence that is not permanently held.';

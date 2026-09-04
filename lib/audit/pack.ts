@@ -19,6 +19,7 @@ import {
   type PackManifest,
 } from "@/lib/audit/manifest"
 import crypto from "crypto"
+import { archivePackFiles, archiveUrl, type ArchiveResult } from "@/lib/audit/archive"
 
 export type PackIntegrity = {
   reference: string
@@ -29,6 +30,14 @@ export type PackIntegrity = {
   evidenceCount: number
   coverage: PackManifest["coverage"]
   generatedAt: string
+  /** Phase 1.3. Absent on a reused share pack, whose files were archived when
+   *  the pack was first issued. */
+  archive?: ArchiveResult
+  /** Source R2 key -> permanent archive URL, for every file this pack holds a
+   *  copy of. The report swaps its expiring signed URLs for these, which is the
+   *  whole point of archiving: a pack opened in eighteen months still shows its
+   *  photographs. */
+  archiveUrlByPath?: Record<string, string>
   /** Set when the record could not be built at all; the UI must say so rather
    *  than print an integrity block that means nothing. */
   error?: string
@@ -219,6 +228,35 @@ export async function createPackRecord(args: {
       }
     }
 
+    // Phase 1.3: copy every referenced file into this pack's archive prefix,
+    // named by the hash of its own bytes. Done after the manifest is stored, so
+    // a slow or failing archive cannot cost us the integrity record — the
+    // manifest is the thing that must survive.
+    const fileRows = rows.filter(r => r.entity_type === "file" && r.storage_path)
+    const archive = await archivePackFiles({
+      companyId: args.companyId,
+      packRef: reference,
+      subjects: fileRows.map(r => ({ sourceKey: r.storage_path as string, sha256: r.sha256 })),
+    })
+
+    if (archive.failed > 0) {
+      await args.service.from("audit_packs")
+        .update({ archive_failed_count: archive.failed })
+        .eq("reference", reference)
+    }
+
+    // Only files that are actually in the archive get a permanent URL. A failed
+    // copy keeps its expiring signed URL, which at least works today, rather
+    // than a permanent-looking link to an object that was never written.
+    const failed = new Set(archive.failedKeys)
+    const archiveUrlByPath: Record<string, string> = {}
+    for (const r of fileRows) {
+      const key = r.storage_path as string
+      if (failed.has(key)) continue
+      const url = archiveUrl(args.companyId, reference, r.sha256, key)
+      if (url) archiveUrlByPath[key] = url
+    }
+
     return {
       reference,
       merkleRoot: manifest.merkleRoot,
@@ -227,6 +265,8 @@ export async function createPackRecord(args: {
       evidenceCount: manifest.evidence.count,
       coverage: manifest.coverage,
       generatedAt,
+      archive,
+      archiveUrlByPath,
     }
   } catch (e: any) {
     console.error("[audit] pack record failed", reference, e?.message)

@@ -769,6 +769,41 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
 </html>`
 }
 
+/**
+ * Repoint media at archived copies. Diary photos are stored as full public
+ * URLs, QA and defect media keep a *_path beside the URL, so both shapes have
+ * to be handled to cover the same set of files the archiver saw.
+ */
+function applyArchiveUrls(data: any, map: Record<string, string> | undefined) {
+  if (!map || Object.keys(map).length === 0) return
+
+  const base = (process.env.CLOUDFLARE_R2_PUBLIC_URL || "").replace(/\/$/, "")
+  const keyOf = (url: string | null | undefined): string | null => {
+    if (!url) return null
+    if (!/^https?:\/\//i.test(url)) return url
+    return base && url.startsWith(base) ? url.slice(base.length + 1) : null
+  }
+
+  for (const q of data.qa || []) {
+    if (q.photo_path && map[q.photo_path]) q.photo_url = map[q.photo_path]
+    if (q.video_path && map[q.video_path]) q.video_url = map[q.video_path]
+  }
+  for (const d of data.defects || []) {
+    if (d.photo_path && map[d.photo_path]) d.photo_url = map[d.photo_path]
+    if (d.video_path && map[d.video_path]) d.video_url = map[d.video_path]
+  }
+  for (const e of data.diary || []) {
+    if (Array.isArray(e.photo_urls)) {
+      e.photo_urls = e.photo_urls.map((u: string) => {
+        const k = keyOf(u)
+        return k && map[k] ? map[k] : u
+      })
+    }
+    const vk = keyOf(e.video_url)
+    if (vk && map[vk]) e.video_url = map[vk]
+  }
+}
+
 // ---------------- Route ----------------
 
 export async function GET(request: Request) {
@@ -846,6 +881,16 @@ export async function GET(request: Request) {
     generatedBy,
     shareId,
   })
+
+  // Phase 1.3: swap expiring signed URLs for permanent archive copies wherever
+  // one exists. Done here, once, over the shared data the renderer is about to
+  // walk, rather than at each of the places a photo is drawn -- one substitution
+  // point cannot drift out of step with another.
+  //
+  // A file whose archive copy failed keeps its signed URL: it expires, but it
+  // works today, which beats a permanent-looking link to an object that was
+  // never written.
+  applyArchiveUrls(data, integrity?.archiveUrlByPath)
 
   const html = renderReport(data, narrative, narrativeIsAI, integrity)
   return new NextResponse(html, {
