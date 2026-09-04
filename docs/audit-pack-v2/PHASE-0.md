@@ -107,9 +107,10 @@ fetched `/api/audit`.
   only, and points at 3.6.
 - 0.6: sworn statement prints `onSite.geofenceRadiusMetres` instead of a
   hardcoded 150m. See the note below — the sentence changed further.
-- 0.7: §2 gains a **Sign-in location** column, a 112×64 static map thumbnail per
-  shift linking to full size, coordinates on the link title. Falls back to "—"
-  with no maps key.
+- 0.7: a **Sign-in location** map column was added to §2, then reverted (see
+  0.7 below). No map is rendered per view. `staticMapUrl` and the
+  `map_in_url` / `map_out_url` fields stay in the shared data layer, which is
+  where 1.3 will archive them once per pack.
 - 0.8: `report` state and the v1 fetch removed; `generate()` makes one request.
   Full Evidence reads `reportV2.onSite.fullLog` / `fullEvidence.qa` /
   `fullEvidence.diary`.
@@ -157,22 +158,12 @@ choosing a counting rule; it now matches the HTML report
    crash, so it may not reproduce in CI; check whether Vercel builds `master`
    green today.
 
-3. **Static map cost (0.7).** The Compliance view now renders one Google Static
-   Maps request per shift, per view. A 200-shift job is 200 billed requests
-   each time someone opens the tab, and they are not cached. If that matters,
-   Phase 1.3's archive step should snapshot the map images once per pack
-   instead.
+3. **Map styling is now the report route's.** v2's red-marker 400×200 maps are
+   gone in favour of the teal 320×200 ones. Cosmetic, and nobody had seen
+   either since neither was ever rendered — flagging it only because it is a
+   silent choice that 1.3 will bake into the archive.
 
-4. **Map styling is now the report route's.** v2's red-marker 400×200 maps are
-   gone in favour of the teal 320×200 ones. Cosmetic, but it is a visible change
-   to anyone who had seen the v2 style. Nobody had, since neither was ever
-   rendered — flagging it only because it is a silent choice.
-
-5. **Sign-out location maps stay unrendered.** The spec said "one per shift", so
-   only `map_in_url` is shown. `map_out_url` is still computed and discarded.
-   It belongs with 2.1/2.2 attendance detail; confirm that is where you want it.
-
-6. **Spec vs summary path** — see the note at the top.
+4. **Spec vs summary path** — see the note at the top.
 
 ---
 
@@ -196,6 +187,21 @@ aa6411a  chore(audit): delete the dead Client view, correct walkthrough copy   0
 56ec9d1  fix(audit): sworn statement reads the job's real geofence radius      0.6
 2b4cb4b  feat(audit): render sign-in location maps in the Compliance view      0.7
 a73ff32  refactor(audit): one data layer for every audit producer, delete v1   0.8
+         (2b4cb4b later reverted — see below)
 ```
+
+### 0.7 revisited
+
+The spec's decision for 0.7 was "render, small, one per shift, in the Compliance
+view only", and `2b4cb4b` did that. It was then **reverted**: rendering per view
+meant one Google Static Maps request per shift every time the tab opened,
+uncached and billed, which is the wrong place to spend it. Maps are generated at
+pack generation only and archived once per pack in 1.3.
+
+What that leaves: `staticMapUrl` and the per-sign-in `map_in_url` /
+`map_out_url` fields remain in `lib/audit/data.ts`, still computed on every
+fetch and still rendered nowhere — the state 0.7 originally set out to fix. That
+is deliberate for now, and 1.3 is what closes it. If 1.3 slips, this is again
+dead computation.
 
 Phase 1 not started, per instruction.
