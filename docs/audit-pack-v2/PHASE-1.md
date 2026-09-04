@@ -15,14 +15,26 @@ document it is built from. Moved and committed on 2026-09-04 at your request.
 
 | Item | State |
 |------|-------|
-| 1.1 Content hashing at write time | Done. Migrations **applied** |
-| 1.2 Pack manifest and signature | Done. Migration `20260904030000` **not applied** |
+| 1.1 Content hashing at write time | Code done. Migrations **not applied** |
+| 1.2 Pack manifest and signature | Code done. Migration **not applied** |
 | 1.3 Permanent evidence | Archive done. **Server-side PDF not done** — see below |
 | 1.4 Admin audit log in the pack | Done |
 
-Migrations, in order: `20260904010000_evidence_hashes`,
-`20260904020000_evidence_append_only`, `20260904030000_audit_packs_manifest`.
-The third is unapplied at the time of writing.
+**No Phase 1 migration has been applied.** All three are pending:
+`20260904010000_evidence_hashes`, `20260904020000_evidence_append_only`,
+`20260904030000_audit_packs_manifest`.
+
+A `db push` was reported as landed on 2026-09-04 and had not run — checked
+directly with `select to_regclass('public.evidence_hashes')`, which returned
+null, and confirmed again by `db push --dry-run` still offering all three. The
+cause is almost certainly that the CLI aborts on `.env.local` before reaching
+the database (see "Needs a human"), and its one-line JSON error is easy to read
+past. **Do not trust a push that was not verified**; `supabase migration list
+--linked` is the check, and remote must be non-empty for each.
+
+Until they land, every pack reports that it could not be registered, and §6
+prints the amber "not registered" block rather than an integrity claim. That is
+the designed behaviour, not a bug.
 
 ---
 
