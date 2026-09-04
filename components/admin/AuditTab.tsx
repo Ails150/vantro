@@ -1112,7 +1112,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-200 text-xs text-gray-700 leading-relaxed">
                   <p className="font-semibold mb-2">SWORN STATEMENT</p>
-                  <p>This audit pack was generated automatically from data captured by the Vantro field operations platform during the period stated above. All sign-in/out times are recorded with GPS coordinates within 150m of the registered job site. All photographic evidence is timestamped at point of capture. No data has been edited or removed.</p>
+                  <p>This audit pack was generated automatically from data captured by the Vantro field operations platform during the period stated above. Sign-in and sign-out events are recorded with GPS coordinates and measured against this job&apos;s geofence radius of {reportV2.onSite?.geofenceRadiusMetres ?? "—"}m; the proportion falling within that radius is stated in section 2. All photographic evidence is timestamped at point of capture. No data has been edited or removed.</p>
                 </div>
               </div>
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { resolveGeofenceRadius } from "@/lib/geofence-server"
 import { createHash } from "crypto"
 
 type AnyRow = Record<string, any>
@@ -94,8 +95,13 @@ export async function POST(request: Request) {
   const { data: job } = await service.from("jobs").select("*").eq("id", jobId).eq("company_id", companyId).single()
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
-  const { data: company } = await service.from("companies").select("id, name, ai_audit_enabled, ai_audit_trial_ends_at, multi_trade_enabled").eq("id", companyId).single()
+  const { data: company } = await service.from("companies").select("id, name, ai_audit_enabled, ai_audit_trial_ends_at, multi_trade_enabled, geofence_radius_metres").eq("id", companyId).single()
   const aiAuditActive = !!company?.ai_audit_enabled
+
+  // The radius sign-ins on this job were actually measured against — per-job
+  // override, else company default, else 150m, widened for remote sites. The
+  // Compliance statement prints this rather than asserting a hardcoded 150m.
+  const geofenceRadiusMetres = await resolveGeofenceRadius(job, company)
 
   // Final sign-off (job completion)
   let finalSignoff: any = null
@@ -545,7 +551,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     timeline: timelineDays,
     deliverables,
     signoffs: progressiveSignoffs,
-    onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, fullLog: signins },
+    onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, geofenceRadiusMetres, fullLog: signins },
     issues: { blockers, issues, openDefects, allDefects: defects },
     fullEvidence: { qa: qaRaw || [], diary, walkthroughs, signins },
     aiAuditActive,
