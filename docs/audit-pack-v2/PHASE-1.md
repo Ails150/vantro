@@ -17,7 +17,7 @@ document it is built from. Moved and committed on 2026-09-04 at your request.
 |------|-------|
 | 1.1 Content hashing at write time | Code done. Migrations **applied and verified** |
 | 1.2 Pack manifest and signature | Code done. Migration **applied and verified** |
-| 1.3 Permanent evidence | Archive done. **Server-side PDF not done** — see below |
+| 1.3 Permanent evidence | Archive done. PDF: **decided — archive URLs** (spec deviation) |
 | 1.4 Admin audit log in the pack | Done |
 
 **All three Phase 1 migrations are applied** as of 2026-09-07:
@@ -180,6 +180,10 @@ route loses access. Deliberate.
    bearing: two capture moments per sign-in, batch size binding, file hashing,
    and files having no entity at hash time.
 5. RLS with no policies rather than superadmin role arrays (stricter).
+6. No server-side PDF — archive URLs instead, the spec's non-preferred branch.
+   Decided 2026-09-07; reasoning in 1.3.
+7. The archive is durable by convention, not by permission — the write-once
+   bucket policy the spec asks for is infrastructure that does not exist yet.
 
 ### Bugs found and fixed on the way
 
@@ -314,10 +318,16 @@ first branch. The preferred branch means headless Chromium on Vercel
 (`puppeteer-core` + `@sparticuz/chromium`), which is the single most likely
 thing to turn the preview red — and `npm run build` cannot be run on this
 machine at all, so it would be taken blind at the end of a phase that is already
-entirely unverified. That is not the safe choice. **This is the one open
-decision in Phase 1.** The alternatives are Chromium, a pure-JS renderer
-(`@react-pdf/renderer`, no binary, but a second renderer to keep in step with
-the HTML one), or leaving it as archive URLs.
+entirely unverified. That is not the safe choice.
+
+**Decided 2026-09-07: stay on archive URLs.** Neither renderer is being added.
+Chromium would be taken blind, and `@react-pdf/renderer` buys a second renderer
+that every future change to the report has to land in twice — drift between the
+PDF and the HTML pack would be silent, which is the wrong failure mode for a
+document that exists to be trusted. Phase 1 closes on the first branch. This
+stays a **recorded deviation from the spec**, not a closed item: the spec's
+preferred branch has not been built, and a customer asking for a PDF should be
+told the pack is archive URLs.
 
 ---
 
@@ -337,6 +347,31 @@ table with no caption reads as proof of no activity, which it is not.
 
 ---
 
+## Trigger behaviour, verified against live data
+
+Run 2026-09-07 against the linked project, inside a `DO` block ending in an
+uncaught `raise` so every probe write was rolled back by construction rather
+than by remembering to. Confirmed afterwards: 528 evidence rows unchanged, zero
+`amended` rows, probed row uncontaminated. Subject was one `diary_entries` row.
+
+| Probe | Expected | Result |
+|-------|----------|--------|
+| `update diary_entries set company_id = ...` | refused | raised `23000` — `evidence integrity: diary_entries.company_id is immutable` |
+| `update ... set ai_summary = ...` (denylisted) | no amendment | evidence rows 1 → 1, no-op |
+| `update ... set entry_text = ...` (evidential) | chained amendment | rows 1 → 2, `event=amended`, `supersedes_id` = prior hash, `ca750e8c` → `a8f1823d` |
+
+This closes the part of runtime verification that can be closed without
+generating a pack: the capture, denylist and amendment-chaining logic all fire
+correctly on real rows. The denylist result is the one worth keeping — it is the
+check that an approval or an AI re-run does not forge an amendment, and it is
+the one that silently rots if the two denylists in `20260904010000` and
+`20260904020000` ever drift apart.
+
+Still unobserved: `record_location_batch_hash` at sign-out, file hashing via
+`lib/evidence.ts`, and everything downstream of a generated pack.
+
+---
+
 ## Needs a human
 
 1. ~~Push `20260904030000_audit_packs_manifest.sql`.~~ **Done** — all three
@@ -346,16 +381,15 @@ table with no caption reads as proof of no activity, which it is not.
    file now starts at `NEXT_PUBLIC_SUPABASE_URL=` and the CLI parses it. A
    timestamped `.env.local.bak.*` copy of the original is in the repo root,
    gitignored; delete it once you are happy.
-3. **Runtime verification is still outstanding**, exactly as at the end of
-   Phase 0. The schema is now proven; the *behaviour* is not. Nothing in 1.1 has
-   been observed firing on a live write, and no pack has been generated since
-   the migrations landed, so §6 has never actually printed the registered-pack
-   block. First run should confirm: a pack registers and gets a reference, §6
-   shows the integrity claim, `/verify <ref>` passes all three checks, and an
-   edit to a live row writes an `amended` row chained by `supersedes_id`.
-4. **The one open decision: server-side PDF** (1.3). Chromium, `@react-pdf/
-   renderer`, or leave it as archive URLs. Nothing else in Phase 1 is blocked on
-   it. See "Two things 1.3 does not do".
+3. ~~The one open decision: server-side PDF.~~ **Decided** 2026-09-07 — staying
+   on archive URLs, recorded as a spec deviation in 1.3.
+4. **Generate one pack.** This is the only outstanding verification and it
+   cannot be done from SQL. Confirm, in order: the pack registers and returns a
+   reference; §6 prints the integrity claim rather than the amber "not
+   registered" block; `/verify <ref>` passes all three checks; and
+   `audit_packs.archive_failed_count` is 0.
 5. **The archive is not write-once.** `CLOUDFLARE_R2_ARCHIVE_BUCKET` with a
    token lacking `DeleteObject` is infrastructure work that has not been done.
    Until it is, do not describe the archive as write-once to a customer.
+6. **`AUDIT_SIGNING_KEY` has one copy**, in Vercel. Lose it and every signature
+   already issued becomes unverifiable. `vercel env pull` is the backup.
