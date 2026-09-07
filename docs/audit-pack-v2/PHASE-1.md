@@ -15,26 +15,47 @@ document it is built from. Moved and committed on 2026-09-04 at your request.
 
 | Item | State |
 |------|-------|
-| 1.1 Content hashing at write time | Code done. Migrations **not applied** |
-| 1.2 Pack manifest and signature | Code done. Migration **not applied** |
+| 1.1 Content hashing at write time | Code done. Migrations **applied and verified** |
+| 1.2 Pack manifest and signature | Code done. Migration **applied and verified** |
 | 1.3 Permanent evidence | Archive done. **Server-side PDF not done** — see below |
 | 1.4 Admin audit log in the pack | Done |
 
-**No Phase 1 migration has been applied.** All three are pending:
+**All three Phase 1 migrations are applied** as of 2026-09-07:
 `20260904010000_evidence_hashes`, `20260904020000_evidence_append_only`,
-`20260904030000_audit_packs_manifest`.
+`20260904030000_audit_packs_manifest`. `supabase migration list --linked`
+shows a non-empty `remote` for each, alongside `20260904000000_jobs_completed_by`.
 
-A `db push` was reported as landed on 2026-09-04 and had not run — checked
-directly with `select to_regclass('public.evidence_hashes')`, which returned
-null, and confirmed again by `db push --dry-run` still offering all three. The
-cause is almost certainly that the CLI aborts on `.env.local` before reaching
-the database (see "Needs a human"), and its one-line JSON error is easy to read
-past. **Do not trust a push that was not verified**; `supabase migration list
---linked` is the check, and remote must be non-empty for each.
+The earlier "not applied" reading was correct at the time and had a single
+cause, now fixed: `.env.local` began with four lines of pasted prose (a
+`notepad ...` line, two ``` fences and "Paste this in, save it, leave it
+open:"), so the CLI aborted while parsing the env file and never reached the
+database. Every `db push` and every `to_regclass` check failed for that reason
+rather than because the schema was missing. With those lines removed the CLI
+connects and the migrations were already there.
 
-Until they land, every pack reports that it could not be registered, and §6
-prints the amber "not registered" block rather than an integrity claim. That is
-the designed behaviour, not a bug.
+Schema verified directly against the linked project, not inferred from the
+migration list:
+
+| Check | Result |
+|-------|--------|
+| `evidence_hashes` / `audit_packs` exist | both |
+| Expected columns on each | none missing |
+| RLS enabled, zero policies on `evidence_hashes` | `t`, 0 |
+| `record_evidence_hash`, `record_location_batch_hash`, `enforce_evidence_immutability`, `record_evidence_amendment` | all present |
+| Capture/amendment triggers | 16 across 8 tables |
+| Immutability triggers | 8 (`defects`, `diary_entries`, `expenses`, `location_logs`, `qa_submissions`, `signins`, `variations`, `walkthroughs`) |
+| `evidence_hashes` rows | 528, all `event='backfill'` |
+| Malformed `sha256` | 0 |
+| Orphaned amendments / amendments duplicating superseded hash | 0 / 0 |
+| Closed sign-ins with no batch hash | 0 |
+| `row_count` disagreeing with its trail | 0 |
+| `audit_packs` rows | 0 (no pack generated yet) |
+
+So the backfill ran, every hash is well-formed, and no ping falls outside the
+scheme. **Packs will now register**; §6 should print the integrity claim rather
+than the amber "not registered" block. That transition is the thing to confirm
+first in runtime verification — it has not been observed yet, because no pack
+has been generated since the migrations landed.
 
 ---
 
@@ -318,11 +339,23 @@ table with no caption reads as proof of no activity, which it is not.
 
 ## Needs a human
 
-1. **Push `20260904030000_audit_packs_manifest.sql`.** The first two landed.
-   Until this one does, every pack will report that it could not be registered.
-2. **`.env.local` still has four lines of pasted prose at the top**, which makes
-   the Supabase CLI refuse to parse it. Delete the `notepad ...` line, both
-   fences and the "Paste this in" line, leaving the file starting at
-   `NEXT_PUBLIC_SUPABASE_URL=`.
+1. ~~Push `20260904030000_audit_packs_manifest.sql`.~~ **Done** — all three
+   Phase 1 migrations are applied and schema-verified; see Status.
+2. ~~`.env.local` has four lines of pasted prose at the top.~~ **Fixed**
+   2026-09-07 — there were five (the blank line between the fences too). The
+   file now starts at `NEXT_PUBLIC_SUPABASE_URL=` and the CLI parses it. A
+   timestamped `.env.local.bak.*` copy of the original is in the repo root,
+   gitignored; delete it once you are happy.
 3. **Runtime verification is still outstanding**, exactly as at the end of
-   Phase 0. Nothing in 1.1 has run against real data.
+   Phase 0. The schema is now proven; the *behaviour* is not. Nothing in 1.1 has
+   been observed firing on a live write, and no pack has been generated since
+   the migrations landed, so §6 has never actually printed the registered-pack
+   block. First run should confirm: a pack registers and gets a reference, §6
+   shows the integrity claim, `/verify <ref>` passes all three checks, and an
+   edit to a live row writes an `amended` row chained by `supersedes_id`.
+4. **The one open decision: server-side PDF** (1.3). Chromium, `@react-pdf/
+   renderer`, or leave it as archive URLs. Nothing else in Phase 1 is blocked on
+   it. See "Two things 1.3 does not do".
+5. **The archive is not write-once.** `CLOUDFLARE_R2_ARCHIVE_BUCKET` with a
+   token lacking `DeleteObject` is infrastructure work that has not been done.
+   Until it is, do not describe the archive as write-once to a customer.
