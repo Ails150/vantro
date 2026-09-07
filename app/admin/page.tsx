@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceClient } from '@/lib/supabase/server'
 import AdminDashboard from '@/components/admin/AdminDashboard'
 import SupportBanner from '@/components/support/SupportBanner'
 import { getCallerContext } from '@/lib/company-context'
@@ -12,6 +12,7 @@ const DASHBOARD_ROLES = ['admin', 'foreman', 'superadmin', 'support']
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string; from?: string }> }) {
   const params = await searchParams
   const supabase = await createClient()
+  const service = await createServiceClient()
   const ctx = await getCallerContext()
   if (!ctx) redirect('/login')
   if (!DASHBOARD_ROLES.includes(ctx.role)) redirect('/onboarding')
@@ -42,7 +43,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     checklistTemplatesResult,
     diaryEntriesResult,
   ] = await Promise.all([
-    supabase.from('companies').select('*').eq('id', companyId).single(),
+    // Read the company with the service client, scoped to ctx.companyId.
+    // There is no SELECT policy on public.companies for the authenticated
+    // role, so the RLS-scoped client returned no row and .single() left
+    // `company` null -- which silently disabled every company-derived gate
+    // (ai_audit_enabled read as undefined, so the Audit tab showed the £79
+    // paywall to a company that has it enabled, and trialExpiredAndUnpaid
+    // could never become true). companyId comes from the caller's own users
+    // row via getCallerContext, so scoping to it grants no new access.
+    service.from('companies').select('*').eq('id', companyId).single(),
     supabase
       .from('jobs')
       .select('*, job_checklists(template_id)')
