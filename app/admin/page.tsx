@@ -108,23 +108,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const company = companyResult.data
 
-  // TEMP DEBUG - remove after diagnosing the audit paywall. cec2104 follow-up.
-  console.log('[AUDIT_DEBUG] ' + JSON.stringify({
-    ctxCompanyId: companyId,
-    ctxRole: ctx.role,
-    ctxIsSupport: ctx.isSupport,
-    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    serviceKeyLen: (process.env.SUPABASE_SERVICE_ROLE_KEY || '').length,
-    companyError: companyResult.error ? String((companyResult.error as any).message) : null,
-    companyErrorCode: companyResult.error ? String((companyResult.error as any).code) : null,
-    companyIsNull: company === null,
-    fetchedId: company ? String((company as any).id) : null,
-    fetchedName: company ? String((company as any).name) : null,
-    aiAuditEnabled: company ? (company as any).ai_audit_enabled : 'NO_COMPANY',
-    aiAuditType: typeof (company as any)?.ai_audit_enabled,
-    subscriptionStatus: company ? (company as any).subscription_status : null,
-    colCount: company ? Object.keys(company as any).length : 0,
-  }))
 
   // Setup wizard redirect: if onboarding not completed, send to setup
   // EXCEPT when admin came from the wizard intending to use a tab (Jobs, Team).
