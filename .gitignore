@@ -114,3 +114,7 @@ settings-page.txt
 # supabase cli local state
 /supabase/.temp
 /supabase/.branches
+
+# Stray env file - .env* does not match this name
+vantro.env.local
+*.env.local
