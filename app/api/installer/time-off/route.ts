@@ -81,6 +81,37 @@ export async function POST(request: Request) {
 
   const service = await createServiceClient()
 
+  // Nothing stopped the same dates being requested twice. A double tap on a slow
+  // connection, or a second go after the first looked like it failed, produced two
+  // live requests for one week off - two rows in the manager's queue, and the
+  // balance counting the week twice. Two ranges overlap when each starts on or
+  // before the other ends.
+  const { data: clashes } = await service
+    .from("time_off_entries")
+    .select("id, start_date, end_date, status")
+    .eq("user_id", installer.userId)
+    .in("status", ["pending", "approved"])
+    .lte("start_date", end_date)
+    .gte("end_date", start_date)
+    .limit(1)
+
+  if (clashes && clashes.length > 0) {
+    const clash = clashes[0]
+    return NextResponse.json(
+      {
+        error: "You already have a request covering those dates.",
+        code: "overlap",
+        conflict: {
+          id: clash.id,
+          start_date: clash.start_date,
+          end_date: clash.end_date,
+          status: clash.status,
+        },
+      },
+      { status: 409 }
+    )
+  }
+
   // Need company_id and the company's sick_auto_approve setting
   const { data: user } = await service
     .from("users")

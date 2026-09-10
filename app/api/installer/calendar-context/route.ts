@@ -33,10 +33,13 @@ export async function GET(request: Request) {
   const countryCode = company?.country_code || "GB"
 
   // Country config (leave year, default entitlement)
+  // The column is country_code. This route asked for "code", matched nothing,
+  // and maybeSingle() turned that into a silent null - which is why the wrong
+  // entitlement below went unnoticed. Every other route keys on country_code.
   const { data: countryCfg } = await service
     .from("country_configs")
     .select("*")
-    .eq("code", countryCode)
+    .eq("country_code", countryCode)
     .maybeSingle()
 
   // Compute current leave year window
@@ -93,7 +96,17 @@ export async function GET(request: Request) {
     .eq("leave_year_start", leaveYear.start)
     .maybeSingle()
 
-  const entitlement = allowance?.days_total ?? countryCfg?.default_holiday_days ?? 28
+  // days_total does not exist; the column is total_days, as admin/schedule-overview,
+  // admin/team-schedules and installer/time-off/balance all read it. This asked for
+  // days_total, always got undefined, and fell through to the hard coded 28 - so the
+  // request screen showed every worker 28 days whatever their real allowance was, and
+  // the guard that blocks an over balance request was measuring against it.
+  // carried_over_days is part of the entitlement everywhere else too.
+  const allowanceTotal =
+    allowance?.total_days != null
+      ? Number(allowance.total_days) + Number(allowance.carried_over_days || 0)
+      : null
+  const entitlement = allowanceTotal ?? Number(countryCfg?.default_holiday_days ?? 28)
 
   // All my entries within window + this leave year
   const queryStart = leaveYear.start < startDate ? leaveYear.start : startDate
@@ -107,11 +120,29 @@ export async function GET(request: Request) {
     .lte("start_date", queryEnd)
     .order("start_date", { ascending: false })
 
-  // Compute days used this leave year (approved + pending? approved only for now)
-  const daysUsed = (myEntries || [])
-    .filter((e) => e.status === "approved" && e.type === "annual_leave")
-    .filter((e) => e.start_date >= leaveYear.start && e.end_date <= leaveYear.end)
-    .reduce((sum, e) => sum + countDays(e.start_date, e.end_date, !!e.is_half_day), 0)
+  // Days committed this leave year. Approved and pending are counted separately
+  // but both come off what is left to book: a request already sitting with the
+  // manager is spent as far as the next request is concerned. Counting only
+  // approved (as this did) let someone submit their allowance several times over
+  // and each one looked affordable, because nothing they had already asked for
+  // had been subtracted yet.
+  const inLeaveYear = (e: { start_date: string; end_date: string; type: string }) =>
+    e.type === "annual_leave" &&
+    e.start_date >= leaveYear.start &&
+    e.end_date <= leaveYear.end
+
+  const sumDays = (rows: typeof myEntries) =>
+    (rows || []).reduce(
+      (sum, e) => sum + countDays(e.start_date, e.end_date, !!e.is_half_day),
+      0
+    )
+
+  const daysUsed = sumDays(
+    (myEntries || []).filter((e) => e.status === "approved" && inLeaveYear(e))
+  )
+  const daysPending = sumDays(
+    (myEntries || []).filter((e) => e.status === "pending" && inLeaveYear(e))
+  )
 
   // Team context: count of approved teammates per day in window
   // (anonymised — just a count, no names)
@@ -188,7 +219,10 @@ export async function GET(request: Request) {
     balance: {
       entitlement,
       used: daysUsed,
-      remaining: entitlement - daysUsed,
+      pending: daysPending,
+      // What is actually still bookable. `used` stays approved-only so the UI can
+      // show the two apart, but remaining nets off both.
+      remaining: entitlement - daysUsed - daysPending,
     },
     weekly_schedule: weeklySchedule,
     my_jobs: myJobs,
