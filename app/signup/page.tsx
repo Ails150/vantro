@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getTierForInstallerCount, TIERS } from '@/lib/billing'
+import { PLANS, SIGNUP_PLAN } from '@/lib/billing'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -15,9 +15,10 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Live tier preview based on team size
-  const suggestedTier = getTierForInstallerCount(teamSize)
-  const tier = TIERS[suggestedTier]
+  // Everyone starts free, with no card. Team size is still asked for because
+  // it shapes onboarding, but it no longer picks a price: headcount pricing was
+  // what made a wide rollout cost more than a narrow one.
+  const tier = PLANS[SIGNUP_PLAN]
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -43,7 +44,7 @@ export default function SignupPage() {
           companyName: companyName.trim(),
           yourName: yourName.trim(),
           teamSize,
-          plan: suggestedTier,
+          plan: SIGNUP_PLAN,
         }),
       })
       const data = await res.json()
@@ -54,8 +55,9 @@ export default function SignupPage() {
         return
       }
 
-      // Redirect to Stripe Checkout
-      window.location.href = data.checkoutUrl
+      // Free signup has no card step, so there is no checkout to send them to.
+      // Only follow one if the server actually issued it.
+      window.location.href = data.checkoutUrl || '/admin'
     } catch (err: any) {
       setError(err?.message || 'Network error. Please try again.')
       setLoading(false)
@@ -154,13 +156,11 @@ export default function SignupPage() {
               <p className="text-xs text-[#4d6478] uppercase tracking-wide mb-1">Your plan</p>
               <div className="flex items-baseline justify-between">
                 <span className="text-white font-semibold">{tier.name}</span>
-                <span className="text-white">
-                  <span className="text-2xl font-bold">£{tier.price}</span>
-                  <span className="text-[#8fa3b8] text-sm">/month</span>
-                </span>
+                <span className="text-2xl font-bold text-white">£0</span>
               </div>
               <p className="text-xs text-[#8fa3b8] mt-1">
-                Up to {tier.installerLimit} installers · 30-day free trial · Cancel anytime
+                {tier.blurb} No card needed. Upgrade from the Billing tab when you want
+                geofenced sign in, payroll export or compliance packs.
               </p>
             </div>
 

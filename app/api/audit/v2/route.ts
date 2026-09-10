@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { can, toPlan } from "@/lib/plan"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { fetchAuditData } from "@/lib/audit/data"
 import { GoogleGenerativeAI } from "@google/generative-ai"
@@ -72,7 +73,8 @@ export async function POST(request: Request) {
   if (!data) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
   const { job, company, signins, qa: qaRows, diary, defects, walkthroughs } = data
-  const aiAuditActive = !!company?.ai_audit_enabled
+  // Audit AI is what Suite is, rather than a separately purchasable flag.
+  const aiAuditActive = can(toPlan(company?.plan), 'aiAudit')
 
   // The radius sign-ins on this job were actually measured against — per-job
   // override, else company default, else 150m, widened for remote sites. The

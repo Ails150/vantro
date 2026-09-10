@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { can, toPlan } from "@/lib/plan"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
@@ -901,7 +902,7 @@ export async function GET(request: Request) {
   const data = await fetchAuditData(service, companyId, jobId, from, to, { includeAdminLog: true })
   if (!data) return NextResponse.json({ error: "Job not found" }, { status: 404 })
 
-  const aiEnabled = !!data.company?.ai_audit_enabled
+  const aiEnabled = can(toPlan(data.company?.plan), 'aiAudit')
   let narrative = ""
   let narrativeIsAI = false
   if (aiEnabled) {

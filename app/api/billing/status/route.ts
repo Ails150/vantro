@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import { TIERS } from '@/lib/billing'
+import { PLANS, PLAN_ORDER } from '@/lib/billing'
+import { toPlan } from '@/lib/plan'
 import { FIELD_ROLES } from '@/lib/roles'
 
 function getStripe(): Stripe {
@@ -60,15 +61,14 @@ export async function GET() {
     trialDaysRemaining = Math.max(0, Math.ceil((end - now) / 86400000))
   }
 
-  const currentTier = company.plan ? (TIERS as any)[company.plan] : null
+  const currentTier = PLANS[toPlan(company.plan)]
 
   return NextResponse.json({
     company: { id: company.id, name: company.name },
     plan: {
       key: company.plan,
-      name: currentTier?.name || 'No plan',
-      price: currentTier?.price || 0,
-      installerLimit: company.installer_limit || currentTier?.installerLimit || 0,
+      name: currentTier.name,
+      price: currentTier.price,
     },
     usage: { installers: installerCount || 0 },
     subscription: {
@@ -77,11 +77,11 @@ export async function GET() {
       stripe: subscription,
     },
     role: userData.role,
-    tiers: Object.entries(TIERS).map(([key, t]: any) => ({
+    tiers: PLAN_ORDER.map((key) => ({
       key,
-      name: t.name,
-      price: t.price,
-      installerLimit: t.installerLimit,
+      name: PLANS[key].name,
+      price: PLANS[key].price,
+      blurb: PLANS[key].blurb,
     })),
   })
 }

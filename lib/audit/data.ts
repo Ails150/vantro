@@ -144,7 +144,7 @@ export async function fetchAuditData(
 
   const { data: company } = await service
     .from("companies")
-    .select("id, name, multi_trade_enabled, ai_audit_enabled, ai_audit_trial_ends_at, geofence_radius_metres")
+    .select("id, name, multi_trade_enabled, plan, geofence_radius_metres")
     .eq("id", companyId).single()
 
   let signinsQ = service.from("signins")

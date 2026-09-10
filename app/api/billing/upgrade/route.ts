@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import { TIERS, type TierKey } from '@/lib/billing'
+import { PLANS } from '@/lib/billing'
+import type { Plan } from '@/lib/plan'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -14,8 +15,8 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { newPlan } = await request.json() as { newPlan: TierKey }
-  if (!TIERS[newPlan]) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+  const { newPlan } = await request.json() as { newPlan: Plan }
+  if (!PLANS[newPlan]?.priceId) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
 
   const service = await createServiceClient()
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     .single()
   if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
 
-  const newTier = TIERS[newPlan]
+  const newTier = PLANS[newPlan]
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.getvantro.com'
 
   if (company.stripe_subscription_id && company.subscription_status === 'active') {
@@ -41,14 +42,13 @@ export async function POST(request: Request) {
     const subscriptionItemId = subscription.items.data[0].id
 
     await getStripe().subscriptions.update(company.stripe_subscription_id, {
-      items: [{ id: subscriptionItemId, price: newTier.priceId }],
+      items: [{ id: subscriptionItemId, price: newTier.priceId as string }],
       proration_behavior: 'always_invoice',
-      metadata: { plan: newPlan, installer_limit: String(newTier.installerLimit) }
+      metadata: { plan: newPlan }
     })
 
     await service.from('companies').update({
       plan: newPlan,
-      installer_limit: newTier.installerLimit,
     }).eq('id', company.id)
 
     return NextResponse.json({ success: true, message: `Upgraded to ${newTier.name}` })
@@ -56,7 +56,6 @@ export async function POST(request: Request) {
 
   await service.from('companies').update({
     plan: newPlan,
-    installer_limit: newTier.installerLimit,
   }).eq('id', company.id)
 
   // checkout_email_fix_v1: Stripe needs customer or customer_email when creating
@@ -64,9 +63,9 @@ export async function POST(request: Request) {
   const checkoutPayload: any = {
     mode: 'subscription',
     payment_method_types: ['card'],
-    line_items: [{ price: newTier.priceId, quantity: 1 }],
+    line_items: [{ price: newTier.priceId as string, quantity: 1 }],
     subscription_data: {
-      metadata: { company_id: company.id, plan: newPlan, installer_limit: String(newTier.installerLimit) }
+      metadata: { company_id: company.id, plan: newPlan }
     },
     success_url: `${appUrl}/admin?billing=upgraded`,
     cancel_url: `${appUrl}/admin?billing=cancelled`,

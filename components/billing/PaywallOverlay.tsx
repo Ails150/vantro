@@ -4,12 +4,13 @@
 // Drop-in: render at top of page, returns null if not gating.
 
 import { useState } from 'react'
-import { TIERS, type TierKey } from '@/lib/billing'
+import { PLANS, formatPrice, type PaidPlan } from '@/lib/billing'
+import type { Plan } from '@/lib/plan'
 
 type Props = {
   show: boolean
   companyName?: string
-  currentPlan?: TierKey
+  currentPlan?: Plan
 }
 
 export default function PaywallOverlay({ show, companyName, currentPlan }: Props) {
@@ -17,7 +18,7 @@ export default function PaywallOverlay({ show, companyName, currentPlan }: Props
 
   if (!show) return null
 
-  async function handleSubscribe(tier: TierKey) {
+  async function handleSubscribe(tier: PaidPlan) {
     setLoadingTier(tier)
     try {
       const res = await fetch('/api/billing/upgrade', {
@@ -41,7 +42,10 @@ export default function PaywallOverlay({ show, companyName, currentPlan }: Props
     setLoadingTier(null)
   }
 
-  const tierKeys: TierKey[] = ['starter', 'growth', 'scale']
+  // Free is not offered here: this overlay exists because a trial ended, and
+  // dropping to free is a downgrade you do through the Billing tab, not an
+  // answer to "your trial has ended".
+  const tierKeys: PaidPlan[] = ['payroll', 'suite']
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -56,9 +60,9 @@ export default function PaywallOverlay({ show, companyName, currentPlan }: Props
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
           {tierKeys.map((key) => {
-            const tier = TIERS[key]
+            const tier = PLANS[key]
             const isCurrent = currentPlan === key
             return (
               <button
@@ -75,8 +79,8 @@ export default function PaywallOverlay({ show, companyName, currentPlan }: Props
                   <div className="text-xs text-teal-700 font-semibold mb-1">RECOMMENDED</div>
                 )}
                 <div className="font-semibold text-lg text-gray-900">{tier.name}</div>
-                <div className="text-2xl font-bold text-gray-900 mt-1">£{tier.price}<span className="text-sm font-normal text-gray-500">/mo</span></div>
-                <div className="text-sm text-gray-500 mt-2">Up to {tier.installerLimit} installers</div>
+                <div className="text-2xl font-bold text-gray-900 mt-1">{formatPrice(tier.price)}<span className="text-sm font-normal text-gray-500">/mo</span></div>
+                <div className="text-sm text-gray-500 mt-2">{tier.blurb}</div>
                 <div className="text-xs text-teal-600 font-semibold mt-3">
                   {loadingTier === key ? 'Loading…' : 'Subscribe →'}
                 </div>

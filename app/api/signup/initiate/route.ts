@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import Stripe from 'stripe'
-import { TIERS, type TierKey } from '@/lib/billing'
+import { PLANS } from '@/lib/billing'
+import type { Plan } from '@/lib/plan'
+import { generateSlug, getInitials, defaultSchedule as makeDefaultSchedule } from '@/lib/provisioning'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -54,11 +56,11 @@ export async function POST(request: Request) {
   if (!teamSize || teamSize < 1 || teamSize > 100) {
     return NextResponse.json({ error: 'Team size must be between 1 and 100' }, { status: 400 })
   }
-  if (!TIERS[plan as TierKey]) {
+  if (!PLANS[plan as Plan]) {
     return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
   }
 
-  const tier = TIERS[plan as TierKey]
+  const tier = PLANS[plan as Plan]
   const service = await createServiceClient()
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.getvantro.com'
 
@@ -94,6 +96,52 @@ export async function POST(request: Request) {
 
   const authUserId = authData.user.id
 
+  // Free signs up without Stripe. The paid path relies on the checkout webhook
+  // to provision the company, and there is no checkout here, so the rows are
+  // created directly. Everything else about the company is identical, which is
+  // what lets an upgrade later be a plan change rather than a migration.
+  if ((plan as Plan) === 'free') {
+    const slug = generateSlug(companyName.trim())
+    const defaultSchedule = makeDefaultSchedule()
+
+    const { data: company, error: compErr } = await service
+      .from('companies')
+      .insert({
+        name: companyName.trim(),
+        slug,
+        plan: 'free',
+        subscription_status: 'free',
+        default_schedule: defaultSchedule,
+      })
+      .select('id')
+      .single()
+
+    if (compErr || !company) {
+      console.error('[signup] free company insert failed:', compErr)
+      return NextResponse.json({ error: 'Could not create your company' }, { status: 500 })
+    }
+
+    const adminName = yourName.trim()
+    const { error: userErr } = await service.from('users').insert({
+      company_id: company.id,
+      auth_user_id: authUserId,
+      email: email.toLowerCase().trim(),
+      name: adminName,
+      initials: getInitials(adminName),
+      role: 'admin',
+      is_active: true,
+    })
+
+    if (userErr) {
+      // Roll the company back rather than leave one nobody can sign in to.
+      await service.from('companies').delete().eq('id', company.id)
+      console.error('[signup] free user insert failed:', userErr)
+      return NextResponse.json({ error: 'Could not create your account' }, { status: 500 })
+    }
+
+    return NextResponse.json({ ok: true, plan: 'free', companyId: company.id })
+  }
+
   // Step 2: Create Stripe customer immediately so we can attach metadata
   const customer = await getStripe().customers.create({
     email: email.toLowerCase().trim(),
@@ -113,7 +161,7 @@ export async function POST(request: Request) {
       mode: 'subscription',
       payment_method_types: ['card'],
       customer: customer.id,
-      line_items: [{ price: tier.priceId, quantity: 1 }],
+      line_items: [{ price: tier.priceId as string, quantity: 1 }],
       subscription_data: {
         trial_period_days: 30,
         trial_settings: {
@@ -127,7 +175,6 @@ export async function POST(request: Request) {
           admin_name: yourName.trim(),
           admin_email: email.toLowerCase().trim(),
           plan,
-          installer_limit: String(tier.installerLimit),
           team_size: String(teamSize),
         },
       },

@@ -15,7 +15,8 @@
 import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import { TIERS } from '@/lib/billing'
+import { PLANS } from '@/lib/billing'
+import { toPlan } from '@/lib/plan'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
   // Day 29 (24h left): second warning email
   const { data: companiesNearExpiry } = await service
     .from('companies')
-    .select('id, name, billing_email, trial_ends_at, last_trial_email_day, current_plan, stripe_customer_id, subscription_status')
+    .select('id, name, billing_email, trial_ends_at, last_trial_email_day, plan, stripe_customer_id, subscription_status')
     .eq('subscription_status', 'trial')
     .gte('trial_ends_at', now.toISOString())
     .lte('trial_ends_at', in48h.toISOString())
@@ -71,7 +72,7 @@ export async function GET(request: Request) {
   // Companies whose trial ends within the next 24 hours.
   const { data: expiring } = await service
     .from('companies')
-    .select('id, name, trial_ends_at, current_plan, stripe_customer_id, stripe_subscription_id, subscription_status, billing_email, last_conversion_attempt')
+    .select('id, name, trial_ends_at, plan, stripe_customer_id, stripe_subscription_id, subscription_status, billing_email, last_conversion_attempt')
     .eq('subscription_status', 'trial')
     .lte('trial_ends_at', in24h.toISOString())
     .gte('trial_ends_at', now.toISOString())
@@ -91,7 +92,7 @@ export async function GET(request: Request) {
       continue
     }
 
-    if (!c.current_plan || !TIERS[c.current_plan as keyof typeof TIERS]) {
+    if (!c.plan || toPlan(c.plan) === 'free') {
       results.push({ id: c.id, action: 'no_plan_skipped' })
       continue
     }
@@ -101,16 +102,15 @@ export async function GET(request: Request) {
       .update({ last_conversion_attempt: now.toISOString() })
       .eq('id', c.id)
 
-    const tier = TIERS[c.current_plan as keyof typeof TIERS]
+    const tier = PLANS[toPlan(c.plan)]
 
     try {
       const subscription = await getStripe().subscriptions.create({
         customer: c.stripe_customer_id,
-        items: [{ price: tier.priceId }],
+        items: [{ price: tier.priceId as string }],
         metadata: {
           company_id: c.id,
-          plan: c.current_plan,
-          installer_limit: String(tier.installerLimit),
+          plan: c.plan,
           source: 'auto_conversion',
         },
         payment_behavior: 'default_incomplete',

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import { TIERS, type TierKey } from '@/lib/billing'
+import { PLANS } from '@/lib/billing'
+import type { Plan } from '@/lib/plan'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -26,8 +27,9 @@ export async function POST(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
-  const { plan } = await request.json() as { plan: TierKey }
-  if (!TIERS[plan]) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+  const { plan } = await request.json() as { plan: Plan }
+  // free has no Stripe price, so it is not checkout-able.
+  if (!PLANS[plan]?.priceId) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
 
   const service = await createServiceClient()
   const { data: userData } = await service
@@ -54,14 +56,14 @@ export async function POST(request: Request) {
     }, { status: 400 })
   }
 
-  const tier = TIERS[plan]
+  const tier = PLANS[plan]
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.getvantro.com'
 
   // Build checkout payload — subscription mode with 30-day trial
   const checkoutPayload: Stripe.Checkout.SessionCreateParams = {
     mode: 'subscription',
     payment_method_types: ['card'],
-    line_items: [{ price: tier.priceId, quantity: 1 }],
+    line_items: [{ price: tier.priceId as string, quantity: 1 }],
     subscription_data: {
       trial_period_days: 30,
       // Tells Stripe to send trial_will_end email 7 days before
@@ -73,7 +75,6 @@ export async function POST(request: Request) {
       metadata: {
         company_id: company.id,
         plan,
-        installer_limit: String(tier.installerLimit)
       },
     },
     // Force card collection even on trial

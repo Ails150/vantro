@@ -1,7 +1,8 @@
 ﻿import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import { AI_AUDIT_PACK } from '@/lib/billing'
+import { planForPriceId } from '@/lib/billing'
+import { generateSlug, getInitials } from '@/lib/provisioning'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -12,15 +13,6 @@ function getStripe(): Stripe {
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-function generateSlug(name: string): string {
-  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
-  const suffix = Math.random().toString(36).slice(2, 6)
-  return `${base || 'co'}-${suffix}`
-}
-
-function getInitials(name: string): string {
-  return name.trim().split(/\s+/).map(p => p[0] || '').join('').toUpperCase().slice(0, 2)
-}
 
 export async function POST(request: Request) {
   const body = await request.text()
@@ -70,10 +62,10 @@ export async function POST(request: Request) {
         const companyId = sub.metadata?.company_id
         const status: string = sub.status === 'canceled' ? 'cancelled' : sub.status
         const hasAiAudit = sub.items.data.some(
-          (item) => item.price.id === AI_AUDIT_PACK.priceId
+          (item) => !!planForPriceId(item.price.id)
         )
         const aiAuditItem = sub.items.data.find(
-          (item) => item.price.id === AI_AUDIT_PACK.priceId
+          (item) => !!planForPriceId(item.price.id)
         )
         const updates: Record<string, any> = {
           subscription_status: status,

@@ -7,12 +7,13 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { formatTrialDaysRemaining, type TierKey, TIERS, getNextTier } from '@/lib/billing'
+import { formatTrialDaysRemaining } from '@/lib/billing'
+import { toPlan, atLeast, type Plan } from '@/lib/plan'
 import { FIELD_ROLES } from '@/lib/roles'
 
 export type BillingState = {
   loading: boolean
-  plan: TierKey | null
+  plan: Plan | null
   subscriptionStatus: string | null
   installerLimit: number
   activeInstallers: number
@@ -22,7 +23,7 @@ export type BillingState = {
   blockReason: string | null
   isAtInstallerLimit: boolean
   isNearInstallerLimit: boolean // within 5 of limit
-  nextTier: TierKey | null
+  nextTier: Plan | null
   cardCollected: boolean
   shouldShowCardPrompt: boolean // day 25-30 during trial
 }
@@ -80,8 +81,9 @@ export function useBillingGate(companyId: string | null): BillingState {
       const trialDaysRemaining = formatTrialDaysRemaining(company.trial_ends_at)
       const isTrialExpired = trialDaysRemaining === 0 && company.subscription_status === 'trial'
       const isBlocked = isTrialExpired || ['cancelled', 'blocked'].includes(company.subscription_status)
-      const plan = company.plan as TierKey
-      const nextTier = plan ? getNextTier(plan) : null
+      const plan = toPlan(company.plan)
+      // One step up, or null at the top. Free -> payroll -> suite.
+      const nextTier: Plan | null = plan === 'free' ? 'payroll' : plan === 'payroll' ? 'suite' : null
       const cardCollected = !!company.card_collected_at
       const shouldShowCardPrompt = 
         company.subscription_status === 'trial' && 
@@ -122,7 +124,7 @@ export function useBillingGate(companyId: string | null): BillingState {
 export function useCanAddInstaller(billing: BillingState): {
   canAdd: boolean
   reason: string | null
-  upgradeRequired: TierKey | null
+  upgradeRequired: Plan | null
 } {
   if (billing.loading) return { canAdd: false, reason: null, upgradeRequired: null }
   if (billing.isAtInstallerLimit) {

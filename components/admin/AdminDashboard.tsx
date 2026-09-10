@@ -24,6 +24,7 @@ import SitesTab from "./SitesTab"
 import { adminNavGroups, tabBadge, DEFAULT_TAB, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
 import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
+import { toPlan } from "@/lib/plan"
 import BillingTab from "./tabs/BillingTab"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/Button"
@@ -2298,7 +2299,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "sites" && <SitesTab />}
         {activeTab === "trades" && <TradesTab />}
         {activeTab === "subcontractors" && <SubcontractorsSection />}
-        {activeTab === "audit" && <AuditTab jobs={jobs} aiAuditEnabled={!!company?.ai_audit_enabled} aiAuditTrialEndsAt={company?.ai_audit_trial_ends_at} stripeAiAuditSubscriptionItemId={company?.stripe_ai_audit_subscription_item_id} />}
+        {activeTab === "audit" && <AuditTab jobs={jobs} plan={toPlan(company?.plan)} />}
         {activeTab === "map" && <MapTab />}
         {activeTab === "walkthroughs" && <WalkthroughsTab />}
           {activeTab === "progress" && <JobProgressTab />}

@@ -2,29 +2,19 @@
 
 import { useState, useEffect } from "react"
 import UpgradeAIAuditPack from "./UpgradeAIAuditPack"
+import { can, type Plan } from "@/lib/plan"
 
 interface Props {
   jobs: any[]
-  aiAuditEnabled?: boolean
-  aiAuditTrialEndsAt?: string | null
-  stripeAiAuditSubscriptionItemId?: string | null
-}
-
-function getAiAuditView(trialEndsAt?: string | null, subscriptionItemId?: string | null) {
-  if (subscriptionItemId) return { kind: "paid" as const }
-  if (trialEndsAt && new Date(trialEndsAt) > new Date()) {
-    const ms = new Date(trialEndsAt).getTime() - Date.now()
-    const daysLeft = Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)))
-    return { kind: "trial" as const, daysLeft, endsAt: trialEndsAt }
-  }
-  return { kind: "none" as const }
+  /** Entitlement comes from the plan now, not a per-company audit flag. */
+  plan: Plan
 }
 
 type ViewMode = "daily" | "progress" | "iteration" | "compliance"
 
-export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, stripeAiAuditSubscriptionItemId }: Props) {
-  if (!aiAuditEnabled) return <UpgradeAIAuditPack />
-  const aiAuditView = getAiAuditView(aiAuditTrialEndsAt, stripeAiAuditSubscriptionItemId)
+export default function AuditTab({ jobs, plan }: Props) {
+  // Audit packs are the Suite plan. There is no separate add-on to be missing.
+  if (!can(plan, "auditPack")) return <UpgradeAIAuditPack />
 
   const [selectedJob, setSelectedJob] = useState("")
   const [from, setFrom] = useState("")
@@ -257,26 +247,6 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
   return (
     <div className="space-y-4">
-      {/* Trial banner */}
-      {aiAuditView.kind === "trial" && (
-        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-line rounded-md p-4 flex items-center justify-between gap-4">
-          <div>
-            <div className="font-semibold text-accent-ink text-sm">AI Audit Pack — free during trial</div>
-            <div className="text-xs text-accent-ink mt-0.5">{aiAuditView.daysLeft} day{aiAuditView.daysLeft === 1 ? "" : "s"} left, then £79/month to keep your audit pack.</div>
-          </div>
-          <button onClick={() => window.location.href = "/billing"} className="px-4 py-2 bg-accent hover:bg-accent-ink text-white rounded-md text-sm font-semibold whitespace-nowrap">
-            Add £79/mo to keep
-          </button>
-        </div>
-      )}
-      {aiAuditView.kind === "paid" && (
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-wash text-accent-ink rounded-full text-xs font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent"></span>
-            AI Audit Pack · Active
-          </span>
-        </div>
-      )}
 
       {/* Generate form */}
       <div className={card + " p-6"}>
