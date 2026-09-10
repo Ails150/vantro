@@ -5,3 +5,17 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # react and react-dom are released in lockstep and each declares an exact
+      # peer range on the other (react-dom@19.2.8 requires react ^19.2.8), so a
+      # PR that moves only one of them can never install. Dependabot split them
+      # once already (#1, closed) and that PR failed Vercel for exactly this
+      # reason. Grouping forces them into a single PR.
+      # The @types packages ride along so a React major cannot land ahead of
+      # its typings.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
