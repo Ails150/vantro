@@ -243,8 +243,8 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
     }
   }
 
-  const card = "bg-white border border-gray-200 rounded-2xl shadow-sm"
-  const inp = "w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+  const card = "rounded-md border border-line bg-surface"
+  const inp = "w-full rounded-md border border-line-strong bg-canvas px-3 py-2 text-sm text-ink transition-colors duration-fast ease-out focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-ink/20"
 
   // Evidence section figures, straight off the shared data layer
   const evidenceSignins: any[] = reportV2?.onSite?.fullLog || []
@@ -259,20 +259,20 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
     <div className="space-y-4">
       {/* Trial banner */}
       {aiAuditView.kind === "trial" && (
-        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl p-4 flex items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-teal-50 to-emerald-50 border border-line rounded-md p-4 flex items-center justify-between gap-4">
           <div>
-            <div className="font-semibold text-teal-900 text-sm">AI Audit Pack — free during trial</div>
-            <div className="text-xs text-teal-700 mt-0.5">{aiAuditView.daysLeft} day{aiAuditView.daysLeft === 1 ? "" : "s"} left, then £79/month to keep your audit pack.</div>
+            <div className="font-semibold text-accent-ink text-sm">AI Audit Pack — free during trial</div>
+            <div className="text-xs text-accent-ink mt-0.5">{aiAuditView.daysLeft} day{aiAuditView.daysLeft === 1 ? "" : "s"} left, then £79/month to keep your audit pack.</div>
           </div>
-          <button onClick={() => window.location.href = "/billing"} className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold whitespace-nowrap">
+          <button onClick={() => window.location.href = "/billing"} className="px-4 py-2 bg-accent hover:bg-accent-ink text-white rounded-md text-sm font-semibold whitespace-nowrap">
             Add £79/mo to keep
           </button>
         </div>
       )}
       {aiAuditView.kind === "paid" && (
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-teal-100 text-teal-700 rounded-full text-xs font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-accent-wash text-accent-ink rounded-full text-xs font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent"></span>
             AI Audit Pack · Active
           </span>
         </div>
@@ -280,14 +280,14 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
       {/* Generate form */}
       <div className={card + " p-6"}>
-        <h2 className="text-xl font-semibold text-gray-900 mb-1">Audit and Dispute Report</h2>
-        <p className="text-sm text-gray-500 mb-5">
+        <h2 className="text-xl font-semibold text-ink mb-1">Audit and Dispute Report</h2>
+        <p className="text-sm text-ink-muted mb-5">
           Generate a full evidence pack for any job — diary entries, photos, GPS sign-ins, QA responses, AI insight.
         </p>
 
         <div className="space-y-3 mb-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">JOB</label>
+            <label className="block text-xs font-medium text-ink-muted mb-1">JOB</label>
             <select data-testid="audit-job" value={selectedJob} onChange={(e) => setSelectedJob(e.target.value)} className={inp}>
               <option value="">Select a job…</option>
               {jobs.map((j: any) => <option key={j.id} value={j.id}>{j.name}</option>)}
@@ -295,11 +295,11 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">FROM (optional)</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1">FROM (optional)</label>
               <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inp} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">TO (optional)</label>
+              <label className="block text-xs font-medium text-ink-muted mb-1">TO (optional)</label>
               <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={inp} />
             </div>
           </div>
@@ -307,13 +307,13 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
             onClick={generate}
             data-testid="audit-generate"
             disabled={!selectedJob || loading}
-            className="w-full px-4 py-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl text-sm font-semibold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+            className="w-full px-4 py-3 bg-accent hover:bg-accent-ink text-white rounded-md text-sm font-semibold disabled:bg-surface-hover disabled:text-ink-subtle disabled:cursor-not-allowed"
           >
             {loading ? "Generating…" : "Generate Report"}
           </button>
         </div>
 
-        {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{error}</p>}
+        {error && <p className="text-sm text-danger bg-danger-wash border border-danger/30 rounded-md px-4 py-3">{error}</p>}
       </div>
 
       {reportV2 && (
@@ -322,15 +322,15 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           <div className={card + " p-4 sticky top-0 z-10"}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <div className="text-sm font-semibold text-gray-900 truncate">{reportV2.job?.name}</div>
-                <div className="text-xs text-gray-500 truncate">{reportV2.job?.address}</div>
+                <div className="text-sm font-semibold text-ink truncate">{reportV2.job?.name}</div>
+                <div className="text-xs text-ink-muted truncate">{reportV2.job?.address}</div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="inline-flex bg-gray-100 rounded-lg p-0.5">
-                  <button onClick={() => setViewMode("daily")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "daily" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Daily</button>
-                  <button onClick={() => setViewMode("progress")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "progress" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Progress</button>
-                  <button onClick={() => setViewMode("iteration")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "iteration" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Iteration</button>
-                  <button onClick={() => setViewMode("compliance")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "compliance" ? "bg-white shadow-sm text-gray-900" : "text-gray-600 hover:text-gray-900")}>Compliance</button>
+                <div className="inline-flex bg-surface-hover rounded-md p-0.5">
+                  <button onClick={() => setViewMode("daily")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "daily" ? "bg-canvas shadow-sm text-ink" : "text-ink-muted hover:text-ink")}>Daily</button>
+                  <button onClick={() => setViewMode("progress")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "progress" ? "bg-canvas shadow-sm text-ink" : "text-ink-muted hover:text-ink")}>Progress</button>
+                  <button onClick={() => setViewMode("iteration")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "iteration" ? "bg-canvas shadow-sm text-ink" : "text-ink-muted hover:text-ink")}>Iteration</button>
+                  <button onClick={() => setViewMode("compliance")} className={"px-3 py-1 text-xs font-semibold rounded-md " + (viewMode === "compliance" ? "bg-canvas shadow-sm text-ink" : "text-ink-muted hover:text-ink")}>Compliance</button>
                 </div>
                 {viewMode !== "iteration" && reportV2?.onSite?.fullLog && (() => {
                   const names = Array.from(new Set((reportV2.onSite.fullLog || []).map((s: any) => s.users?.name).filter(Boolean))) as string[]
@@ -339,7 +339,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                     <select
                       value={installerFilter}
                       onChange={(e) => setInstallerFilter(e.target.value)}
-                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                      className="px-2 py-1 bg-canvas border border-line-strong rounded-md text-xs text-ink focus:outline-none focus:ring-2 focus:ring-teal-500"
                       title="Filter to a single installer"
                     >
                       <option value="">All installers ({names.length})</option>
@@ -347,23 +347,23 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                     </select>
                   )
                 })()}
-                <button onClick={refreshAI} disabled={loading} className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium disabled:opacity-50">
+                <button onClick={refreshAI} disabled={loading} className="px-3 py-1.5 bg-canvas border border-line-strong hover:bg-surface text-ink rounded-md text-xs font-medium disabled:opacity-50">
                   {loading ? "Refreshing…" : "Refresh AI"}
                 </button>
-                <button onClick={createShareLink} disabled={creatingLink} className="px-3 py-1.5 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-xs font-semibold disabled:opacity-50">
+                <button onClick={createShareLink} disabled={creatingLink} className="px-3 py-1.5 bg-accent hover:bg-accent-ink text-white rounded-md text-xs font-semibold disabled:opacity-50">
                   {creatingLink ? "Creating…" : "Share with client"}
                 </button>
               </div>
             </div>
             {actionMsg && (
-              <div className="mt-2 text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded px-3 py-1.5">{actionMsg}</div>
+              <div className="mt-2 text-xs text-accent-ink bg-accent-wash border border-line rounded px-3 py-1.5">{actionMsg}</div>
             )}
             {shareLink && (
-              <div className="mt-3 bg-teal-50 border border-teal-200 rounded-lg p-3">
-                <div className="text-xs font-medium text-teal-900 mb-1">Share link created — expires in 30 days</div>
+              <div className="mt-3 bg-accent-wash border border-line rounded-md p-3">
+                <div className="text-xs font-medium text-accent-ink mb-1">Share link created — expires in 30 days</div>
                 <div className="flex gap-2">
-                  <input value={shareLink} readOnly className="flex-1 px-2 py-1 bg-white border border-teal-200 rounded text-xs text-gray-700 font-mono" onClick={(e) => (e.target as HTMLInputElement).select()} />
-                  <button onClick={() => copyLink(shareLink)} className="px-3 py-1 bg-teal-500 hover:bg-teal-600 text-white rounded text-xs font-medium">{copied ? "Copied" : "Copy"}</button>
+                  <input value={shareLink} readOnly className="flex-1 px-2 py-1 bg-canvas border border-line rounded text-xs text-ink font-mono" onClick={(e) => (e.target as HTMLInputElement).select()} />
+                  <button onClick={() => copyLink(shareLink)} className="px-3 py-1 bg-accent hover:bg-accent-ink text-white rounded text-xs font-medium">{copied ? "Copied" : "Copy"}</button>
                 </div>
               </div>
             )}
@@ -371,27 +371,27 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
           {viewMode === "daily" && (
             <div className={card + " p-4 flex items-center gap-3 flex-wrap"}>
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">Day</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Day</span>
               <input
                 type="date"
                 value={from || new Date().toISOString().slice(0,10)}
                 onChange={(e) => { const d = e.target.value; setFrom(d); setTo(d); }}
-                className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm"
+                className="px-3 py-1.5 bg-canvas border border-line-strong rounded-md text-sm"
               />
               <button
                 onClick={() => { const d = new Date().toISOString().slice(0,10); setFrom(d); setTo(d); generate(); }}
-                className="px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg text-xs font-medium"
+                className="px-3 py-1.5 bg-canvas border border-line-strong hover:bg-surface text-ink rounded-md text-xs font-medium"
               >
                 Today
               </button>
               <button
                 onClick={() => generate()}
                 disabled={loading}
-                className="px-3 py-1.5 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-xs font-semibold disabled:opacity-50"
+                className="px-3 py-1.5 bg-accent hover:bg-accent-ink text-white rounded-md text-xs font-semibold disabled:opacity-50"
               >
                 {loading ? "Loading…" : "Reload for this day"}
               </button>
-              <span className="text-xs text-gray-500 ml-auto">Showing {from || "today"}</span>
+              <span className="text-xs text-ink-muted ml-auto">Showing {from || "today"}</span>
             </div>
           )}
 
@@ -405,62 +405,62 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
             const inProgressDlvs = dlvs.filter((d: any) => d.status === "in_progress").length
             const notStartedDlvs = dlvs.filter((d: any) => d.status === "not_started").length
             const hours = reportV2?.onSite?.totalHours ?? reportV2?.health?.metrics?.hoursThisPeriod ?? 0
-            const pctColour = pct >= 80 ? "text-emerald-600" : pct >= 40 ? "text-amber-600" : "text-red-600"
-            const barColour = pct >= 80 ? "bg-emerald-500" : pct >= 40 ? "bg-amber-500" : "bg-red-500"
+            const pctColour = pct >= 80 ? "text-emerald-600" : pct >= 40 ? "text-warn" : "text-danger"
+            const barColour = pct >= 80 ? "bg-emerald-500" : pct >= 40 ? "bg-warn-wash0" : "bg-danger-wash0"
             return (
               <div className={card + " p-6 mb-4"}>
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900">Job progress at a glance</h3>
-                    <p className="text-xs text-gray-500">Overall completion across all deliverables on this job.</p>
+                    <h3 className="text-sm font-semibold text-ink">Job progress at a glance</h3>
+                    <p className="text-xs text-ink-muted">Overall completion across all deliverables on this job.</p>
                   </div>
                   <div className="text-right">
                     <div className={"text-4xl font-bold tabular-nums " + pctColour}>{pct}%</div>
-                    <div className="text-[11px] text-gray-500 uppercase tracking-wide">complete</div>
+                    <div className="text-[11px] text-ink-muted uppercase tracking-wide">complete</div>
                   </div>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2 mb-5 overflow-hidden">
+                <div className="w-full bg-surface-hover rounded-full h-2 mb-5 overflow-hidden">
                   <div className={"h-full transition-all " + barColour} style={{ width: pct + "%" }} />
                 </div>
                 <div className="grid grid-cols-4 gap-3 mb-5">
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">Items approved</div>
-                    <div className="text-lg font-semibold text-gray-900 tabular-nums">{approvedItems}/{totalItems}</div>
+                  <div className="bg-surface rounded-md p-3">
+                    <div className="text-[10px] uppercase text-ink-muted tracking-wide">Items approved</div>
+                    <div className="text-lg font-semibold text-ink tabular-nums">{approvedItems}/{totalItems}</div>
                   </div>
-                  <div className="bg-emerald-50 rounded-lg p-3">
+                  <div className="bg-emerald-50 rounded-md p-3">
                     <div className="text-[10px] uppercase text-emerald-700 tracking-wide">Deliverables done</div>
                     <div className="text-lg font-semibold text-emerald-700 tabular-nums">{completedDlvs}</div>
                   </div>
-                  <div className="bg-amber-50 rounded-lg p-3">
-                    <div className="text-[10px] uppercase text-amber-700 tracking-wide">In progress</div>
-                    <div className="text-lg font-semibold text-amber-700 tabular-nums">{inProgressDlvs}</div>
+                  <div className="bg-warn-wash rounded-md p-3">
+                    <div className="text-[10px] uppercase text-warn tracking-wide">In progress</div>
+                    <div className="text-lg font-semibold text-warn tabular-nums">{inProgressDlvs}</div>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="text-[10px] uppercase text-gray-500 tracking-wide">Not started</div>
-                    <div className="text-lg font-semibold text-gray-900 tabular-nums">{notStartedDlvs}</div>
+                  <div className="bg-surface rounded-md p-3">
+                    <div className="text-[10px] uppercase text-ink-muted tracking-wide">Not started</div>
+                    <div className="text-lg font-semibold text-ink tabular-nums">{notStartedDlvs}</div>
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-gray-600">Deliverable breakdown</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Deliverable breakdown</div>
                   {dlvs.map((d: any) => {
                     const dPct = d.totalItems > 0 ? Math.round((d.approvedItems / d.totalItems) * 100) : 0
-                    const dBar = d.status === "completed" ? "bg-emerald-500" : d.status === "in_progress" ? "bg-amber-500" : "bg-gray-300"
+                    const dBar = d.status === "completed" ? "bg-emerald-500" : d.status === "in_progress" ? "bg-warn-wash0" : "bg-line-strong"
                     return (
-                      <div key={d.id} className="bg-gray-50 rounded-lg p-3">
+                      <div key={d.id} className="bg-surface rounded-md p-3">
                         <div className="flex items-center justify-between mb-1.5">
-                          <div className="text-sm font-medium text-gray-900">{d.name}</div>
-                          <div className="text-xs text-gray-600 tabular-nums">{d.approvedItems}/{d.totalItems} approved · {dPct}%</div>
+                          <div className="text-sm font-medium text-ink">{d.name}</div>
+                          <div className="text-xs text-ink-muted tabular-nums">{d.approvedItems}/{d.totalItems} approved · {dPct}%</div>
                         </div>
-                        <div className="w-full bg-white rounded-full h-1.5 mb-2 overflow-hidden">
+                        <div className="w-full bg-canvas rounded-full h-1.5 mb-2 overflow-hidden">
                           <div className={"h-full transition-all " + dBar} style={{ width: dPct + "%" }} />
                         </div>
-                        {d.aiNarrative && <p className="text-xs text-gray-600 italic leading-relaxed">{d.aiNarrative}</p>}
+                        {d.aiNarrative && <p className="text-xs text-ink-muted italic leading-relaxed">{d.aiNarrative}</p>}
                       </div>
                     )
                   })}
                 </div>
-                <div className="mt-5 pt-4 border-t border-gray-100 text-xs text-gray-500">
-                  <span className="font-medium text-gray-700">{Number(hours).toFixed(1)}h</span> logged on this job
+                <div className="mt-5 pt-4 border-t border-line text-xs text-ink-muted">
+                  <span className="font-medium text-ink">{Number(hours).toFixed(1)}h</span> logged on this job
                 </div>
               </div>
             )
@@ -472,39 +472,39 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 <div className={card + " overflow-hidden"}>
                   <div className={
                     "px-6 py-4 " +
-                    (healthColour === "red" ? "bg-red-50 border-b border-red-200" :
-                     healthColour === "amber" ? "bg-amber-50 border-b border-amber-200" :
+                    (healthColour === "red" ? "bg-danger-wash border-b border-danger/30" :
+                     healthColour === "amber" ? "bg-warn-wash border-b border-warn/30" :
                      "bg-emerald-50 border-b border-emerald-200")
                   }>
                     <div className="flex items-center gap-3 mb-1">
                       <span className={
                         "inline-block w-3 h-3 rounded-full " +
-                        (healthColour === "red" ? "bg-red-500" :
-                         healthColour === "amber" ? "bg-amber-500" :
+                        (healthColour === "red" ? "bg-danger-wash0" :
+                         healthColour === "amber" ? "bg-warn-wash0" :
                          "bg-emerald-500")
                       }></span>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-muted">
                         Job Health · {reportV2.health.status === "in_trouble" ? "In Trouble" : reportV2.health.status === "at_risk" ? "At Risk" : "Healthy"}
                       </span>
                     </div>
-                    <div className="text-base font-semibold text-gray-900">{reportV2.health.message}</div>
+                    <div className="text-base font-semibold text-ink">{reportV2.health.message}</div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-4 bg-white">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-4 bg-canvas">
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-900">{reportV2.health.metrics?.hoursThisPeriod ?? 0}h</div>
-                      <div className="text-xs text-gray-500">Hours this period</div>
+                      <div className="text-2xl font-bold text-ink">{reportV2.health.metrics?.hoursThisPeriod ?? 0}h</div>
+                      <div className="text-xs text-ink-muted">Hours this period</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-900">{reportV2.health.metrics?.signoffsDone ?? 0}</div>
-                      <div className="text-xs text-gray-500">Sign-offs done</div>
+                      <div className="text-2xl font-bold text-ink">{reportV2.health.metrics?.signoffsDone ?? 0}</div>
+                      <div className="text-xs text-ink-muted">Sign-offs done</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-amber-600">{reportV2.health.metrics?.signoffsNeeded ?? 0}</div>
-                      <div className="text-xs text-gray-500">Awaiting approval</div>
+                      <div className="text-2xl font-bold text-warn">{reportV2.health.metrics?.signoffsNeeded ?? 0}</div>
+                      <div className="text-xs text-ink-muted">Awaiting approval</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-2xl font-bold text-red-600">{reportV2.health.metrics?.openIssues ?? 0}</div>
-                      <div className="text-xs text-gray-500">Open issues</div>
+                      <div className="text-2xl font-bold text-danger">{reportV2.health.metrics?.openIssues ?? 0}</div>
+                      <div className="text-xs text-ink-muted">Open issues</div>
                     </div>
                   </div>
                 </div>
@@ -536,16 +536,16 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 return (
                 <div className={card + " p-6"}>
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-gray-900">What needs you today</h3>
-                    <span className="text-xs text-gray-400">{grouped.length} action{grouped.length === 1 ? "" : "s"}</span>
+                    <h3 className="text-sm font-semibold text-ink">What needs you today</h3>
+                    <span className="text-xs text-ink-subtle">{grouped.length} action{grouped.length === 1 ? "" : "s"}</span>
                   </div>
                   <div className="space-y-2">
                     {grouped.map((a: any, i: number) => (
-                      <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                        <span className={"flex-shrink-0 w-1.5 h-12 rounded-full " + (a.priority === "high" ? "bg-red-500" : "bg-amber-500")}></span>
+                      <div key={i} className="flex items-start gap-3 p-3 bg-surface rounded-md">
+                        <span className={"flex-shrink-0 w-1.5 h-12 rounded-full " + (a.priority === "high" ? "bg-danger-wash0" : "bg-warn-wash0")}></span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-gray-900">{a.title}</div>
-                          {a.subtitle && <div className="text-xs text-gray-600 mt-0.5">{a.subtitle}</div>}
+                          <div className="text-sm font-semibold text-ink">{a.title}</div>
+                          {a.subtitle && <div className="text-xs text-ink-muted mt-0.5">{a.subtitle}</div>}
                         </div>
                         <button
                           disabled={actionInProgress}
@@ -561,7 +561,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                               setTimeout(() => document.querySelector("#evidence-section")?.scrollIntoView({ behavior: "smooth" }), 100)
                             }
                           }}
-                          className="flex-shrink-0 px-3 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-900 rounded-lg text-xs font-semibold disabled:opacity-50"
+                          className="flex-shrink-0 px-3 py-1.5 bg-canvas border border-line-strong hover:bg-surface text-ink rounded-md text-xs font-semibold disabled:opacity-50"
                         >
                           {a.actionLabel}
                         </button>
@@ -576,8 +576,8 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <div className="flex items-center gap-3">
                     <span className="flex-shrink-0 w-8 h-8 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">✓</span>
                     <div>
-                      <div className="text-sm font-semibold text-gray-900">All caught up</div>
-                      <div className="text-xs text-gray-500">No actions outstanding on this job.</div>
+                      <div className="text-sm font-semibold text-ink">All caught up</div>
+                      <div className="text-xs text-ink-muted">No actions outstanding on this job.</div>
                     </div>
                   </div>
                 </div>
@@ -587,33 +587,33 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               {reportV2.execSummary && (
                 <div className={card + " p-6 border-l-4 border-l-teal-500"}>
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-teal-50 border border-teal-200 rounded-full text-xs font-semibold text-teal-700">
-                      <span className="w-1.5 h-1.5 rounded-full bg-teal-500"></span>
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-accent-wash border border-line rounded-full text-xs font-semibold text-accent-ink">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent"></span>
                       AI Executive Summary
                     </span>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{reportV2.execSummary}</p>
+                  <p className="text-sm text-ink leading-relaxed">{reportV2.execSummary}</p>
                 </div>
               )}
 
               {/* Red Flags */}
               {reportV2.redFlags && reportV2.redFlags.length > 0 && (
                 <div className={card + " p-6"}>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                    <span className="text-red-500">⚠</span> Red Flags ({reportV2.redFlags.length})
+                  <h3 className="text-sm font-semibold text-ink mb-3 flex items-center gap-2">
+                    <span className="text-danger">⚠</span> Red Flags ({reportV2.redFlags.length})
                   </h3>
                   <div className="space-y-2">
                     {reportV2.redFlags.map((rf: any, i: number) => (
-                      <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                      <div key={i} className="flex items-start gap-3 p-3 bg-surface rounded-md">
                         <span className={
                           "flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full uppercase " +
-                          (rf.severity === "high" ? "bg-red-100 text-red-700" :
-                           rf.severity === "medium" ? "bg-amber-100 text-amber-700" :
+                          (rf.severity === "high" ? "bg-danger-wash text-danger" :
+                           rf.severity === "medium" ? "bg-warn-wash text-warn" :
                            "bg-yellow-100 text-yellow-700")
                         }>{rf.severity}</span>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-gray-900">{rf.item}</div>
-                          <div className="text-xs text-gray-600 mt-0.5">{rf.action}</div>
+                          <div className="text-sm font-semibold text-ink">{rf.item}</div>
+                          <div className="text-xs text-ink-muted mt-0.5">{rf.action}</div>
                         </div>
                       </div>
                     ))}
@@ -624,19 +624,19 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               {/* Timeline strip */}
               {reportV2.timeline && reportV2.timeline.length > 0 && (
                 <div className={card + " p-6"}>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Last 14 days</h3>
+                  <h3 className="text-sm font-semibold text-ink mb-3">Last 14 days</h3>
                   <div className="flex gap-1 overflow-x-auto pb-2">
                     {reportV2.timeline.map((d: any, i: number) => {
                       const events = (d.signins || 0) + (d.diary || 0) + (d.qa || 0) + (d.defects || 0) + ((d.walkthroughs || []).length || 0)
-                      const intensity = events === 0 ? "bg-gray-100" : events < 3 ? "bg-teal-100" : events < 6 ? "bg-teal-300" : "bg-teal-500"
+                      const intensity = events === 0 ? "bg-surface-hover" : events < 3 ? "bg-accent-wash" : events < 6 ? "bg-accent-wash" : "bg-accent"
                       const dateLabel = new Date(d.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })
                       return (
                         <div key={i} className="flex-1 min-w-[60px] text-center" title={`${dateLabel}: ${d.signins} sign-ins, ${d.diary} diary, ${(d.walkthroughs||[]).length} walk & talks, ${d.qa} QA, ${d.blockers} blockers, ${d.photos} photos`}>
                           <div className={"h-12 rounded " + intensity + " flex flex-col items-center justify-center text-xs text-white font-medium"}>
-                            {d.blockers > 0 && <span className="text-red-600 text-base leading-none">⚠</span>}
-                            {events > 0 && <span className={events >= 3 ? "text-white" : "text-teal-800"}>{events}</span>}
+                            {d.blockers > 0 && <span className="text-danger text-base leading-none">⚠</span>}
+                            {events > 0 && <span className={events >= 3 ? "text-white" : "text-accent-ink"}>{events}</span>}
                           </div>
-                          <div className="text-[10px] text-gray-500 mt-1 whitespace-nowrap">{dateLabel}</div>
+                          <div className="text-[10px] text-ink-muted mt-1 whitespace-nowrap">{dateLabel}</div>
                         </div>
                       )
                     })}
@@ -646,11 +646,11 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
               {/* Walk & Talks */}
               {reportV2.fullEvidence?.walkthroughs && reportV2.fullEvidence.walkthroughs.length > 0 && (
-                <div className="bg-white border border-gray-200 rounded-2xl p-5 mb-5">
+                <div className="bg-canvas border border-line-strong rounded-md p-5 mb-5">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="font-bold text-gray-900 mb-1">🎙 Walk &amp; Talks ({reportV2.fullEvidence.walkthroughs.length})</h3>
-                      <p className="text-xs text-gray-500">Voice-narrated site walkthroughs with AI-structured documentation. Internal view only — walkthroughs are not yet included in the client or compliance pack.</p>
+                      <h3 className="font-bold text-ink mb-1">🎙 Walk &amp; Talks ({reportV2.fullEvidence.walkthroughs.length})</h3>
+                      <p className="text-xs text-ink-muted">Voice-narrated site walkthroughs with AI-structured documentation. Internal view only — walkthroughs are not yet included in the client or compliance pack.</p>
                     </div>
                   </div>
                   <div className="space-y-3">
@@ -658,18 +658,18 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                       const isApproved = w.approval_status === "approved"
                       const isRejected = w.approval_status === "rejected"
                       const sentimentColor =
-                        w.sentiment === "defect" || w.sentiment === "negative" ? "text-red-700 bg-red-50" :
-                        w.sentiment === "concern" ? "text-amber-700 bg-amber-50" :
+                        w.sentiment === "defect" || w.sentiment === "negative" ? "text-danger bg-danger-wash" :
+                        w.sentiment === "concern" ? "text-warn bg-warn-wash" :
                         w.sentiment === "confident" ? "text-emerald-700 bg-emerald-50" :
-                        "text-gray-600 bg-gray-50"
+                        "text-ink-muted bg-surface"
                       const installerName = w.installer?.name || "Installer"
                       const recorded = new Date(w.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
                       const clipsCount = (w.clips || []).length
                       return (
-                        <div key={w.id} className={"border rounded-xl p-4 " + (isApproved ? "border-emerald-200 bg-emerald-50/30" : isRejected ? "border-red-200 bg-red-50/30 opacity-60" : "border-gray-200 bg-white")}>
+                        <div key={w.id} className={"border rounded-md p-4 " + (isApproved ? "border-emerald-200 bg-emerald-50/30" : isRejected ? "border-danger/30 bg-danger-wash/30 opacity-60" : "border-line-strong bg-canvas")}>
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className={"text-xs font-bold px-2 py-0.5 rounded " + (isApproved ? "bg-emerald-100 text-emerald-800" : isRejected ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-800")}>
+                              <span className={"text-xs font-bold px-2 py-0.5 rounded " + (isApproved ? "bg-emerald-100 text-emerald-800" : isRejected ? "bg-danger-wash text-danger" : "bg-warn-wash text-warn")}>
                                 {(w.approval_status || "pending").toUpperCase()}
                               </span>
                               {w.sentiment && (
@@ -677,19 +677,19 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                                   {w.sentiment}
                                 </span>
                               )}
-                              <span className="text-xs text-gray-500">{installerName} · {recorded} · {clipsCount} clip{clipsCount === 1 ? "" : "s"}</span>
+                              <span className="text-xs text-ink-muted">{installerName} · {recorded} · {clipsCount} clip{clipsCount === 1 ? "" : "s"}</span>
                             </div>
                           </div>
-                          {w.summary && <p className="text-sm text-gray-800 mb-2">{w.summary}</p>}
+                          {w.summary && <p className="text-sm text-ink mb-2">{w.summary}</p>}
                           {Array.isArray(w.themes) && w.themes.length > 0 && (
                             <div className="flex flex-wrap gap-1 mb-2">
                               {w.themes.slice(0, 8).map((t: string, ti: number) => (
-                                <span key={ti} className="text-[11px] px-2 py-0.5 bg-gray-100 text-gray-700 rounded">#{t}</span>
+                                <span key={ti} className="text-[11px] px-2 py-0.5 bg-surface-hover text-ink rounded">#{t}</span>
                               ))}
                             </div>
                           )}
                           {Array.isArray(w.flags) && w.flags.length > 0 && (
-                            <div className="text-xs text-red-700 mb-2">
+                            <div className="text-xs text-danger mb-2">
                               <div className="font-semibold mb-1">⚠ Flags ({w.flags.length})</div>
                               <ul className="list-disc list-inside space-y-0.5">
                                 {w.flags.map((f: any, fi: number) => (
@@ -703,10 +703,10 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                           {Array.isArray(w.sections) && w.sections.length > 0 && (
                             <div className="mt-2 space-y-2">
                               {w.sections.map((sec: any, si: number) => (
-                                <div key={si} className="bg-white border border-gray-100 rounded-lg p-3">
-                                  {sec.title && <div className="text-sm font-semibold text-gray-800 mb-1">{sec.title}</div>}
+                                <div key={si} className="bg-canvas border border-line rounded-md p-3">
+                                  {sec.title && <div className="text-sm font-semibold text-ink mb-1">{sec.title}</div>}
                                   {Array.isArray(sec.bullets) && (
-                                    <ul className="text-xs text-gray-700 list-disc list-inside space-y-0.5">
+                                    <ul className="text-xs text-ink list-disc list-inside space-y-0.5">
                                       {sec.bullets.map((b: string, bi: number) => <li key={bi}>{b}</li>)}
                                     </ul>
                                   )}
@@ -716,12 +716,12 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                           )}
                           {Array.isArray(w.clips) && w.clips.length > 0 && (
                             <details className="mt-3">
-                              <summary className="text-xs text-teal-700 font-semibold cursor-pointer hover:text-teal-800">
+                              <summary className="text-xs text-accent-ink font-semibold cursor-pointer hover:text-accent-ink">
                                 View transcript &amp; video ({clipsCount} clip{clipsCount === 1 ? "" : "s"})
                               </summary>
                               <div className="mt-2 space-y-3">
                                 {w.clips.map((c: any, ci: number) => (
-                                  <div key={ci} className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                                  <div key={ci} className="bg-canvas border border-line-strong rounded-md overflow-hidden">
                                     {c.stream_video_id && !c.stream_video_id.includes("test") && (
                                       <div className="aspect-video bg-black">
                                         <iframe
@@ -733,10 +733,10 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                                       </div>
                                     )}
                                     <div className="p-3">
-                                      <div className="text-xs font-semibold text-gray-500 mb-1">
+                                      <div className="text-xs font-semibold text-ink-muted mb-1">
                                         Clip {c.sequence_number} · {c.duration_seconds || 0}s
                                       </div>
-                                      <div className="text-xs text-gray-700">{c.transcript || "(no transcript)"}</div>
+                                      <div className="text-xs text-ink">{c.transcript || "(no transcript)"}</div>
                                     </div>
                                   </div>
                                 ))}
@@ -753,46 +753,46 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               {/* Deliverables */}
               {reportV2.deliverables && reportV2.deliverables.length > 0 && (
                 <div className={card + " p-6"}>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Deliverables ({reportV2.deliverables.length})</h3>
+                  <h3 className="text-sm font-semibold text-ink mb-3">Deliverables ({reportV2.deliverables.length})</h3>
                   <div className="space-y-3">
                     {reportV2.deliverables.map((d: any) => {
                       const expanded = expandedDeliverable === d.id
                       const pct = d.totalItems > 0 ? Math.round((d.approvedItems / d.totalItems) * 100) : 0
                       return (
-                        <div key={d.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                          <button onClick={() => setExpandedDeliverable(expanded ? null : d.id)} className="w-full p-4 text-left hover:bg-gray-50">
+                        <div key={d.id} className="border border-line-strong rounded-md overflow-hidden">
+                          <button onClick={() => setExpandedDeliverable(expanded ? null : d.id)} className="w-full p-4 text-left hover:bg-surface">
                             <div className="flex items-center justify-between gap-3 mb-2">
-                              <div className="font-semibold text-gray-900">{d.name}</div>
+                              <div className="font-semibold text-ink">{d.name}</div>
                               <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="text-xs text-gray-500">{d.approvedItems}/{d.totalItems} approved</span>
+                                <span className="text-xs text-ink-muted">{d.approvedItems}/{d.totalItems} approved</span>
                                 <span className={
                                   "px-2 py-0.5 text-xs font-medium rounded-full " +
-                                  (d.status === "completed" ? "bg-green-100 text-green-700" :
-                                   d.status === "in_progress" ? "bg-amber-100 text-amber-700" :
-                                   "bg-gray-100 text-gray-600")
+                                  (d.status === "completed" ? "bg-ok-wash text-ok" :
+                                   d.status === "in_progress" ? "bg-warn-wash text-warn" :
+                                   "bg-surface-hover text-ink-muted")
                                 }>{d.status === "in_progress" ? "In progress" : d.status === "completed" ? "Completed" : "Not started"}</span>
                               </div>
                             </div>
-                            <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">
-                              <div className="h-full bg-teal-500" style={{ width: pct + "%" }}></div>
+                            <div className="w-full bg-surface-hover rounded-full h-1.5 overflow-hidden">
+                              <div className="h-full bg-accent" style={{ width: pct + "%" }}></div>
                             </div>
                             {d.aiNarrative && !expanded && (
-                              <p className="text-xs text-gray-600 italic mt-2">{d.aiNarrative}</p>
+                              <p className="text-xs text-ink-muted italic mt-2">{d.aiNarrative}</p>
                             )}
                           </button>
                           {expanded && (
-                            <div className="px-4 pb-4 bg-gray-50 border-t border-gray-100">
-                              {d.aiNarrative && <p className="text-xs text-gray-700 italic mb-3 mt-3">{d.aiNarrative}</p>}
+                            <div className="px-4 pb-4 bg-surface border-t border-line">
+                              {d.aiNarrative && <p className="text-xs text-ink italic mb-3 mt-3">{d.aiNarrative}</p>}
                               {d.items && d.items.length > 0 && (
                                 <div className="space-y-1">
                                   {d.items.map((it: any) => (
                                     <div key={it.id} className="flex items-center justify-between py-1 text-xs">
-                                      <span className="text-gray-700 truncate flex-1">{it.label}</span>
+                                      <span className="text-ink truncate flex-1">{it.label}</span>
                                       <span className={
                                         "ml-2 flex-shrink-0 font-medium " +
-                                        (it.state === "approved" ? "text-green-600" :
-                                         it.state === "submitted" ? "text-amber-600" :
-                                         it.state === "rejected" ? "text-red-600" : "text-gray-400")
+                                        (it.state === "approved" ? "text-ok" :
+                                         it.state === "submitted" ? "text-warn" :
+                                         it.state === "rejected" ? "text-danger" : "text-ink-subtle")
                                       }>{it.state || "pending"}</span>
                                     </div>
                                   ))}
@@ -810,15 +810,15 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               {/* Cost panel toggle */}
               <div className={card + " p-4"}>
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                    <input type="checkbox" checked={costEnabled} onChange={(e) => setCostEnabled(e.target.checked)} className="w-4 h-4 rounded text-teal-500 focus:ring-teal-500" />
+                  <label className="flex items-center gap-2 text-sm text-ink cursor-pointer">
+                    <input type="checkbox" checked={costEnabled} onChange={(e) => setCostEnabled(e.target.checked)} className="w-4 h-4 rounded text-accent-ink focus:ring-teal-500" />
                     Show labour cost
                   </label>
                   {costEnabled && (
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-500">Hourly rate £</span>
-                      <input type="number" value={hourlyRate} onChange={(e) => setHourlyRate(parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 bg-white border border-gray-200 rounded text-sm" />
-                      <span className="text-gray-700 font-semibold">= £{((reportV2.health?.metrics?.hoursThisPeriod || 0) * hourlyRate).toFixed(2)}</span>
+                      <span className="text-ink-muted">Hourly rate £</span>
+                      <input type="number" value={hourlyRate} onChange={(e) => setHourlyRate(parseFloat(e.target.value) || 0)} className="w-20 px-2 py-1 bg-canvas border border-line-strong rounded text-sm" />
+                      <span className="text-ink font-semibold">= £{((reportV2.health?.metrics?.hoursThisPeriod || 0) * hourlyRate).toFixed(2)}</span>
                     </div>
                   )}
                 </div>
@@ -826,16 +826,16 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
               {/* Evidence accordion */}
               <div id="evidence-section" className={card}>
-                <button onClick={() => setEvidenceOpen(!evidenceOpen)} className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50">
-                  <div className="text-sm font-semibold text-gray-900">Full evidence</div>
-                  <div className="text-xs text-gray-400">{evidenceOpen ? "Hide" : "Show"} sign-ins · diary · QA · defects</div>
+                <button onClick={() => setEvidenceOpen(!evidenceOpen)} className="w-full px-6 py-4 flex items-center justify-between hover:bg-surface">
+                  <div className="text-sm font-semibold text-ink">Full evidence</div>
+                  <div className="text-xs text-ink-subtle">{evidenceOpen ? "Hide" : "Show"} sign-ins · diary · QA · defects</div>
                 </button>
                 {evidenceOpen && reportV2 && (
-                  <div className="px-6 pb-6 space-y-4 border-t border-gray-100 pt-4">
+                  <div className="px-6 pb-6 space-y-4 border-t border-line pt-4">
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">Sign-ins ({evidenceSignins.length})</h4>
-                      {evidenceSignins.length === 0 ? <p className="text-xs text-gray-400">None</p> :
-                        <div className="text-xs text-gray-600">{evidenceSignins.length} sign-in events · {totalHours.toFixed(1)}h total</div>}
+                      <h4 className="text-xs font-semibold text-ink mb-2">Sign-ins ({evidenceSignins.length})</h4>
+                      {evidenceSignins.length === 0 ? <p className="text-xs text-ink-subtle">None</p> :
+                        <div className="text-xs text-ink-muted">{evidenceSignins.length} sign-in events · {totalHours.toFixed(1)}h total</div>}
                     </div>
                     <div>
                       {(() => {
@@ -864,9 +864,9 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                         const days = Object.keys(byDay).sort().reverse()
                         return (
                           <>
-                            <h4 className="text-xs font-semibold text-gray-700 mb-2">
+                            <h4 className="text-xs font-semibold text-ink mb-2">
                               Site activity · {meaningful.length} entries · {totalPhotos} photos
-                              {filteredCount > 0 && <span className="ml-2 text-gray-400 font-normal">({filteredCount} test entries hidden)</span>}
+                              {filteredCount > 0 && <span className="ml-2 text-ink-subtle font-normal">({filteredCount} test entries hidden)</span>}
                             </h4>
                             <div className="space-y-2">
                               {days.map(day => {
@@ -874,45 +874,45 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                                 const entries = byDay[day]
                                 const dayPhotos = entries.reduce((s: number, e: any) => s + (e.photo_urls?.length || 0), 0)
                                 return (
-                                  <div key={day} className="border border-gray-100 rounded-lg overflow-hidden">
-                                    <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                                      <span className="text-xs font-semibold text-gray-700">
+                                  <div key={day} className="border border-line rounded-md overflow-hidden">
+                                    <div className="px-3 py-1.5 bg-surface border-b border-line flex items-center justify-between">
+                                      <span className="text-xs font-semibold text-ink">
                                         {dayDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
                                       </span>
-                                      <span className="text-[10px] text-gray-500">{entries.length} entries · {dayPhotos} photos</span>
+                                      <span className="text-[10px] text-ink-muted">{entries.length} entries · {dayPhotos} photos</span>
                                     </div>
                                     <div className="divide-y divide-gray-50">
                                       {entries.map((e: any) => (
                                         <div key={e.id} className="px-3 py-2 flex items-start gap-2.5">
-                                          <div className="text-[10px] text-gray-400 flex-shrink-0 w-10 pt-0.5">
+                                          <div className="text-[10px] text-ink-subtle flex-shrink-0 w-10 pt-0.5">
                                             {new Date(e.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
                                           </div>
                                           <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1.5 mb-0.5">
-                                              <span className="text-[11px] font-medium text-gray-700">{e.users?.name || "Unknown"}</span>
+                                              <span className="text-[11px] font-medium text-ink">{e.users?.name || "Unknown"}</span>
                                               {e.ai_alert_type && e.ai_alert_type !== "none" && (
-                                                <span className={"px-1 py-0 rounded text-[9px] font-semibold uppercase " + (e.ai_alert_type === "blocker" ? "bg-red-100 text-red-700" : e.ai_alert_type === "issue" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600")}>
+                                                <span className={"px-1 py-0 rounded text-[9px] font-semibold uppercase " + (e.ai_alert_type === "blocker" ? "bg-danger-wash text-danger" : e.ai_alert_type === "issue" ? "bg-warn-wash text-warn" : "bg-surface-hover text-ink-muted")}>
                                                   {e.ai_alert_type}
                                                 </span>
                                               )}
                                             </div>
                                             {e.entry_text && !isNoise(e.entry_text) && (
-                                              <div className="text-xs text-gray-700 mb-1">{e.entry_text}</div>
+                                              <div className="text-xs text-ink mb-1">{e.entry_text}</div>
                                             )}
                                             {e.ai_summary && e.ai_summary !== e.entry_text && (
-                                              <div className="text-[11px] text-gray-500 italic mb-1">{e.ai_summary}</div>
+                                              <div className="text-[11px] text-ink-muted italic mb-1">{e.ai_summary}</div>
                                             )}
                                             {e.photo_urls && e.photo_urls.length > 0 && (
                                               <div className="flex flex-wrap gap-1 mt-1">
                                                 {e.photo_urls.map((u: string, i: number) => (
                                                   <a key={i} href={u} target="_blank" rel="noopener noreferrer">
-                                                    <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-gray-200 hover:opacity-80 cursor-pointer" />
+                                                    <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-line-strong hover:opacity-80 cursor-pointer" />
                                                   </a>
                                                 ))}
                                               </div>
                                             )}
                                             {e.video_url && (
-                                              <a href={e.video_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 rounded text-[10px]">📹 Video</a>
+                                              <a href={e.video_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-surface-hover hover:bg-surface-hover rounded text-[10px]">📹 Video</a>
                                             )}
                                           </div>
                                         </div>
@@ -927,8 +927,8 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                       })()}
                     </div>
                     <div>
-                      <h4 className="text-xs font-semibold text-gray-700 mb-2">QA ({evidenceQa.length})</h4>
-                      <div className="text-xs text-gray-600">{evidenceQa.filter((q: any) => q.state === "approved" || q.value === "pass").length} pass · {evidenceQa.filter((q: any) => q.state === "rejected" || q.value === "fail").length} fail</div>
+                      <h4 className="text-xs font-semibold text-ink mb-2">QA ({evidenceQa.length})</h4>
+                      <div className="text-xs text-ink-muted">{evidenceQa.filter((q: any) => q.state === "approved" || q.value === "pass").length} pass · {evidenceQa.filter((q: any) => q.state === "rejected" || q.value === "fail").length} fail</div>
                     </div>
                   </div>
                 )}
@@ -939,31 +939,31 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           {viewMode === "iteration" && (
             <>
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">Compare two periods</h3>
-                <p className="text-xs text-gray-500 mb-4">Pick two date ranges to see what changed between them — hours, photos, defects, signoffs.</p>
+                <h3 className="text-sm font-semibold text-ink mb-1">Compare two periods</h3>
+                <p className="text-xs text-ink-muted mb-4">Pick two date ranges to see what changed between them — hours, photos, defects, signoffs.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-600">Period A (earlier)</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Period A (earlier)</div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">FROM</label>
+                        <label className="block text-[10px] text-ink-muted mb-1">FROM</label>
                         <input type="date" value={iterFromA} onChange={(e) => setIterFromA(e.target.value)} className={inp} />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">TO</label>
+                        <label className="block text-[10px] text-ink-muted mb-1">TO</label>
                         <input type="date" value={iterToA} onChange={(e) => setIterToA(e.target.value)} className={inp} />
                       </div>
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <div className="text-xs font-semibold uppercase tracking-wide text-gray-600">Period B (later)</div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">Period B (later)</div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">FROM</label>
+                        <label className="block text-[10px] text-ink-muted mb-1">FROM</label>
                         <input type="date" value={iterFromB} onChange={(e) => setIterFromB(e.target.value)} className={inp} />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">TO</label>
+                        <label className="block text-[10px] text-ink-muted mb-1">TO</label>
                         <input type="date" value={iterToB} onChange={(e) => setIterToB(e.target.value)} className={inp} />
                       </div>
                     </div>
@@ -973,7 +973,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <button
                     onClick={compareIterPeriods}
                     disabled={iterLoading || !iterFromA || !iterToA || !iterFromB || !iterToB}
-                    className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-accent hover:bg-accent-ink text-white rounded-md text-sm font-semibold disabled:bg-surface-hover disabled:text-ink-subtle disabled:cursor-not-allowed"
                   >
                     {iterLoading ? "Comparing…" : "Compare periods"}
                   </button>
@@ -982,19 +982,19 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                     <button
                       onClick={generateIterNarrative}
                       disabled={iterNarrativeLoading}
-                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-semibold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-xs font-semibold disabled:bg-surface-hover disabled:text-ink-subtle disabled:cursor-not-allowed"
                     >
                       {iterNarrativeLoading ? "Generating…" : iterNarrative ? "Regenerate AI narrative" : "Generate AI narrative"}
                     </button>
                   )}
                 </div>
-                {iterError && <p className="mt-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{iterError}</p>}
+                {iterError && <p className="mt-3 text-sm text-danger bg-danger-wash border border-danger/30 rounded-md px-3 py-2">{iterError}</p>}
               </div>
 
               {iterNarrativeError && (
-                <div className={card + " p-4 border-red-200 bg-red-50"}>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-red-700 mb-1">Narrative error</div>
-                  <p className="text-sm text-red-700">{iterNarrativeError}</p>
+                <div className={card + " p-4 border-danger/30 bg-danger-wash"}>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-danger mb-1">Narrative error</div>
+                  <p className="text-sm text-danger">{iterNarrativeError}</p>
                 </div>
               )}
               {iterNarrative && (
@@ -1003,7 +1003,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                     <div className="text-xs font-semibold uppercase tracking-wide text-purple-700">AI iteration narrative</div>
                     <div className="text-[10px] text-purple-500">Gemini 2.5 Flash</div>
                   </div>
-                  <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{iterNarrative}</p>
+                  <p className="text-sm text-ink leading-relaxed whitespace-pre-wrap">{iterNarrative}</p>
                 </div>
               )}
               {iterReportA && iterReportB && (() => {
@@ -1027,31 +1027,31 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 const renderCol = (label: string, range: string, r: any, photos: { url: string; date: string; source: string }[]) => (
                   <div>
                     <div className="mb-3">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</div>
-                      <div className="text-sm text-gray-700">{range}</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-ink-muted">{label}</div>
+                      <div className="text-sm text-ink">{range}</div>
                     </div>
                     <div className="grid grid-cols-3 gap-2 mb-3">
-                      <div className="bg-gray-50 rounded-lg p-2">
-                        <div className="text-[10px] uppercase text-gray-500">Hours</div>
-                        <div className="text-sm font-semibold text-gray-900">{fmtH(r?.health?.metrics?.hoursThisPeriod)}</div>
+                      <div className="bg-surface rounded-md p-2">
+                        <div className="text-[10px] uppercase text-ink-muted">Hours</div>
+                        <div className="text-sm font-semibold text-ink">{fmtH(r?.health?.metrics?.hoursThisPeriod)}</div>
                       </div>
-                      <div className="bg-gray-50 rounded-lg p-2">
-                        <div className="text-[10px] uppercase text-gray-500">Installers</div>
-                        <div className="text-sm font-semibold text-gray-900">{r?.onSite?.installerCount ?? 0}</div>
+                      <div className="bg-surface rounded-md p-2">
+                        <div className="text-[10px] uppercase text-ink-muted">Installers</div>
+                        <div className="text-sm font-semibold text-ink">{r?.onSite?.installerCount ?? 0}</div>
                       </div>
-                      <div className="bg-gray-50 rounded-lg p-2">
-                        <div className="text-[10px] uppercase text-gray-500">Open defects</div>
-                        <div className="text-sm font-semibold text-gray-900">{r?.issues?.openDefects?.length ?? 0}</div>
+                      <div className="bg-surface rounded-md p-2">
+                        <div className="text-[10px] uppercase text-ink-muted">Open defects</div>
+                        <div className="text-sm font-semibold text-ink">{r?.issues?.openDefects?.length ?? 0}</div>
                       </div>
                     </div>
-                    <div className="text-[11px] text-gray-500 mb-2">{photos.length} photo{photos.length === 1 ? "" : "s"} {photos.length > PHOTO_LIMIT && <span>· showing most recent {PHOTO_LIMIT}</span>}</div>
+                    <div className="text-[11px] text-ink-muted mb-2">{photos.length} photo{photos.length === 1 ? "" : "s"} {photos.length > PHOTO_LIMIT && <span>· showing most recent {PHOTO_LIMIT}</span>}</div>
                     {photos.length === 0 ? (
-                      <div className="text-xs text-gray-400 italic bg-gray-50 rounded-lg p-4 text-center">No photos captured in this period.</div>
+                      <div className="text-xs text-ink-subtle italic bg-surface rounded-md p-4 text-center">No photos captured in this period.</div>
                     ) : (
                       <div className="grid grid-cols-3 gap-1.5">
                         {photos.slice(0, PHOTO_LIMIT).map((p, i) => (
                           <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" title={new Date(p.date).toLocaleString("en-GB") + " · " + p.source}>
-                            <img src={p.url} alt="" className="w-full h-20 object-cover rounded border border-gray-200 hover:opacity-80" />
+                            <img src={p.url} alt="" className="w-full h-20 object-cover rounded border border-line-strong hover:opacity-80" />
                           </a>
                         ))}
                       </div>
@@ -1061,8 +1061,8 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
                 return (
                   <div className={card + " p-6"}>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-1">Iteration report</h3>
-                    <p className="text-xs text-gray-500 mb-5">Side-by-side view of what happened in each period.</p>
+                    <h3 className="text-sm font-semibold text-ink mb-1">Iteration report</h3>
+                    <p className="text-xs text-ink-muted mb-5">Side-by-side view of what happened in each period.</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {renderCol("Period A (earlier)", iterFromA + " → " + iterToA, iterReportA, photosA)}
                       {renderCol("Period B (later)", iterFromB + " → " + iterToB, iterReportB, photosB)}
@@ -1077,22 +1077,22 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           {viewMode === "compliance" && (
             <div className="space-y-4 print:space-y-0">
               <div className={card + " p-6 print:break-after-page"}>
-                <div className="text-xs font-mono text-gray-500">AUDIT REFERENCE</div>
-                <div className="text-sm font-mono font-bold text-gray-900">VTR-{new Date().getFullYear()}-{(reportV2.job?.id || "").slice(0, 8).toUpperCase()}</div>
-                <div className="mt-3 space-y-1 text-xs text-gray-700">
+                <div className="text-xs font-mono text-ink-muted">AUDIT REFERENCE</div>
+                <div className="text-sm font-mono font-bold text-ink">VTR-{new Date().getFullYear()}-{(reportV2.job?.id || "").slice(0, 8).toUpperCase()}</div>
+                <div className="mt-3 space-y-1 text-xs text-ink">
                   <div><strong>Job:</strong> {reportV2.job?.name}</div>
                   <div><strong>Address:</strong> {reportV2.job?.address}</div>
                   <div><strong>Period:</strong> {reportV2.period?.from || "all time"} to {reportV2.period?.to || "now"}</div>
                   <div><strong>Generated:</strong> {new Date(reportV2.generated || Date.now()).toLocaleString("en-GB")}</div>
                 </div>
-                <div className="mt-4 pt-4 border-t border-gray-200 text-xs text-gray-700 leading-relaxed">
+                <div className="mt-4 pt-4 border-t border-line-strong text-xs text-ink leading-relaxed">
                   <p className="font-semibold mb-2">SWORN STATEMENT</p>
                   <p>This audit pack was generated automatically from data captured by the Vantro field operations platform during the period stated above. Sign-in and sign-out events are recorded with GPS coordinates and measured against this job&apos;s geofence radius of {reportV2.onSite?.geofenceRadiusMetres ?? "—"}m; the proportion falling within that radius is stated in section 2. All photographic evidence is timestamped at point of capture. No data has been edited or removed.</p>
                 </div>
               </div>
 
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-2">1. JOB DETAILS</h3>
+                <h3 className="text-sm font-bold text-ink mb-2">1. JOB DETAILS</h3>
                 <table className="w-full text-xs">
                   <tbody>
                     <tr><td className="font-semibold py-1 pr-2 w-32">Name</td><td>{reportV2.job?.name}</td></tr>
@@ -1105,12 +1105,12 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               </div>
 
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-2">2. PERSONNEL ON SITE</h3>
-                <div className="text-xs text-gray-700 mb-3">{reportV2.onSite?.installerCount || 0} installer(s) · {reportV2.onSite?.totalHours || 0}h total · {reportV2.onSite?.geofenceCompliance || 100}% geofence compliance</div>
+                <h3 className="text-sm font-bold text-ink mb-2">2. PERSONNEL ON SITE</h3>
+                <div className="text-xs text-ink mb-3">{reportV2.onSite?.installerCount || 0} installer(s) · {reportV2.onSite?.totalHours || 0}h total · {reportV2.onSite?.geofenceCompliance || 100}% geofence compliance</div>
                 {reportV2.onSite?.fullLog && reportV2.onSite.fullLog.length > 0 && (
                   <table className="w-full text-xs mt-2">
                     <thead>
-                      <tr className="bg-gray-50 text-gray-600">
+                      <tr className="bg-surface text-ink-muted">
                         <th className="text-left px-2 py-1.5 font-semibold">Installer</th>
                         <th className="text-left px-2 py-1.5 font-semibold">Signed In</th>
                         <th className="text-left px-2 py-1.5 font-semibold">Signed Out</th>
@@ -1125,12 +1125,12 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                         const outT = s.signed_out_at ? new Date(s.signed_out_at) : null
                         const hrs = outT ? ((outT.getTime() - inT.getTime()) / 3600000).toFixed(1) : "—"
                         return (
-                          <tr key={s.id} className="border-t border-gray-100">
+                          <tr key={s.id} className="border-t border-line">
                             <td className="px-2 py-1">{s.users?.name || "Unknown"}</td>
-                            <td className="px-2 py-1 text-gray-600">{inT.toLocaleString("en-GB")}</td>
-                            <td className="px-2 py-1 text-gray-600">{outT ? outT.toLocaleString("en-GB") : "—"}</td>
-                            <td className="px-2 py-1 text-right text-gray-500">{s.distance_from_site_metres != null ? s.distance_from_site_metres + "m" : "—"}</td>
-                            <td className="px-2 py-1 text-right text-gray-500">{s.sign_out_distance_metres != null ? s.sign_out_distance_metres + "m" : "—"}</td>
+                            <td className="px-2 py-1 text-ink-muted">{inT.toLocaleString("en-GB")}</td>
+                            <td className="px-2 py-1 text-ink-muted">{outT ? outT.toLocaleString("en-GB") : "—"}</td>
+                            <td className="px-2 py-1 text-right text-ink-muted">{s.distance_from_site_metres != null ? s.distance_from_site_metres + "m" : "—"}</td>
+                            <td className="px-2 py-1 text-right text-ink-muted">{s.sign_out_distance_metres != null ? s.sign_out_distance_metres + "m" : "—"}</td>
                             <td className="px-2 py-1 text-right font-semibold">{hrs}</td>
                           </tr>
                         )
@@ -1141,24 +1141,24 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               </div>
 
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-3">3. DELIVERABLES & QUALITY CONTROL</h3>
+                <h3 className="text-sm font-bold text-ink mb-3">3. DELIVERABLES & QUALITY CONTROL</h3>
                 {reportV2.deliverables?.map((d: any, i: number) => (
-                  <div key={d.id} className="mt-3 pl-3 border-l-2 border-gray-300">
+                  <div key={d.id} className="mt-3 pl-3 border-l-2 border-line-strong">
                     <div className="text-xs font-bold mb-1">3.{i+1} {d.name}</div>
-                    <div className="text-xs text-gray-600 mb-2">{d.approvedItems} of {d.totalItems} items approved · Status: {d.status}</div>
+                    <div className="text-xs text-ink-muted mb-2">{d.approvedItems} of {d.totalItems} items approved · Status: {d.status}</div>
                     {d.items && d.items.length > 0 && (
-                      <table className="w-full text-xs mt-2 border border-gray-200">
-                        <thead className="bg-gray-50">
+                      <table className="w-full text-xs mt-2 border border-line-strong">
+                        <thead className="bg-surface">
                           <tr>
-                            <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Item</th>
-                            <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">State</th>
-                            <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Approver</th>
-                            <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Approved at</th>
+                            <th className="text-left px-2 py-1.5 font-semibold border-b border-line-strong">Item</th>
+                            <th className="text-left px-2 py-1.5 font-semibold border-b border-line-strong">State</th>
+                            <th className="text-left px-2 py-1.5 font-semibold border-b border-line-strong">Approver</th>
+                            <th className="text-left px-2 py-1.5 font-semibold border-b border-line-strong">Approved at</th>
                           </tr>
                         </thead>
                         <tbody>
                           {d.items.map((it: any, j: number) => (
-                            <tr key={it.id} className="border-b border-gray-100">
+                            <tr key={it.id} className="border-b border-line">
                               <td className="px-2 py-1">3.{i+1}.{j+1} {it.label}</td>
                               <td className="px-2 py-1">{it.state || "pending"}</td>
                               <td className="px-2 py-1">{it.signedOffBy || "—"}</td>
@@ -1172,25 +1172,25 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 ))}
 
                 {/* Sign-off register — every progressive QA approval, chronologically */}
-                <div className="mt-5 pt-4 border-t border-gray-200">
+                <div className="mt-5 pt-4 border-t border-line-strong">
                   <div className="text-xs font-bold mb-2">
                     3.{(reportV2.deliverables?.length || 0) + 1} Sign-off register ({reportV2.signoffs?.length || 0})
                   </div>
                   {(reportV2.signoffs?.length || 0) === 0 ? (
-                    <div className="text-xs text-gray-500 italic">No items have been signed off in this period.</div>
+                    <div className="text-xs text-ink-muted italic">No items have been signed off in this period.</div>
                   ) : (
-                    <table className="w-full text-xs border border-gray-200">
-                      <thead className="bg-gray-50">
+                    <table className="w-full text-xs border border-line-strong">
+                      <thead className="bg-surface">
                         <tr>
-                          <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Deliverable</th>
-                          <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Item</th>
-                          <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Signed off by</th>
-                          <th className="text-left px-2 py-1.5 font-semibold border-b border-gray-200">Signed off at</th>
+                          <th className="text-left px-2 py-1.5 font-semibold border-b border-line-strong">Deliverable</th>
+                          <th className="text-left px-2 py-1.5 font-semibold border-b border-line-strong">Item</th>
+                          <th className="text-left px-2 py-1.5 font-semibold border-b border-line-strong">Signed off by</th>
+                          <th className="text-left px-2 py-1.5 font-semibold border-b border-line-strong">Signed off at</th>
                         </tr>
                       </thead>
                       <tbody>
                         {reportV2.signoffs.map((so: any, i: number) => (
-                          <tr key={i} className="border-b border-gray-100">
+                          <tr key={i} className="border-b border-line">
                             <td className="px-2 py-1">{so.deliverable || "—"}</td>
                             <td className="px-2 py-1">{so.item || "—"}</td>
                             <td className="px-2 py-1">{so.by || "—"}</td>
@@ -1204,22 +1204,22 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               </div>
 
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-3">4. ISSUES LOG</h3>
+                <h3 className="text-sm font-bold text-ink mb-3">4. ISSUES LOG</h3>
 
                 {/* 4.1 Blockers */}
-                <div className="mb-4 pl-3 border-l-2 border-red-300">
+                <div className="mb-4 pl-3 border-l-2 border-danger/40">
                   <div className="text-xs font-bold mb-2">4.1 Blockers ({reportV2.issues?.blockers?.length || 0})</div>
-                  {reportV2.issues?.blockers?.length === 0 && <div className="text-xs text-gray-500 italic">None recorded.</div>}
+                  {reportV2.issues?.blockers?.length === 0 && <div className="text-xs text-ink-muted italic">None recorded.</div>}
                   {reportV2.issues?.blockers?.map((b: any, j: number) => (
-                    <div key={b.id} className="text-xs mb-3 pb-2 border-b border-gray-100 last:border-0">
+                    <div key={b.id} className="text-xs mb-3 pb-2 border-b border-line last:border-0">
                       <div className="font-semibold mb-0.5">4.1.{j+1} · {new Date(b.created_at).toLocaleString("en-GB")} · {b.users?.name || "Unknown"}</div>
-                      {b.entry_text && <div className="text-gray-700 whitespace-pre-wrap">“{b.entry_text}”</div>}
-                      {b.ai_summary && b.ai_summary !== b.entry_text && <div className="text-gray-500 italic mt-0.5">AI: {b.ai_summary}</div>}
+                      {b.entry_text && <div className="text-ink whitespace-pre-wrap">“{b.entry_text}”</div>}
+                      {b.ai_summary && b.ai_summary !== b.entry_text && <div className="text-ink-muted italic mt-0.5">AI: {b.ai_summary}</div>}
                       {b.photo_urls && b.photo_urls.length > 0 && (
                         <div className="flex gap-1.5 mt-1.5">
                           {b.photo_urls.map((u: string, k: number) => (
                             <a key={k} href={u} target="_blank" rel="noopener noreferrer">
-                              <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-gray-200" />
+                              <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-line-strong" />
                             </a>
                           ))}
                         </div>
@@ -1229,19 +1229,19 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 </div>
 
                 {/* 4.2 Issues */}
-                <div className="mb-4 pl-3 border-l-2 border-amber-300">
+                <div className="mb-4 pl-3 border-l-2 border-warn/40">
                   <div className="text-xs font-bold mb-2">4.2 Issues ({reportV2.issues?.issues?.length || 0})</div>
-                  {reportV2.issues?.issues?.length === 0 && <div className="text-xs text-gray-500 italic">None recorded.</div>}
+                  {reportV2.issues?.issues?.length === 0 && <div className="text-xs text-ink-muted italic">None recorded.</div>}
                   {reportV2.issues?.issues?.map((iss: any, j: number) => (
-                    <div key={iss.id} className="text-xs mb-3 pb-2 border-b border-gray-100 last:border-0">
+                    <div key={iss.id} className="text-xs mb-3 pb-2 border-b border-line last:border-0">
                       <div className="font-semibold mb-0.5">4.2.{j+1} · {new Date(iss.created_at).toLocaleString("en-GB")} · {iss.users?.name || "Unknown"}</div>
-                      {iss.entry_text && <div className="text-gray-700 whitespace-pre-wrap">“{iss.entry_text}”</div>}
-                      {iss.ai_summary && iss.ai_summary !== iss.entry_text && <div className="text-gray-500 italic mt-0.5">AI: {iss.ai_summary}</div>}
+                      {iss.entry_text && <div className="text-ink whitespace-pre-wrap">“{iss.entry_text}”</div>}
+                      {iss.ai_summary && iss.ai_summary !== iss.entry_text && <div className="text-ink-muted italic mt-0.5">AI: {iss.ai_summary}</div>}
                       {iss.photo_urls && iss.photo_urls.length > 0 && (
                         <div className="flex gap-1.5 mt-1.5">
                           {iss.photo_urls.map((u: string, k: number) => (
                             <a key={k} href={u} target="_blank" rel="noopener noreferrer">
-                              <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-gray-200" />
+                              <img src={u} alt="" className="w-16 h-16 object-cover rounded border border-line-strong" />
                             </a>
                           ))}
                         </div>
@@ -1253,21 +1253,21 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 {/* 4.3 Defects */}
                 <div className="pl-3 border-l-2 border-orange-300">
                   <div className="text-xs font-bold mb-2">4.3 Defects ({reportV2.issues?.allDefects?.length || 0})</div>
-                  {(reportV2.issues?.allDefects?.length || 0) === 0 && <div className="text-xs text-gray-500 italic">None recorded.</div>}
+                  {(reportV2.issues?.allDefects?.length || 0) === 0 && <div className="text-xs text-ink-muted italic">None recorded.</div>}
                   {reportV2.issues?.allDefects?.map((df: any, j: number) => (
-                    <div key={df.id} className="text-xs mb-3 pb-2 border-b border-gray-100 last:border-0">
+                    <div key={df.id} className="text-xs mb-3 pb-2 border-b border-line last:border-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-semibold">4.3.{j+1}</span>
-                        <span className={"px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (df.severity === "high" || df.severity === "critical" ? "bg-red-100 text-red-700" : df.severity === "medium" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600")}>{df.severity || "unspecified"}</span>
-                        <span className="text-gray-500">{new Date(df.created_at).toLocaleString("en-GB")}</span>
-                        <span className="text-gray-500">· {df.users?.name || "Unknown"}</span>
-                        <span className={"ml-auto px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (df.status === "resolved" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700")}>{df.status || "open"}</span>
+                        <span className={"px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (df.severity === "high" || df.severity === "critical" ? "bg-danger-wash text-danger" : df.severity === "medium" ? "bg-warn-wash text-warn" : "bg-surface-hover text-ink-muted")}>{df.severity || "unspecified"}</span>
+                        <span className="text-ink-muted">{new Date(df.created_at).toLocaleString("en-GB")}</span>
+                        <span className="text-ink-muted">· {df.users?.name || "Unknown"}</span>
+                        <span className={"ml-auto px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (df.status === "resolved" ? "bg-ok-wash text-ok" : "bg-surface-hover text-ink")}>{df.status || "open"}</span>
                       </div>
-                      {df.description && <div className="text-gray-700 mt-0.5">{df.description}</div>}
-                      {df.resolution_note && <div className="text-gray-500 italic mt-0.5">Resolution: {df.resolution_note}</div>}
+                      {df.description && <div className="text-ink mt-0.5">{df.description}</div>}
+                      {df.resolution_note && <div className="text-ink-muted italic mt-0.5">Resolution: {df.resolution_note}</div>}
                       {df.photo_url && (
                         <a href={df.photo_url} target="_blank" rel="noopener noreferrer" className="inline-block mt-1.5">
-                          <img src={df.photo_url} alt="" className="w-16 h-16 object-cover rounded border border-gray-200" />
+                          <img src={df.photo_url} alt="" className="w-16 h-16 object-cover rounded border border-line-strong" />
                         </a>
                       )}
                     </div>
@@ -1276,14 +1276,14 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
               </div>
 
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-2">5. AI ANALYSIS DISCLOSURE</h3>
-                <p className="text-xs text-gray-700 leading-relaxed">This report includes machine-generated insights produced by Google Gemini 2.5 Flash. AI output is offered as analytical assistance only and does not substitute for human judgement. Source data underlying the AI summary is included in this report.</p>
-                {reportV2.execSummary && <p className="text-xs text-gray-700 mt-2 italic">"{reportV2.execSummary}"</p>}
+                <h3 className="text-sm font-bold text-ink mb-2">5. AI ANALYSIS DISCLOSURE</h3>
+                <p className="text-xs text-ink leading-relaxed">This report includes machine-generated insights produced by Google Gemini 2.5 Flash. AI output is offered as analytical assistance only and does not substitute for human judgement. Source data underlying the AI summary is included in this report.</p>
+                {reportV2.execSummary && <p className="text-xs text-ink mt-2 italic">"{reportV2.execSummary}"</p>}
               </div>
 
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-2">6. EVIDENCE INTEGRITY</h3>
-                <div className="text-xs text-gray-700 space-y-1 leading-relaxed">
+                <h3 className="text-sm font-bold text-ink mb-2">6. EVIDENCE INTEGRITY</h3>
+                <div className="text-xs text-ink space-y-1 leading-relaxed">
                   {/* Only claims that are computed. The old version of this
                       section asserted a chain of custody in prose; every line
                       here is either printed from the manifest or is a statement
@@ -1296,42 +1296,42 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <div>· Generated {new Date(reportV2.generated || Date.now()).toLocaleString("en-GB")} · source database Supabase, EU region.</div>
 
                   {reportV2.integrity?.error && (
-                    <div className="mt-3 pt-2 border-t border-amber-300 bg-amber-50 -mx-2 px-2 py-2 rounded">
-                      <div className="font-bold text-amber-800">This pack is not registered</div>
-                      <div className="text-amber-800">{reportV2.integrity.error}</div>
-                      <div className="text-amber-700 italic mt-0.5">Treat the integrity claims above as unproven for this copy.</div>
+                    <div className="mt-3 pt-2 border-t border-warn/40 bg-warn-wash -mx-2 px-2 py-2 rounded">
+                      <div className="font-bold text-warn">This pack is not registered</div>
+                      <div className="text-warn">{reportV2.integrity.error}</div>
+                      <div className="text-warn italic mt-0.5">Treat the integrity claims above as unproven for this copy.</div>
                     </div>
                   )}
 
                   {reportV2.integrity && !reportV2.integrity.error && (
-                    <div className="mt-3 pt-2 border-t border-gray-200 space-y-2">
+                    <div className="mt-3 pt-2 border-t border-line-strong space-y-2">
                       <div>
-                        <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">Pack reference</div>
+                        <div className="text-[10px] uppercase tracking-wide text-ink-muted mb-0.5">Pack reference</div>
                         <div className="font-mono text-[13px] font-bold">{reportV2.integrity.reference}</div>
                       </div>
 
                       <div>
-                        <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">
+                        <div className="text-[10px] uppercase tracking-wide text-ink-muted mb-0.5">
                           Merkle root over {reportV2.integrity.evidenceCount} evidence record{reportV2.integrity.evidenceCount === 1 ? "" : "s"}
                         </div>
                         <div className="font-mono text-[11px]">{(reportV2.integrity.merkleRoot || "").slice(0, 16)}…</div>
-                        <div className="font-mono break-all text-[10px] text-gray-500">{reportV2.integrity.merkleRoot}</div>
+                        <div className="font-mono break-all text-[10px] text-ink-muted">{reportV2.integrity.merkleRoot}</div>
                       </div>
 
                       {reportV2.integrity.signed ? (
                         <div>
-                          <div className="text-[10px] uppercase tracking-wide text-gray-500 mb-0.5">Signature (Ed25519)</div>
+                          <div className="text-[10px] uppercase tracking-wide text-ink-muted mb-0.5">Signature (Ed25519)</div>
                           <div className="font-mono break-all text-[10px]">{reportV2.integrity.signature}</div>
                         </div>
                       ) : (
-                        <div className="text-amber-700">
+                        <div className="text-warn">
                           <strong>Unsigned.</strong> No signing key is configured in this environment, so this
                           copy carries a root but nothing binding it to Vantro.
                         </div>
                       )}
 
                       {reportV2.integrity.coverage && (
-                        <div className="text-gray-600">
+                        <div className="text-ink-muted">
                           {reportV2.integrity.coverage.created + reportV2.integrity.coverage.signedOut} record(s) hashed
                           at the moment of capture
                           {reportV2.integrity.coverage.backfill > 0 && (
@@ -1345,7 +1345,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                         </div>
                       )}
 
-                      <div className="text-gray-700">
+                      <div className="text-ink">
                         Verify at <strong>getvantro.com/verify</strong> using the pack reference above. Verification
                         does not require an account and reveals nothing about this job.
                       </div>
@@ -1359,13 +1359,13 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   records afterwards, which is the half an assessor questions
                   just as hard. */}
               <div className={card + " p-6"}>
-                <h3 className="text-sm font-bold text-gray-900 mb-2">7. ADMINISTRATIVE ACTIONS</h3>
-                <p className="text-xs text-gray-600 mb-3">
+                <h3 className="text-sm font-bold text-ink mb-2">7. ADMINISTRATIVE ACTIONS</h3>
+                <p className="text-xs text-ink-muted mb-3">
                   Every recorded action taken on this job&apos;s evidence during the period, in order.
                   Read-only activity is excluded.
                 </p>
                 {(!reportV2.adminLog || reportV2.adminLog.length === 0) ? (
-                  <p className="text-xs text-gray-500 italic">
+                  <p className="text-xs text-ink-muted italic">
                     No administrative actions were recorded against this job in this period. That means
                     none were logged, not that none occurred — logging covers the actions the application
                     records, and is not a complete account of database access.
@@ -1374,7 +1374,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="text-[10px] uppercase tracking-wide text-gray-500 border-b border-gray-200">
+                        <tr className="text-[10px] uppercase tracking-wide text-ink-muted border-b border-line-strong">
                           <th className="text-left font-semibold py-1.5 pr-3">When</th>
                           <th className="text-left font-semibold py-1.5 pr-3">Who</th>
                           <th className="text-left font-semibold py-1.5 pr-3">Action</th>
@@ -1383,13 +1383,13 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                       </thead>
                       <tbody>
                         {reportV2.adminLog.map((r: any) => (
-                          <tr key={r.id} className="border-b border-gray-100 last:border-0">
+                          <tr key={r.id} className="border-b border-line last:border-0">
                             <td className="py-1.5 pr-3 whitespace-nowrap">
                               {r.created_at ? new Date(r.created_at).toLocaleString("en-GB") : "—"}
                             </td>
                             <td className="py-1.5 pr-3">{r.users?.name || "—"}</td>
                             <td className="py-1.5 pr-3">{String(r.action || "").replace(/_/g, " ")}</td>
-                            <td className="py-1.5 text-gray-600">{r.entity_type || "—"}</td>
+                            <td className="py-1.5 text-ink-muted">{r.entity_type || "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1398,7 +1398,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                 )}
               </div>
 
-              <div className="text-xs text-gray-400 text-center pt-2">
+              <div className="text-xs text-ink-subtle text-center pt-2">
                 Generated by Vantro · field operations software · getvantro.com<br/>
                 CNNCTD Ltd · Company No. NI695071
               </div>
@@ -1410,11 +1410,11 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
       {/* MODALS */}
       {qaModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setQaModal(null)}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-canvas rounded-md max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-2">Approve QA — {qaModal.deliverableName}</h3>
-            <p className="text-sm text-gray-600 mb-4">{qaModal.itemIds.length} submission{qaModal.itemIds.length === 1 ? "" : "s"} awaiting review.</p>
+            <p className="text-sm text-ink-muted mb-4">{qaModal.itemIds.length} submission{qaModal.itemIds.length === 1 ? "" : "s"} awaiting review.</p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setQaModal(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm">Cancel</button>
+              <button onClick={() => setQaModal(null)} className="px-4 py-2 bg-surface-hover hover:bg-surface-hover text-ink rounded-md text-sm">Cancel</button>
               <button
                 disabled={actionInProgress}
                 onClick={async () => {
@@ -1423,7 +1423,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   }
                   setQaModal(null)
                 }}
-                className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
+                className="px-4 py-2 bg-accent hover:bg-accent-ink text-white rounded-md text-sm font-semibold disabled:opacity-50"
               >
                 {actionInProgress ? "Approving…" : "Approve all"}
               </button>
@@ -1434,11 +1434,11 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
       {defectModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setDefectModal(null)}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-canvas rounded-md max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-2">Resolve defects</h3>
-            <p className="text-sm text-gray-600 mb-4">{defectModal.defectIds.length} defect{defectModal.defectIds.length === 1 ? "" : "s"} marked as resolved.</p>
+            <p className="text-sm text-ink-muted mb-4">{defectModal.defectIds.length} defect{defectModal.defectIds.length === 1 ? "" : "s"} marked as resolved.</p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setDefectModal(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm">Cancel</button>
+              <button onClick={() => setDefectModal(null)} className="px-4 py-2 bg-surface-hover hover:bg-surface-hover text-ink rounded-md text-sm">Cancel</button>
               <button
                 disabled={actionInProgress}
                 onClick={async () => {
@@ -1447,7 +1447,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
                   }
                   setDefectModal(null)
                 }}
-                className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
+                className="px-4 py-2 bg-accent hover:bg-accent-ink text-white rounded-md text-sm font-semibold disabled:opacity-50"
               >
                 {actionInProgress ? "Resolving…" : "Mark resolved"}
               </button>
@@ -1458,18 +1458,18 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
 
       {completeModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setCompleteModal(null)}>
-          <div className="bg-white rounded-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-canvas rounded-md max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-2">Mark job complete</h3>
-            <p className="text-sm text-gray-600 mb-4">{completeModal.jobName} will be marked as completed. This is the final sign-off.</p>
+            <p className="text-sm text-ink-muted mb-4">{completeModal.jobName} will be marked as completed. This is the final sign-off.</p>
             <div className="flex gap-2 justify-end">
-              <button onClick={() => setCompleteModal(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm">Cancel</button>
+              <button onClick={() => setCompleteModal(null)} className="px-4 py-2 bg-surface-hover hover:bg-surface-hover text-ink rounded-md text-sm">Cancel</button>
               <button
                 disabled={actionInProgress}
                 onClick={async () => {
                   await performAction("mark_complete", { jobId: completeModal.jobId })
                   setCompleteModal(null)
                 }}
-                className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50"
+                className="px-4 py-2 bg-accent hover:bg-accent-ink text-white rounded-md text-sm font-semibold disabled:opacity-50"
               >
                 {actionInProgress ? "Completing…" : "Mark complete"}
               </button>
