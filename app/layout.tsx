@@ -1,24 +1,42 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Fraunces } from "next/font/google"
+import { Inter, Geist_Mono } from "next/font/google"
+import localFont from "next/font/local"
 import Script from "next/script";
 import "./globals.css";
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+
+// Body face. Inter across the whole product.
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
+
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
-// Display face. Variable, with the optical-size axis requested so page titles
-// and hero numerals can be tuned per size. Weight 600 comes from the variable
-// wght axis via CSS (.font-display / .font-display-num in globals.css).
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  axes: ["opsz"],
+
+/**
+ * Display face for headings.
+ *
+ * Self-hosted rather than pulled from Fontshare: the CSP in vercel.json allows
+ * fonts from 'self' and fonts.gstatic.com only, so a CDN link would be blocked
+ * at runtime with nothing in the console to explain the fallback. Files live in
+ * public/fonts and are served same-origin.
+ *
+ * Three static weights, no variable axis - so anything asking for 600 lands on
+ * 500 or 700 rather than being synthesised.
+ */
+const cabinet = localFont({
+  variable: "--font-cabinet",
   display: "swap",
+  src: [
+    { path: "../public/fonts/CabinetGrotesk-Medium.woff2", weight: "500", style: "normal" },
+    { path: "../public/fonts/CabinetGrotesk-Bold.woff2", weight: "700", style: "normal" },
+    { path: "../public/fonts/CabinetGrotesk-Extrabold.woff2", weight: "800", style: "normal" },
+  ],
 });
+
 export const metadata: Metadata = {
   title: "Vantro",
   description: "Field operations app for installers",
@@ -40,7 +58,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} ${cabinet.variable} h-full antialiased`}
     >
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>

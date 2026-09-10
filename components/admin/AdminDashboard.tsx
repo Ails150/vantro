@@ -16,12 +16,13 @@ import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
 import SupportTab from "@/components/admin/SupportTab"
-import React, { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import PaywallOverlay from '@/components/billing/PaywallOverlay' // paywall_wired_v2
 import SitesTab from "./SitesTab"
-import { setupTabs, operationsTabs, tabBadge, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
+import { adminNavGroups, tabBadge, DEFAULT_TAB, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
+import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
 import { filterTabsByVertical, isTabVisible, toVertical } from "@/lib/vertical"
 import TradesTab from "./TradesTab"
@@ -69,14 +70,22 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   // the hide list is data in lib/vertical.ts, so the render below stays a map
   // over an array and nothing here knows why a tab is missing.
   const vertical = toVertical(company?.vertical)
-  const visibleSetupTabs = useMemo(() => filterTabsByVertical(setupTabs, vertical), [vertical])
-  const visibleOperationsTabs = useMemo(() => filterTabsByVertical(operationsTabs, vertical), [vertical])
+  // Groups keep their shape; only the items inside are filtered. A group that
+  // ends up empty for a vertical is dropped rather than rendered as a heading
+  // with nothing under it.
+  const visibleGroups = useMemo(
+    () =>
+      adminNavGroups
+        .map(g => ({ ...g, items: filterTabsByVertical(g.items, vertical) }))
+        .filter(g => g.items.length > 0),
+    [vertical],
+  )
 
   // A hidden tab must never reach activeTab: its nav entry is gone, so there
   // would be no way back out of it. Each of the four ways in is filtered here
   // rather than corrected afterwards -- ?tab=, the stored tab, the navigate
   // event, and switchTab below.
-  const [activeTab, setActiveTab] = useState(() => isTabVisible(defaultTab, vertical) ? defaultTab : "overview")
+  const [activeTab, setActiveTab] = useState(() => isTabVisible(defaultTab, vertical) ? defaultTab : DEFAULT_TAB)
   // optimistic-assign-2026-05-20 - mirror jobAssignments prop in local state so pill toggles instantly
   const [localAssignments, setLocalAssignments] = useState<any[]>(jobAssignments)
   // Sync from server when prop updates (router.refresh, page nav, etc)
@@ -97,16 +106,25 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     } catch {}
   }, [vertical])
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [setupExpanded, setSetupExpanded] = useState(true)
-  const [operationsExpanded, setOperationsExpanded] = useState(true)
+  // One record keyed by group, rather than a boolean per group, so adding a
+  // zone to nav/tabs.ts needs no new state here. Setup starts collapsed
+  // because onboarding is a one-off; the stored value wins once set.
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(adminNavGroups.map(g => [g.key, !g.defaultCollapsed])),
+  )
   useEffect(() => {
     try {
-      if (localStorage.getItem("vantro_setup_expanded") === "0") setSetupExpanded(false)
-      if (localStorage.getItem("vantro_ops_expanded") === "0") setOperationsExpanded(false)
+      const raw = localStorage.getItem("vantro_nav_groups")
+      if (raw) setExpandedGroups(prev => ({ ...prev, ...JSON.parse(raw) }))
     } catch {}
   }, [])
-  useEffect(() => { try { localStorage.setItem("vantro_setup_expanded", setupExpanded ? "1" : "0") } catch {} }, [setupExpanded])
-  useEffect(() => { try { localStorage.setItem("vantro_ops_expanded", operationsExpanded ? "1" : "0") } catch {} }, [operationsExpanded])
+  const toggleGroup = useCallback((key: string) => {
+    setExpandedGroups(prev => {
+      const next = { ...prev, [key]: prev[key] === false }
+      try { localStorage.setItem("vantro_nav_groups", JSON.stringify(next)) } catch {}
+      return next
+    })
+  }, [])
   useEffect(() => {
     try {
       const stored = localStorage.getItem("vantro_sidebar_collapsed")
@@ -122,11 +140,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     window.addEventListener("resize", onResize)
     return () => window.removeEventListener("resize", onResize)
   }, [])
-  function tabInitials(label: string): string {
-    const parts = label.trim().split(/\s+/)
-    if (parts.length === 1) return parts[0].slice(0, 2)
-    return (parts[0][0] + parts[1][0]).toUpperCase()
-  }
   const [showAddJob, setShowAddJob] = useState(false)
   const [showPayrollExport, setShowPayrollExport] = useState(false)
   const [showJobsImport, setShowJobsImport] = useState(false)
@@ -1176,137 +1189,36 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const viewerIsSuperadmin = userData?.role === "superadmin" || teamMembers.some((m: any) => m.id === userData?.id && m.is_superadmin === true)
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900">
-        <PaywallOverlay show={!!trialExpiredAndUnpaid} companyName={company?.name} currentPlan={company?.current_plan} />
-      <div className="bg-white border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-teal-400 flex items-center justify-center flex-shrink-0">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-              <rect x="2" y="2" width="7" height="7" rx="1.5" fill="white"/>
-              <rect x="11" y="2" width="7" height="7" rx="1.5" fill="white" opacity="0.7"/>
-              <rect x="2" y="11" width="7" height="7" rx="1.5" fill="white" opacity="0.7"/>
-              <rect x="11" y="11" width="7" height="7" rx="1.5" fill="white" opacity="0.4"/>
-            </svg>
-          </div>
-          <div>
-            <div className="font-bold text-base">Van<span className="text-teal-500">tro</span></div>
-            <div className="text-xs text-gray-500">Field Operations</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-full px-4 py-1.5">
-            <div className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"/>
-            <span className="text-sm text-teal-700 font-semibold">{signins.length} on site</span>
-          </div>
-          <SettingsMenu user={user} userData={userData} company={company} onSiteRulesClick={() => setActiveTab("settings")} />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3 md:gap-4 px-4 md:px-8 py-4 md:py-6">
-        {(() => {
-          const now = Date.now()
-          const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
-          const sevenDaysAgo = now - 7 * 86400000
-          const todayCount = liveAlerts.filter((a: any) => new Date(a.created_at).getTime() >= todayStart.getTime()).length
-          const blockerOpenCount = liveAlerts.filter((a: any) => a.alert_type === "blocker").length
-          const olderCount = liveAlerts.filter((a: any) => new Date(a.created_at).getTime() < sevenDaysAgo).length
-          return [
-            { label: "On Site Now", value: signins.length, color: "text-teal-500" },
-            { label: "Active Jobs", value: jobs.filter((j: any) => j.status === "active").length, color: "text-gray-900" },
-            { label: "Awaiting Approval", value: pendingQA.length, color: "text-amber-500" },
-            { label: "Today's Alerts", value: todayCount, color: todayCount > 0 ? "text-red-500" : "text-gray-400", onClick: () => { setActiveTab("alerts"); setAlertFilter("today" as any) } },
-            { label: "Open Blockers", value: blockerOpenCount, color: blockerOpenCount > 0 ? "text-red-600" : "text-gray-400", onClick: () => { setActiveTab("alerts"); setAlertFilter("blocker" as any) } },
-            { label: "Older than 7d", value: olderCount, color: olderCount > 0 ? "text-amber-600" : "text-gray-400", onClick: () => { setActiveTab("alerts") } },
-          ]
-        })().map((s: any) => (
-          <div
-            key={s.label}
-            onClick={s.onClick}
-            className={"bg-white border border-gray-200 rounded-2xl p-4 md:p-6 shadow-sm " + (s.onClick ? "cursor-pointer hover:border-gray-300 transition-colors" : "")}
-          >
-            <div className="text-gray-500 text-xs md:text-sm font-medium mb-1 md:mb-2">{s.label}</div>
-            <div className={"text-3xl md:text-4xl font-bold " + s.color}>{s.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex">
-        {/* Left Sidebar */}
-        <div data-marker="sidebar-collapsible-v1" className={"border-r border-gray-200 min-h-screen transition-all duration-200 relative " + (sidebarCollapsed ? "w-16" : "w-64")} style={{ backgroundColor: "#f0fdf9" }}>
-          <div className={"space-y-6 " + (sidebarCollapsed ? "px-2 pt-14" : "p-6 pt-14")}>
-              <button
-                data-marker="sidebar-toggle-btn"
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="absolute top-3 right-2 w-8 h-8 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 flex items-center justify-center text-gray-500 hover:text-gray-800 transition-colors z-20"
-                aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-                title={sidebarCollapsed ? "Expand" : "Collapse"}
-              >
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" className={"transition-transform " + (sidebarCollapsed ? "rotate-180" : "")}>
-                  <path d="M12 4l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-            {/* Setup Section */}
-            <div>
-              {!sidebarCollapsed && (
-                <button onClick={() => setSetupExpanded(!setupExpanded)} className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 mb-3 hover:text-teal-600 transition-colors">
-                  <span>Setup</span>
-                  <svg width="12" height="12" viewBox="0 0 20 20" fill="none" className={"transition-transform " + (setupExpanded ? "rotate-90" : "")}>
-                    <path d="M7 4l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              )}
-              <nav className="space-y-1">
-                {(sidebarCollapsed || setupExpanded) && visibleSetupTabs.map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => switchTab(tab.id)}
-                    className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
-                      activeTab === tab.id 
-                        ? 'bg-teal-100 text-teal-800 border-l-4 border-teal-500' 
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span title={sidebarCollapsed ? tab.label : undefined}>{sidebarCollapsed ? tabInitials(tab.label) : tab.label}</span>
-                    {badgeFor(tab) ? <span className={sidebarCollapsed ? "absolute top-1 right-1 w-2 h-2 bg-teal-500 rounded-full" : "bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full"}>{sidebarCollapsed ? "" : badgeFor(tab)}</span> : null}
-                  </button>
-                ))}
-              </nav>
-            </div>
-
-            {/* Operations Section */}
-            <div>
-              {!sidebarCollapsed && (
-                <button onClick={() => setOperationsExpanded(!operationsExpanded)} className="w-full flex items-center justify-between text-sm font-semibold text-gray-900 mb-3 hover:text-teal-600 transition-colors">
-                  <span>Operations</span>
-                  <svg width="12" height="12" viewBox="0 0 20 20" fill="none" className={"transition-transform " + (operationsExpanded ? "rotate-90" : "")}>
-                    <path d="M7 4l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </button>
-              )}
-              <nav className="space-y-1">
-                {(sidebarCollapsed || operationsExpanded) && visibleOperationsTabs.map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => switchTab(tab.id)}
-                    className={`w-full text-left px-3 py-2 text-sm font-medium rounded-lg transition-colors flex items-center justify-between ${
-                      activeTab === tab.id 
-                        ? 'bg-teal-100 text-teal-800 border-l-4 border-teal-500' 
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span title={sidebarCollapsed ? tab.label : undefined}>{sidebarCollapsed ? tabInitials(tab.label) : tab.label}</span>
-                    {badgeFor(tab) ? <span className={sidebarCollapsed ? "absolute top-1 right-1 w-2 h-2 bg-teal-500 rounded-full" : "bg-teal-100 text-teal-700 text-xs font-bold px-2 py-0.5 rounded-full"}>{sidebarCollapsed ? "" : badgeFor(tab)}</span> : null}
-                  </button>
-                ))}
-              </nav>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1">
-
-      <div className="px-4 md:px-8 py-4 md:py-6 max-w-6xl">
+    <AdminShell
+      groups={visibleGroups.map(g => ({
+        key: g.key,
+        label: g.label,
+        items: g.items.map(t => ({ ...t, badge: badgeFor(t) })),
+      }))}
+      activeId={activeTab}
+      onSelect={switchTab}
+      collapsed={sidebarCollapsed}
+      onToggleCollapsed={() => setSidebarCollapsed(v => !v)}
+      expandedGroups={expandedGroups}
+      onToggleGroup={toggleGroup}
+      onSiteCount={signins.length}
+      headerRight={
+        <SettingsMenu
+          user={user}
+          userData={userData}
+          company={company}
+          onSiteRulesClick={() => setActiveTab("settings")}
+        />
+      }
+      banner={
+        <PaywallOverlay
+          show={!!trialExpiredAndUnpaid}
+          companyName={company?.name}
+          currentPlan={company?.current_plan}
+        />
+      }
+    >
+      <div>
 
         {activeTab === "overview" && (
           <DashboardTab
@@ -2532,8 +2444,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
 
         </div>
-      </div>
-    </div>
 
     {lightboxUrl && (
       <div onClick={() => setLightboxUrl(null)} className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-8 cursor-pointer">
@@ -2541,13 +2451,6 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         <button onClick={() => setLightboxUrl(null)} className="absolute top-4 right-4 text-white text-3xl font-bold hover:text-gray-300">x</button>
       </div>
     )}
-    </div>
+    </AdminShell>
   )
 }
-
-
-
-
-
-
-
