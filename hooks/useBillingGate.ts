@@ -79,15 +79,21 @@ export function useBillingGate(companyId: string | null): BillingState {
       const activeInstallers = installerCount || 0
       const installerLimit = company.installer_limit || 40
       const trialDaysRemaining = formatTrialDaysRemaining(company.trial_ends_at)
-      const isTrialExpired = trialDaysRemaining === 0 && company.subscription_status === 'trial'
-      const isBlocked = isTrialExpired || ['cancelled', 'blocked'].includes(company.subscription_status)
       const plan = toPlan(company.plan)
+      // Free is never blocked and never asked for a card. A free company that
+      // came off the old model still carries an expired trial_ends_at and a
+      // 'cancelled' status, neither of which means anything now that the plan
+      // itself costs nothing.
+      const isFree = plan === 'free'
+      const isTrialExpired = !isFree && trialDaysRemaining === 0 && company.subscription_status === 'trial'
+      const isBlocked = !isFree && (isTrialExpired || ['cancelled', 'blocked'].includes(company.subscription_status))
       // One step up, or null at the top. Free -> payroll -> suite.
       const nextTier: Plan | null = plan === 'free' ? 'payroll' : plan === 'payroll' ? 'suite' : null
       const cardCollected = !!company.card_collected_at
-      const shouldShowCardPrompt = 
-        company.subscription_status === 'trial' && 
-        trialDaysRemaining <= 5 && 
+      const shouldShowCardPrompt =
+        !isFree &&
+        company.subscription_status === 'trial' &&
+        trialDaysRemaining <= 5 &&
         !cardCollected
 
       setState({

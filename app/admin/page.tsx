@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { toPlan } from '@/lib/plan'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import AdminDashboard from '@/components/admin/AdminDashboard'
 import SupportBanner from '@/components/support/SupportBanner'
@@ -119,7 +120,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // Trial/subscription check
   // paywall_overlay_v1
   let trialExpiredAndUnpaid = false
-  if (company && !ctx.isSupport) {
+  if (company && !ctx.isSupport && toPlan(company.plan) !== 'free') {
+    // Free is free indefinitely, so it can never be behind this paywall.
+    //
+    // Without that guard it would be. The paywall fires on an expired
+    // trial_ends_at plus a status of null/trial/cancelled/past_due, and that is
+    // exactly the set the plan migration mapped to 'free': every company
+    // carrying a stale 30-day trial date from the old model would have been
+    // locked out of a plan that costs nothing, with no way to pay their way out
+    // because free has no Stripe price.
     const now = new Date()
     const trialEnds = company.trial_ends_at ? new Date(company.trial_ends_at) : null
     const status = company.subscription_status
