@@ -43,7 +43,7 @@ export function AdminShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-canvas text-ink">
+    <div data-testid="admin-shell" className="min-h-screen bg-canvas text-ink">
       {banner}
 
       <header className="sticky top-0 z-30 border-b border-line bg-canvas/95 backdrop-blur">

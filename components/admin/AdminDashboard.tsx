@@ -1262,7 +1262,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             )}
             <div className="flex justify-end gap-3">
               <button onClick={() => setShowJobsImport(true)} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-teal-300">Import CSV</button>
-              <button onClick={() => { setShowAddJob(true); setFormError("") }} className={btn}>+ Add job</button>
+              <button onClick={() => { setShowAddJob(true); setFormError("") }} data-testid="job-add" className={btn}>+ Add job</button>
               <CsvImportModal
                 open={showJobsImport}
                 onClose={() => setShowJobsImport(false)}
@@ -1289,7 +1289,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             {showAddJob && (
               <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
                 <h3 className="font-semibold">New job</h3>
-                <input value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={inp}/>
+                <input data-testid="job-name" value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={inp}/>
                 <div className="relative">
                   <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
                   {jobAddress && (
@@ -1310,6 +1310,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       else setJobMapsPasteStatus(v.trim() ? "fail" : "")
                     }}
                     placeholder="e.g. 50.9102,-2.1616 or maps.app.goo.gl/..."
+                    data-testid="job-coords"
                     className={inp}
                   />
                   {jobMapsPasteStatus === "ok" && <div className="mt-1 text-xs font-semibold text-teal-500">✓ Coordinates set</div>}
@@ -1385,7 +1386,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 )}
                 {formError && <p className="text-sm text-red-500">{formError}</p>}
                 <div className="flex gap-3">
-                  <button onClick={addJob} disabled={saving} className={btn}>{saving ? "Saving..." : "Save job"}</button>
+                  <button onClick={addJob} data-testid="job-save" disabled={saving} className={btn}>{saving ? "Saving..." : "Save job"}</button>
                   <button onClick={() => setShowAddJob(false)} className={btnGhost}>Cancel</button>
                 </div>
               </div>

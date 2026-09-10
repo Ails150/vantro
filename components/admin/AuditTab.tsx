@@ -288,7 +288,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
         <div className="space-y-3 mb-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">JOB</label>
-            <select value={selectedJob} onChange={(e) => setSelectedJob(e.target.value)} className={inp}>
+            <select data-testid="audit-job" value={selectedJob} onChange={(e) => setSelectedJob(e.target.value)} className={inp}>
               <option value="">Select a job…</option>
               {jobs.map((j: any) => <option key={j.id} value={j.id}>{j.name}</option>)}
             </select>
@@ -305,6 +305,7 @@ export default function AuditTab({ jobs, aiAuditEnabled, aiAuditTrialEndsAt, str
           </div>
           <button
             onClick={generate}
+            data-testid="audit-generate"
             disabled={!selectedJob || loading}
             className="w-full px-4 py-3 bg-teal-500 hover:bg-teal-600 text-white rounded-xl text-sm font-semibold disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
           >

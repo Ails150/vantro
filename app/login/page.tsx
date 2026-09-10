@@ -68,20 +68,20 @@ export default function LoginPage() {
           ) : (
             <>
               <h1 className="text-xl font-semibold mb-6">Welcome back</h1>
-              <form onSubmit={handleLogin} className="space-y-4">
+              <form onSubmit={handleLogin} data-testid="login-form" className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-[#8fa3b8] mb-2">Email</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="john@smithglazing.com" required className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors" />
+                  <input type="email" data-testid="login-email" value={email} onChange={e => setEmail(e.target.value)} placeholder="john@smithglazing.com" required className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors" />
                 </div>
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-sm font-medium text-[#8fa3b8]">Password</label>
                     <button type="button" onClick={() => setResetMode(true)} className="text-xs text-[#00d4a0] hover:text-[#00a87e] transition-colors">Forgot password?</button>
                   </div>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors" />
+                  <input type="password" data-testid="login-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" required className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm transition-colors" />
                 </div>
                 {error && <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">{error}</p>}
-                <button type="submit" disabled={loading} className="w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-50 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors">{loading ? "Signing in..." : "Sign in"}</button>
+                <button type="submit" data-testid="login-submit" disabled={loading} className="w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-50 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors">{loading ? "Signing in..." : "Sign in"}</button>
               </form>
             </>
           )}

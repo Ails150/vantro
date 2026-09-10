@@ -118,3 +118,6 @@ settings-page.txt
 # Stray env file - .env* does not match this name
 vantro.env.local
 *.env.local
+
+# The e2e template is meant to be committed; .env* above would swallow it.
+!.env.e2e.example
