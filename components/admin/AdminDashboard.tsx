@@ -24,6 +24,11 @@ import SitesTab from "./SitesTab"
 import { adminNavGroups, tabBadge, DEFAULT_TAB, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
 import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
+import { motion } from "framer-motion"
+import { Button } from "@/components/ui/Button"
+import { EmptyState } from "@/components/ui/EmptyState"
+import { PageTransition, PageHeader, Section } from "@/components/ui/Page"
+import { listVariants, itemVariants } from "@/components/ui/motion"
 import { filterTabsByVertical, isTabVisible, toVertical } from "@/lib/vertical"
 import TradesTab from "./TradesTab"
 import TradeMultiSelect from "./TradeMultiSelect"
@@ -1161,6 +1166,14 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const sub = "text-gray-500"
   const btn = "bg-teal-400 hover:bg-teal-500 text-white font-bold rounded-xl px-5 py-2.5 text-sm transition-colors"
   const btnGhost = "bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl px-5 py-2.5 text-sm transition-colors"
+
+  // Design-system field and chip classes. The legacy inp/card/btn constants above
+  // are still referenced by the tabs that have not been restyled yet; each tab's
+  // own commit moves it across and the last one removes them.
+  const field = "w-full rounded-md border border-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-subtle transition-colors duration-fast ease-out focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-ink/20"
+  const fieldLabel = "mb-1.5 block text-xs font-medium text-ink-muted"
+  const chip = "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium bg-accent-wash text-accent-ink"
+  const chipMuted = "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium bg-surface-hover text-ink-muted"
   const itemTypeOptions = [
     { value: "tick", label: "Tick only" },
     { value: "photo", label: "Photo required" },
@@ -1233,232 +1246,261 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "approvals" && <ApprovalsTab key={Date.now().toString()} pendingQA={pendingQA} onRefresh={() => router.refresh()} />}
 
         {activeTab === "jobs" && (
-          <div className="space-y-5">
+          <PageTransition>
+            <PageHeader
+              title="Jobs"
+              description="Every site on the books, who is on it, and what is missing."
+              actions={
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => setShowJobsImport(true)}>Import CSV</Button>
+                  <Button variant="primary" size="sm" data-testid="job-add" onClick={() => { setShowAddJob(true); setFormError("") }}>Add job</Button>
+                </>
+              }
+            />
+
+            <CsvImportModal
+              open={showJobsImport}
+              onClose={() => setShowJobsImport(false)}
+              onSuccess={() => router.refresh()}
+              title="Import jobs from CSV"
+              endpoint="/api/admin/jobs/bulk-import"
+              fields={[
+                { key: "name", label: "Name", required: true, example: "14 The Parade" },
+                { key: "address", label: "Address (blank if remote)", example: "14 The Parade" },
+                { key: "postcode", label: "Postcode", example: "WD17 1AB" },
+                { key: "contractor", label: "Contractor", example: "ABC Construction Ltd" },
+                { key: "foreman_email", label: "Supervisor email", example: "" },
+                { key: "shift_start_time", label: "Shift start time", example: "08:00" },
+                { key: "sign_out_time", label: "Sign-out time", example: "17:00" },
+                { key: "geofence_radius_metres", label: "Geofence radius (m)", example: "150" },
+                { key: "distance_from_site_km", label: "Distance from site (km)", example: "" },
+                { key: "start_date", label: "Start date", example: "2026-05-01" },
+                { key: "end_date", label: "End date", example: "2026-05-15" },
+              ]}
+              templateFilename="vantro-jobs-template.csv"
+              maxRows={200}
+            />
+
             {staffingAlerts.length > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div>
-                    <h3 className="font-semibold text-amber-900">Staffing alerts</h3>
-                    <p className="text-sm text-amber-800 mt-0.5">{staffingAlerts.length} {staffingAlerts.length === 1 ? "job needs" : "jobs need"} attention</p>
-                  </div>
-                </div>
-                <ul className="space-y-2">
+              <Section
+                title="Staffing alerts"
+                actions={<span className="num text-xs text-ink-muted">{staffingAlerts.length} {staffingAlerts.length === 1 ? "job" : "jobs"}</span>}
+              >
+                <ul>
                   {staffingAlerts.slice(0, 5).map((r: any) => (
-                    <li key={r.jobId} className="flex items-center justify-between gap-3 bg-white border border-amber-100 rounded-xl px-4 py-2.5">
-                      <div className="min-w-0 flex-1">
-                        <div className="font-medium text-sm truncate">{r.jobName}</div>
-                        <div className="text-xs text-amber-700 mt-0.5">{summarizeJobStaffing(r)}</div>
+                    <li key={r.jobId} className="flex items-center justify-between gap-4 border-b border-line py-3 last:border-0">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <span className={"h-1.5 w-1.5 shrink-0 rounded-full " + (r.status === "missing" ? "bg-danger" : r.status === "partial" ? "bg-warn" : "bg-ink-subtle")} />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm text-ink">{r.jobName}</p>
+                          <p className="mt-0.5 truncate text-xs text-ink-muted">{summarizeJobStaffing(r)}</p>
+                        </div>
                       </div>
-                      <span className={"text-xs px-2 py-1 rounded-full font-semibold flex-shrink-0 " + (r.status === "missing" ? "bg-red-100 text-red-700" : r.status === "partial" ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-600")}>
-                        {r.status}
-                      </span>
+                      <span className="shrink-0 text-xs text-ink-muted">{r.status}</span>
                     </li>
                   ))}
                 </ul>
                 {staffingAlerts.length > 5 && (
-                  <div className="text-xs text-amber-700 mt-2">+ {staffingAlerts.length - 5} more</div>
+                  <p className="mt-2 text-xs text-ink-subtle">+ {staffingAlerts.length - 5} more</p>
                 )}
-              </div>
+              </Section>
             )}
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setShowJobsImport(true)} className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-teal-300">Import CSV</button>
-              <button onClick={() => { setShowAddJob(true); setFormError("") }} data-testid="job-add" className={btn}>+ Add job</button>
-              <CsvImportModal
-                open={showJobsImport}
-                onClose={() => setShowJobsImport(false)}
-                onSuccess={() => router.refresh()}
-                title="Import jobs from CSV"
-                endpoint="/api/admin/jobs/bulk-import"
-                fields={[
-                  { key: "name", label: "Name", required: true, example: "14 The Parade" },
-                  { key: "address", label: "Address (blank if remote)", example: "14 The Parade" },
-                  { key: "postcode", label: "Postcode", example: "WD17 1AB" },
-                  { key: "contractor", label: "Contractor", example: "ABC Construction Ltd" },
-                  { key: "foreman_email", label: "Supervisor email", example: "" },
-                  { key: "shift_start_time", label: "Shift start time", example: "08:00" },
-                  { key: "sign_out_time", label: "Sign-out time", example: "17:00" },
-                  { key: "geofence_radius_metres", label: "Geofence radius (m)", example: "150" },
-                  { key: "distance_from_site_km", label: "Distance from site (km)", example: "" },
-                  { key: "start_date", label: "Start date", example: "2026-05-01" },
-                  { key: "end_date", label: "End date", example: "2026-05-15" },
-                ]}
-                templateFilename="vantro-jobs-template.csv"
-                maxRows={200}
-              />
-            </div>
+
             {showAddJob && (
-              <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
-                <h3 className="font-semibold">New job</h3>
-                <input data-testid="job-name" value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={inp}/>
-                <div className="relative">
-                  <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
-                  {jobAddress && (
-                    <div className={"absolute right-3 top-3 text-xs font-semibold " + (jobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                      {jobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Or paste a Google Maps link or coordinates</label>
-                  <input
-                    value={jobMapsPaste}
-                    onChange={e => {
-                      const v = e.target.value
-                      setJobMapsPaste(v)
-                      const coords = parseCoordsFromInput(v)
-                      if (coords) { setJobLat(coords.lat as any); setJobLng(coords.lng as any); setJobPlaceSelected(true); setJobMapsPasteStatus("ok") }
-                      else setJobMapsPasteStatus(v.trim() ? "fail" : "")
-                    }}
-                    placeholder="e.g. 50.9102,-2.1616 or maps.app.goo.gl/..."
-                    data-testid="job-coords"
-                    className={inp}
-                  />
-                  {jobMapsPasteStatus === "ok" && <div className="mt-1 text-xs font-semibold text-teal-500">✓ Coordinates set</div>}
-                  {jobMapsPasteStatus === "fail" && <div className="mt-1 text-xs font-semibold text-red-400">✗ Could not parse</div>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Distance from site (km)</label>
-                  <input type="number" min="0" step="0.1" inputMode="decimal" value={jobDistanceKm} onChange={e => setJobDistanceKm(e.target.value)} placeholder="Optional - for remote sites with no address" className={inp}/>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Contractor (optional)</label>
-                  <input value={jobContractor} onChange={e => setJobContractor(e.target.value)} placeholder="Contractor company name" className={inp}/>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Geofence radius (optional)</label>
-                  <select value={jobGeofenceRadius} onChange={e => setJobGeofenceRadius(e.target.value)} className={inp}>
-                    <option value="">Use company default</option>
-                    {GEOFENCE_RADIUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Shift start time</label>
-                  <input type="time" value={jobStartTime} onChange={e => setJobStartTime(e.target.value)} className={inp}/>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Sign-out time (expected finish)</label>
-                  <input type="time" value={jobSignOutTime} onChange={e => setJobSignOutTime(e.target.value)} className={inp}/>
-                </div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
-                  {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).length === 0 ? (
-                    <p className="text-sm text-gray-400">No team yet - <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
-                  ) : (
-                    <div className="space-y-2 mt-1">
-                      {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).map((m: any) => (
-                        <label key={m.id} className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={jobAssignedMembers?.includes(m.id) || false} onChange={e => setJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="w-4 h-4 accent-teal-500"/>
-                          <span className="text-sm text-gray-700">{m.name}</span>
-                          <span className="text-xs text-gray-400">{m.role}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Checklists (optional)</label>
-                  {checklistTemplates.length === 0 ? (
-                    <p className="text-sm text-gray-400">No checklists yet — <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-teal-600 underline">create a checklist first</button></p>
-                  ) : (
-                    <div className="space-y-2 mt-1">
-                      {checklistTemplates.map((t: any) => (
-                        <label key={t.id} className="flex items-center gap-2 cursor-pointer">
-                          <input type="checkbox" checked={jobTemplateIds?.includes(t.id) || false} onChange={e => setJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="w-4 h-4 accent-teal-500"/>
-                          <span className="text-sm text-gray-700">{t.name}</span>
-                          {t.requires_approval && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded">Approval</span>}
-                          {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Audit</span>}
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {/* trades_jobs_patched: add-job */}
-                {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
-                  <div className="pt-2">
-                    <TradeMultiSelect
-                      trades={companyTrades.filter(t => t.enabled)}
-                      selected={jobRequiredTrades}
-                      onChange={setJobRequiredTrades}
-                      label="Trades required for this job"
-                      helperText="Installers without these trades will see a warning when working on this job."
-                    />
+              <Section title="New job" className="mt-8">
+                <div className="space-y-4">
+                  <div>
+                    <label className={fieldLabel}>Job name</label>
+                    <input data-testid="job-name" value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={field}/>
                   </div>
-                )}
-                {formError && <p className="text-sm text-red-500">{formError}</p>}
-                <div className="flex gap-3">
-                  <button onClick={addJob} data-testid="job-save" disabled={saving} className={btn}>{saving ? "Saving..." : "Save job"}</button>
-                  <button onClick={() => setShowAddJob(false)} className={btnGhost}>Cancel</button>
+                  <div>
+                    <label className={fieldLabel}>Address</label>
+                    <div className="relative">
+                      <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing, then select from the dropdown" className={field}/>
+                      {jobAddress && (
+                        <span className={"absolute right-3 top-2.5 text-xs font-medium " + (jobPlaceSelected ? "text-accent-ink" : "text-danger")}>
+                          {jobPlaceSelected ? "GPS verified" : "Select from dropdown"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className={fieldLabel}>Or paste a Google Maps link or coordinates</label>
+                    <input
+                      value={jobMapsPaste}
+                      onChange={e => {
+                        const v = e.target.value
+                        setJobMapsPaste(v)
+                        const coords = parseCoordsFromInput(v)
+                        if (coords) { setJobLat(coords.lat as any); setJobLng(coords.lng as any); setJobPlaceSelected(true); setJobMapsPasteStatus("ok") }
+                        else setJobMapsPasteStatus(v.trim() ? "fail" : "")
+                      }}
+                      placeholder="e.g. 50.9102,-2.1616 or maps.app.goo.gl/..."
+                      data-testid="job-coords"
+                      className={field}
+                    />
+                    {jobMapsPasteStatus === "ok" && <p className="mt-1.5 text-xs text-accent-ink">Coordinates set</p>}
+                    {jobMapsPasteStatus === "fail" && <p className="mt-1.5 text-xs text-danger">Could not parse</p>}
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className={fieldLabel}>Distance from site (km)</label>
+                      <input type="number" min="0" step="0.1" inputMode="decimal" value={jobDistanceKm} onChange={e => setJobDistanceKm(e.target.value)} placeholder="Optional, for remote sites" className={field}/>
+                    </div>
+                    <div>
+                      <label className={fieldLabel}>Contractor (optional)</label>
+                      <input value={jobContractor} onChange={e => setJobContractor(e.target.value)} placeholder="Contractor company name" className={field}/>
+                    </div>
+                    <div>
+                      <label className={fieldLabel}>Geofence radius (optional)</label>
+                      <select value={jobGeofenceRadius} onChange={e => setJobGeofenceRadius(e.target.value)} className={field}>
+                        <option value="">Use company default</option>
+                        {GEOFENCE_RADIUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                    <div />
+                    <div>
+                      <label className={fieldLabel}>Shift start time</label>
+                      <input type="time" value={jobStartTime} onChange={e => setJobStartTime(e.target.value)} className={field}/>
+                    </div>
+                    <div>
+                      <label className={fieldLabel}>Sign-out time (expected finish)</label>
+                      <input type="time" value={jobSignOutTime} onChange={e => setJobSignOutTime(e.target.value)} className={field}/>
+                    </div>
+                  </div>
+                  <div>
+                    <label className={fieldLabel}>Assign team</label>
+                    {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).length === 0 ? (
+                      <p className="text-sm text-ink-muted">No team yet. <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("team") }} className="text-accent-ink underline underline-offset-2">Add team members first</button></p>
+                    ) : (
+                      <div className="mt-1 space-y-1">
+                        {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).map((m: any) => (
+                          <label key={m.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-fast ease-out hover:bg-surface-hover">
+                            <input type="checkbox" checked={jobAssignedMembers?.includes(m.id) || false} onChange={e => setJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="h-4 w-4 accent-[var(--color-accent)]"/>
+                            <span className="text-sm text-ink">{m.name}</span>
+                            <span className="text-xs text-ink-subtle">{m.role}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className={fieldLabel}>Checklists (optional)</label>
+                    {checklistTemplates.length === 0 ? (
+                      <p className="text-sm text-ink-muted">No checklists yet. <button type="button" onClick={() => { setShowAddJob(false); setActiveTab("checklists") }} className="text-accent-ink underline underline-offset-2">Create a checklist first</button></p>
+                    ) : (
+                      <div className="mt-1 space-y-1">
+                        {checklistTemplates.map((t: any) => (
+                          <label key={t.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-fast ease-out hover:bg-surface-hover">
+                            <input type="checkbox" checked={jobTemplateIds?.includes(t.id) || false} onChange={e => setJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="h-4 w-4 accent-[var(--color-accent)]"/>
+                            <span className="text-sm text-ink">{t.name}</span>
+                            {t.requires_approval && <span className={chip}>Approval</span>}
+                            {t.audit_only && <span className={chipMuted}>Audit</span>}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* trades_jobs_patched: add-job */}
+                  {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
+                    <div className="pt-1">
+                      <TradeMultiSelect
+                        trades={companyTrades.filter(t => t.enabled)}
+                        selected={jobRequiredTrades}
+                        onChange={setJobRequiredTrades}
+                        label="Trades required for this job"
+                        helperText="Installers without these trades will see a warning when working on this job."
+                      />
+                    </div>
+                  )}
+                  {formError && <p className="text-sm text-danger">{formError}</p>}
+                  <div className="flex gap-2 pt-1">
+                    <Button variant="primary" data-testid="job-save" onClick={addJob} disabled={saving}>{saving ? "Saving..." : "Save job"}</Button>
+                    <Button variant="ghost" onClick={() => setShowAddJob(false)}>Cancel</Button>
+                  </div>
                 </div>
-              </div>
+              </Section>
             )}
-            <div className={card}>
-              <div className="px-6 pt-5 pb-3 flex gap-2 flex-wrap border-b border-gray-100">
+
+            <Section className="mt-8">
+              <div className="mb-4 flex flex-wrap gap-1.5">
                 {["all","active","on_hold","completed","cancelled"].map((f: any) => (
                   <button key={f} onClick={() => setJobFilter(f)}
-                    className={"px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors " + (jobFilter === f ? "bg-teal-400 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>
+                    className={"rounded-md px-2.5 py-1 text-xs font-medium transition-colors duration-fast ease-out " + (jobFilter === f ? "bg-accent-wash text-accent-ink" : "text-ink-muted hover:bg-surface-hover hover:text-ink")}>
                     {f === "all" ? "All" : f === "on_hold" ? "On hold" : f.charAt(0).toUpperCase() + f.slice(1)}
-                    <span className="ml-1 opacity-70">{f === "all" ? jobs.length : jobs.filter((j: any) => j.status === f).length}</span>
+                    <span className="num ml-1.5 text-ink-subtle">{f === "all" ? jobs.length : jobs.filter((j: any) => j.status === f).length}</span>
                   </button>
                 ))}
               </div>
-              {jobs.filter((j: any) => jobFilter === "all" || j.status === jobFilter).length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No jobs</div>
-              : jobs.filter((j: any) => jobFilter === "all" || j.status === jobFilter).map((j: any) => {
+              {jobs.filter((j: any) => jobFilter === "all" || j.status === jobFilter).length === 0 ? (
+                <EmptyState line="No jobs here yet." actionLabel="Add job" onAction={() => { setShowAddJob(true); setFormError("") }} />
+              ) : (
+                <motion.ul initial="hidden" animate="visible" variants={listVariants}>
+                {jobs.filter((j: any) => jobFilter === "all" || j.status === jobFilter).map((j: any) => {
                 const assigned = getAssigned(j.id)
                 const isAssigning = assigningJobId === j.id
                 const template = checklistTemplates.find((t) => t.id === j.checklist_template_id)
                 return (
-                  <div key={j.id} className="border-b border-gray-50 last:border-0">
-                    <div className="flex items-center gap-4 px-6 py-5">
-                      <div className="flex-1">
-                        <div className="font-semibold">{j.name}</div>
-                        <div className={"text-sm " + sub + " mt-0.5"}>{j.address}</div>
-                        {j.distance_from_site_km != null && <div className={"text-xs " + sub + " mt-0.5"}>📍 {j.distance_from_site_km} km from site</div>}
-                        {j.contractor && <div className={"text-xs " + sub + " mt-0.5"}>🏗️ {j.contractor}</div>}
+                  <motion.li key={j.id} variants={itemVariants} className="border-b border-line last:border-0">
+                    <div className="flex items-start gap-4 py-4">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-ink">{j.name}</p>
+                        <p className="mt-0.5 truncate text-xs text-ink-muted">{j.address}</p>
+                        {j.distance_from_site_km != null && <p className="mt-0.5 text-xs text-ink-subtle">{j.distance_from_site_km} km from site</p>}
+                        {j.contractor && <p className="mt-0.5 truncate text-xs text-ink-subtle">{j.contractor}</p>}
                         {(() => {
                           const gps = j.lat != null && j.lng != null
                           // Three states: unanchored (no GPS) / anchored by first installer / manually verified.
                           const state = !gps ? "none" : (j.gps_source === "installer" ? "anchored" : "verified")
                           const cfg = {
-                            none: { cls: "text-gray-400", label: "No GPS yet", title: "No GPS location set — the first installer to sign in will anchor it" },
-                            anchored: { cls: "text-amber-600", label: "GPS set on site", title: "Location anchored by the first installer to sign in" },
-                            verified: { cls: "text-teal-600", label: "GPS verified", title: "Location set/verified by an admin" },
+                            none: { cls: "text-ink-subtle", label: "No GPS yet", title: "No GPS location set — the first installer to sign in will anchor it" },
+                            anchored: { cls: "text-warn", label: "GPS set on site", title: "Location anchored by the first installer to sign in" },
+                            verified: { cls: "text-accent-ink", label: "GPS verified", title: "Location set/verified by an admin" },
                           }[state]
                           return (
-                            <span className={"inline-flex items-center gap-1 mt-1 text-xs font-medium " + cfg.cls} title={cfg.title}>
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
+                            <span className={"mt-1 inline-flex items-center gap-1 text-xs " + cfg.cls} title={cfg.title}>
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>
                               {cfg.label}
                             </span>
                           )
                         })()}
-                        {(j.job_checklists || []).map((jc: any) => <span key={jc.template_id} className="text-xs bg-teal-50 text-teal-600 px-2 py-0.5 rounded-full mr-1">{checklistTemplates.find((t:any) => t.id === jc.template_id)?.name}</span>)}
-                        {assigned.length > 0 && (
-                          <div className="flex gap-2 mt-2 flex-wrap">
-                            {assigned.map((a: any) => <span key={a.id} className="text-xs bg-teal-50 text-teal-700 px-2 py-1 rounded-lg font-medium">{a.name}</span>)}
+                        {((j.job_checklists || []).length > 0 || assigned.length > 0) && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {(j.job_checklists || []).map((jc: any) => <span key={jc.template_id} className={chipMuted}>{checklistTemplates.find((t:any) => t.id === jc.template_id)?.name}</span>)}
+                            {assigned.map((a: any) => <span key={a.id} className={chip}>{a.name}</span>)}
                           </div>
                         )}
                       </div>
-                      <button onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobContractor(j.contractor || ""); setEditJobGeofenceRadius(j.geofence_radius_metres != null ? String(j.geofence_radius_metres) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobStartTime(j.start_time ? j.start_time.slice(0, 5) : companyDefaultStart); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : companyDefaultSignOut); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setEditJobAssignedMembers(getAssigned(j.id).map((m: any) => m.id)); setFormError("") }} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
-                        {editingJobId === j.id ? "Cancel" : "Edit"}
-                      </button>
-                      <button onClick={() => setAssigningJobId(isAssigning ? null : j.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-4 py-2 transition-colors flex-shrink-0">
-                        {isAssigning ? "Done" : "Assign"}
-                      </button>
-                      {(() => { const sr = staffingByJobId[j.id]; if (!sr || sr.status === "covered") return null; const cls = sr.status === "missing" ? "bg-red-50 text-red-700" : sr.status === "partial" ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-500"; return <span className={"text-xs px-2.5 py-1 rounded-full font-semibold flex-shrink-0 " + cls} title={summarizeJobStaffing(sr)}>{sr.status === "missing" ? "Understaffed" : sr.status === "partial" ? "Partial" : "Trades not set"}</span> })()}
-                      <span className={"text-sm px-3 py-1 rounded-full font-medium flex-shrink-0 " + (j.status === "active" ? "bg-teal-50 text-teal-600" : "bg-gray-100 text-gray-500")}>{j.status}</span>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {(() => { const sr = staffingByJobId[j.id]; if (!sr || sr.status === "covered") return null; const cls = sr.status === "missing" ? "text-danger" : sr.status === "partial" ? "text-warn" : "text-ink-subtle"; return <span className={"text-xs font-medium " + cls} title={summarizeJobStaffing(sr)}>{sr.status === "missing" ? "Understaffed" : sr.status === "partial" ? "Partial" : "Trades not set"}</span> })()}
+                        <span className={"text-xs " + (j.status === "active" ? "text-accent-ink" : "text-ink-subtle")}>{j.status}</span>
+                        <Button variant="ghost" size="sm" onClick={() => { setEditingJobId(editingJobId === j.id ? null : j.id); setEditJobName(j.name); setEditJobAddress(j.address); setEditJobDistanceKm(j.distance_from_site_km != null ? String(j.distance_from_site_km) : ""); setEditJobContractor(j.contractor || ""); setEditJobGeofenceRadius(j.geofence_radius_metres != null ? String(j.geofence_radius_metres) : ""); setEditJobTemplateId(j.checklist_template_id || ""); setEditJobTemplateIds((j.job_checklists||[]).map((jc:any) => jc.template_id)); fetch('/api/admin/jobs/checklists?jobId='+j.id).then(r=>r.json()).then((d:any)=>{ if(d.templateIds) setEditJobTemplateIds(d.templateIds) }); setEditJobLat(j.lat ?? null); setEditJobLng(j.lng ?? null); setEditJobPlaceSelected(j.lat != null && j.lng != null); setEditJobStartTime(j.start_time ? j.start_time.slice(0, 5) : companyDefaultStart); setEditJobSignOutTime(j.sign_out_time ? j.sign_out_time.slice(0, 5) : companyDefaultSignOut); setEditJobRequiredTrades(Array.isArray(j.required_trades) ? j.required_trades : []); setEditJobAssignedMembers(getAssigned(j.id).map((m: any) => m.id)); setFormError("") }}>
+                          {editingJobId === j.id ? "Cancel" : "Edit"}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => setAssigningJobId(isAssigning ? null : j.id)}>
+                          {isAssigning ? "Done" : "Assign"}
+                        </Button>
+                      </div>
                     </div>
                     {editingJobId === j.id && (
-                      <div className="px-6 pb-5">
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 space-y-3">
-                          <h4 className="text-sm font-semibold">Edit job</h4>
-                          <input value={editJobName} onChange={e => setEditJobName(e.target.value)} placeholder="Job name" className={inp}/>
-                          <div className="relative">
-                            <input ref={editAddressRef} value={editJobAddress} onChange={e => { setEditJobAddress(e.target.value); setEditJobPlaceSelected(false) }} placeholder="Start typing address, then select from dropdown..." className={inp}/>
-                            <div className={"absolute right-3 top-3 text-xs font-semibold " + (editJobPlaceSelected ? "text-teal-500" : "text-red-400")}>
-                              {editJobPlaceSelected ? "✓ GPS verified" : "✗ Select from dropdown"}
+                      <div className="border-t border-line py-4">
+                        <div className="space-y-3">
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Edit job</h4>
+                          <div>
+                            <label className={fieldLabel}>Job name</label>
+                            <input value={editJobName} onChange={e => setEditJobName(e.target.value)} placeholder="Job name" className={field}/>
+                          </div>
+                          <div>
+                            <label className={fieldLabel}>Address</label>
+                            <div className="relative">
+                              <input ref={editAddressRef} value={editJobAddress} onChange={e => { setEditJobAddress(e.target.value); setEditJobPlaceSelected(false) }} placeholder="Start typing, then select from the dropdown" className={field}/>
+                              <span className={"absolute right-3 top-2.5 text-xs font-medium " + (editJobPlaceSelected ? "text-accent-ink" : "text-danger")}>
+                                {editJobPlaceSelected ? "GPS verified" : "Select from dropdown"}
+                              </span>
                             </div>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Or paste a Google Maps link or coordinates</label>
+                            <label className={fieldLabel}>Or paste a Google Maps link or coordinates</label>
                             <input
                               value={editJobMapsPaste}
                               onChange={e => {
@@ -1469,60 +1511,62 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                 else setEditJobMapsPasteStatus(v.trim() ? "fail" : "")
                               }}
                               placeholder="e.g. 50.9102,-2.1616 or maps.app.goo.gl/..."
-                              className={inp}
+                              className={field}
                             />
-                            {editJobMapsPasteStatus === "ok" && <div className="mt-1 text-xs font-semibold text-teal-500">✓ Coordinates set</div>}
-                            {editJobMapsPasteStatus === "fail" && <div className="mt-1 text-xs font-semibold text-red-400">✗ Could not parse</div>}
+                            {editJobMapsPasteStatus === "ok" && <p className="mt-1.5 text-xs text-accent-ink">Coordinates set</p>}
+                            {editJobMapsPasteStatus === "fail" && <p className="mt-1.5 text-xs text-danger">Could not parse</p>}
                           </div>
                           {editJobLat != null && editJobLng != null && (
                             <div>
-                              <label className="block text-sm font-medium text-gray-600 mb-1">Map preview — drag the pin to fix the exact location</label>
-                              <div ref={editMapRef} className="w-full h-48 rounded-xl border border-gray-200 overflow-hidden" />
+                              <label className={fieldLabel}>Map preview — drag the pin to fix the exact location</label>
+                              <div ref={editMapRef} className="h-48 w-full overflow-hidden rounded-md border border-line" />
                             </div>
                           )}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Distance from site (km)</label>
-                            <input type="number" min="0" step="0.1" inputMode="decimal" value={editJobDistanceKm} onChange={e => setEditJobDistanceKm(e.target.value)} placeholder="Optional - for remote sites with no address" className={inp}/>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div>
+                              <label className={fieldLabel}>Distance from site (km)</label>
+                              <input type="number" min="0" step="0.1" inputMode="decimal" value={editJobDistanceKm} onChange={e => setEditJobDistanceKm(e.target.value)} placeholder="Optional, for remote sites" className={field}/>
+                            </div>
+                            <div>
+                              <label className={fieldLabel}>Contractor (optional)</label>
+                              <input value={editJobContractor} onChange={e => setEditJobContractor(e.target.value)} placeholder="Contractor company name" className={field}/>
+                            </div>
+                            <div>
+                              <label className={fieldLabel}>Geofence radius (optional)</label>
+                              <select value={editJobGeofenceRadius} onChange={e => setEditJobGeofenceRadius(e.target.value)} className={field}>
+                                <option value="">Use company default</option>
+                                {GEOFENCE_RADIUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className={fieldLabel}>Status</label>
+                              <select value={editJobStatus || j.status} onChange={e => setEditJobStatus(e.target.value)} className={field}>
+                                <option value="active">Active</option>
+                                <option value="on_hold">On hold</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className={fieldLabel}>Shift start time</label>
+                              <input type="time" value={editJobStartTime} onChange={e => setEditJobStartTime(e.target.value)} className={field}/>
+                            </div>
+                            <div>
+                              <label className={fieldLabel}>Sign-out time</label>
+                              <input type="time" value={editJobSignOutTime} onChange={e => setEditJobSignOutTime(e.target.value)} className={field}/>
+                            </div>
                           </div>
                           <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Contractor (optional)</label>
-                            <input value={editJobContractor} onChange={e => setEditJobContractor(e.target.value)} placeholder="Contractor company name" className={inp}/>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Geofence radius (optional)</label>
-                            <select value={editJobGeofenceRadius} onChange={e => setEditJobGeofenceRadius(e.target.value)} className={inp}>
-                              <option value="">Use company default</option>
-                              {GEOFENCE_RADIUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Status</label>
-                            <select value={editJobStatus || j.status} onChange={e => setEditJobStatus(e.target.value)} className={inp}>
-                              <option value="active">Active</option>
-                              <option value="on_hold">On hold</option>
-                              <option value="completed">Completed</option>
-                              <option value="cancelled">Cancelled</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Shift start time</label>
-                            <input type="time" value={editJobStartTime} onChange={e => setEditJobStartTime(e.target.value)} className={inp}/>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Sign-out time</label>
-                            <input type="time" value={editJobSignOutTime} onChange={e => setEditJobSignOutTime(e.target.value)} className={inp}/>
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Assign team</label>
+                            <label className={fieldLabel}>Assign team</label>
                             {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).length === 0 ? (
-                              <p className="text-sm text-gray-400">No team yet - <button type="button" onClick={() => { setEditingJobId(null); setActiveTab("team") }} className="text-teal-600 underline">add team members first</button></p>
+                              <p className="text-sm text-ink-muted">No team yet. <button type="button" onClick={() => { setEditingJobId(null); setActiveTab("team") }} className="text-accent-ink underline underline-offset-2">Add team members first</button></p>
                             ) : (
-                              <div className="space-y-2 mt-1">
+                              <div className="mt-1 space-y-1">
                                 {teamMembers.filter((m: any) => isFieldOrSupervisor(m.role)).map((m: any) => (
-                                  <label key={m.id} className="flex items-center gap-2 cursor-pointer">
-                                    <input type="checkbox" checked={editJobAssignedMembers?.includes(m.id) || false} onChange={e => setEditJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="w-4 h-4 accent-teal-500"/>
-                                    <span className="text-sm text-gray-700">{m.name}</span>
-                                    <span className="text-xs text-gray-400">{m.role}</span>
+                                  <label key={m.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-fast ease-out hover:bg-surface-hover">
+                                    <input type="checkbox" checked={editJobAssignedMembers?.includes(m.id) || false} onChange={e => setEditJobAssignedMembers((prev: string[]) => e.target.checked ? [...(prev||[]), m.id] : (prev||[]).filter((id: string) => id !== m.id))} className="h-4 w-4 accent-[var(--color-accent)]"/>
+                                    <span className="text-sm text-ink">{m.name}</span>
+                                    <span className="text-xs text-ink-subtle">{m.role}</span>
                                   </label>
                                 ))}
                               </div>
@@ -1540,55 +1584,55 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             </div>
                           )}
                           <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">Checklists</label>
-                            <div className="space-y-2 mt-1">
+                            <label className={fieldLabel}>Checklists</label>
+                            <div className="mt-1 space-y-1">
                               {checklistTemplates.map((t: any) => (
-                                <label key={t.id} className="flex items-center gap-2 cursor-pointer">
-                                  <input type="checkbox" checked={editJobTemplateIds?.includes(t.id) || false} onChange={e => setEditJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="w-4 h-4 accent-teal-500"/>
-                                  <span className="text-sm text-gray-700">{t.name}</span>
-                                  {t.requires_approval && <span className="text-xs bg-teal-50 text-teal-600 px-1.5 py-0.5 rounded">Approval</span>}
-                                  {t.audit_only && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Audit</span>}
+                                <label key={t.id} className="flex cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors duration-fast ease-out hover:bg-surface-hover">
+                                  <input type="checkbox" checked={editJobTemplateIds?.includes(t.id) || false} onChange={e => setEditJobTemplateIds((prev: string[]) => e.target.checked ? [...(prev||[]), t.id] : (prev||[]).filter((id: string) => id !== t.id))} className="h-4 w-4 accent-[var(--color-accent)]"/>
+                                  <span className="text-sm text-ink">{t.name}</span>
+                                  {t.requires_approval && <span className={chip}>Approval</span>}
+                                  {t.audit_only && <span className={chipMuted}>Audit</span>}
                                 </label>
                               ))}
                             </div>
                           </div>
-                          {formError && <p className="text-sm text-red-500">{formError}</p>}
-                          <div className="flex gap-3">
-                            <button onClick={() => updateJob(j.id)} disabled={saving} className={btn}>{saving ? "Saving..." : "Save changes"}</button>
-                            <button onClick={() => setEditingJobId(null)} className={btnGhost}>Cancel</button>
-                            <button onClick={() => archiveJob(j.id, j.name)} className="bg-amber-50 hover:bg-amber-100 text-amber-600 border border-amber-200 rounded-xl px-5 py-2.5 text-sm transition-colors">Archive</button>
+                          {formError && <p className="text-sm text-danger">{formError}</p>}
+                          <div className="flex gap-2 pt-1">
+                            <Button variant="primary" onClick={() => updateJob(j.id)} disabled={saving}>{saving ? "Saving..." : "Save changes"}</Button>
+                            <Button variant="ghost" onClick={() => setEditingJobId(null)}>Cancel</Button>
+                            <Button variant="ghost" tone="danger" onClick={() => archiveJob(j.id, j.name)}>Archive</Button>
                           </div>
                         </div>
                       </div>
                     )}
                     {isAssigning && (
-                      <div className="px-6 pb-5">
-                        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <p className={"text-sm " + sub}>Click to assign or unassign</p>
-                            <button onClick={async () => { setAssigningAll(true); await fetch("/api/admin/assign-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId: j.id }) }); setAssigningAll(false); window.location.reload() }} disabled={assigningAll} className="text-xs bg-teal-50 text-teal-600 border border-teal-200 hover:bg-teal-100 rounded-lg px-3 py-1.5 font-medium disabled:opacity-50">{assigningAll ? "Assigning..." : "Assign all installers"}</button>
-                          </div>
-                          {installers.length === 0 ? <p className={"text-sm " + sub}>No installers yet</p>
-                          : <div className="flex flex-wrap gap-2">
-                            {installers.map((m: any) => {
-                              const isAssigned = localAssignments.some((a: any) => a.job_id === j.id && a.user_id === m.id)
-                              return (
-                                <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
-                                  className={"flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors " + (isAssigned ? "bg-teal-400 text-white" : "bg-white text-gray-700 border border-gray-200 hover:border-teal-300")}>
-                                  <div className="w-6 h-6 rounded-full bg-black/10 flex items-center justify-center text-xs font-bold">{m.initials}</div>
-                                  {m.name}{isAssigned && " ✓"}
-                                </button>
-                              )
-                            })}
-                          </div>}
+                      <div className="border-t border-line py-4">
+                        <div className="mb-3 flex items-center justify-between gap-4">
+                          <p className="text-xs text-ink-muted">Click to assign or unassign</p>
+                          <Button variant="ghost" size="sm" disabled={assigningAll} onClick={async () => { setAssigningAll(true); await fetch("/api/admin/assign-all", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId: j.id }) }); setAssigningAll(false); window.location.reload() }}>{assigningAll ? "Assigning..." : "Assign all installers"}</Button>
                         </div>
+                        {installers.length === 0 ? <p className="text-sm text-ink-muted">No installers yet</p>
+                        : <div className="flex flex-wrap gap-1.5">
+                          {installers.map((m: any) => {
+                            const isAssigned = localAssignments.some((a: any) => a.job_id === j.id && a.user_id === m.id)
+                            return (
+                              <button key={m.id} onClick={() => toggleAssignment(j.id, m.id)}
+                                className={"inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors duration-fast ease-out " + (isAssigned ? "bg-accent text-white" : "border border-line-strong bg-canvas text-ink hover:bg-surface-hover")}>
+                                <span className={"flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium " + (isAssigned ? "bg-black/15 text-white" : "bg-accent-wash text-accent-ink")}>{m.initials}</span>
+                                {m.name}
+                              </button>
+                            )
+                          })}
+                        </div>}
                       </div>
                     )}
-                  </div>
+                  </motion.li>
                 )
               })}
-            </div>
-          </div>
+                </motion.ul>
+              )}
+            </Section>
+          </PageTransition>
         )}
 
         {activeTab === "team" && (
