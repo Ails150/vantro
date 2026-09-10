@@ -1261,6 +1261,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             teamMembers={teamMembers}
             pendingQA={pendingQA}
             currentUserId={userData?.id}
+            plan={toPlan(company?.plan)}
             onNavigate={setActiveTab}
           />
         )}

@@ -26,15 +26,15 @@ type Props = {
 /** What each plan gets, in the customer's words rather than feature flags. */
 const INCLUDES: Record<Plan, string[]> = {
   free: [
-    "Sign in and out by hand",
+    "Geofenced sign in, so hours are verified",
     "Today's board",
     "Invite your team",
     "5 days of history",
   ],
   payroll: [
     "Everything in Free",
-    "Geofenced sign in, so hours are verified",
     "QR site and worker codes",
+    "Manual sign in, for when GPS will not fix",
     "Payroll export, expenses and the scheduler",
     "History kept for good",
   ],
@@ -119,8 +119,8 @@ export default function BillingTab({ company, teamMembers, onOpenPortal }: Props
         <div className="mt-6 rounded-md border border-warn/30 bg-warn-wash p-4">
           <p className="text-sm text-ink">Shifts older than {retention} days are deleted.</p>
           <p className="mt-1 text-xs text-ink-muted">
-            On a paid plan nothing is deleted, and sign in can be checked against the site
-            boundary rather than taken on trust.
+            Sign in is already checked against the site boundary on Free. What a paid plan
+            adds is keeping the record: nothing is deleted, and the hours go out as payroll.
           </p>
         </div>
       )}

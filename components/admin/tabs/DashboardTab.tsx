@@ -13,6 +13,7 @@ import {
   Wrench,
 } from "lucide-react"
 import { isFieldOrSupervisor } from "@/lib/roles"
+import { historyDays, type Plan } from "@/lib/plan"
 import { PageTransition, PageHeader } from "@/components/ui/Page"
 import { Card, StatTile, IconCircle, Avatar } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
@@ -33,6 +34,8 @@ type Props = {
   pendingQA: any[]
   /** The viewer. Their own row is never flagged late -- see LateNote. */
   currentUserId?: string
+  /** Drives the one upgrade line on this page. */
+  plan?: Plan
   onNavigate: (tab: string) => void
 }
 
@@ -130,6 +133,7 @@ export default function DashboardTab({
   teamMembers,
   pendingQA,
   currentUserId,
+  plan = "free",
   onNavigate,
 }: Props) {
   const peopleThisWeek = React.useMemo(() => {
@@ -193,6 +197,12 @@ export default function DashboardTab({
   return (
     <PageTransition>
       <PageHeader title="Overview" description="What needs you today, and where the work stands." />
+
+      {/* The one upgrade line on this page, and only on Free.
+          It leads with what Free already does -- sign in is geofenced, so the
+          hours on this board are verified -- because an upsell that implies the
+          numbers above cannot be trusted is an argument against the product. */}
+      {plan === "free" && <FreePlanLine onNavigate={onNavigate} />}
 
       {/* Four tiles, 12px gutters. Label, figure, one line of context. */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -509,6 +519,37 @@ export default function DashboardTab({
         </Card>
       </div>
     </PageTransition>
+  )
+}
+
+/**
+ * Free-plan line. One sentence, one link, no box: it sits between the title
+ * and the figures, and must not compete with either.
+ */
+function FreePlanLine({ onNavigate }: { onNavigate: (tab: string) => void }) {
+  const days = historyDays("free")
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-muted">
+      <span className="rounded-full border border-line bg-surface-1 px-2 py-0.5 font-medium text-ink">
+        Free
+      </span>
+      <span>
+        Sign in is geofenced, so these hours are verified. Shifts older than{" "}
+        <span className="num">{days}</span> days are deleted, and payroll export and QR
+        codes need a paid plan.
+      </span>
+      <button
+        type="button"
+        onClick={() => onNavigate("billing")}
+        className="group inline-flex items-center gap-1 font-medium text-accent-ink transition-colors duration-fast ease-out hover:text-ink"
+      >
+        See plans
+        <ArrowRight
+          size={12}
+          className="transition-transform duration-fast ease-out group-hover:translate-x-0.5"
+        />
+      </button>
+    </div>
   )
 }
 

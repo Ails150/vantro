@@ -159,8 +159,8 @@ export default function SignupPage() {
                 <span className="text-2xl font-bold text-white">£0</span>
               </div>
               <p className="text-xs text-[#8fa3b8] mt-1">
-                {tier.blurb} No card needed. Upgrade from the Billing tab when you want
-                geofenced sign in, payroll export or compliance packs.
+                {tier.blurb} Geofenced sign in is included. No card needed. Upgrade from
+                the Billing tab when you want payroll export, QR codes or compliance packs.
               </p>
             </div>
 

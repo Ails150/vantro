@@ -18,13 +18,27 @@ export type Feature =
   // --- Free ---------------------------------------------------------------
   /** Today's board. Every plan has it; a company with no board has no product. */
   | "today"
-  /** Manual sign in and out, typed by hand, no location check. */
-  | "manualSignInOut"
+  /**
+   * Sign in is refused outside the site boundary.
+   *
+   * Free, and the ONLY way a free worker signs in. An attendance record that
+   * can be typed from the van is not worth keeping, so free gets the enforced
+   * version rather than a weaker one -- what a paid plan adds is what you can
+   * do with the hours afterwards, not whether they are true.
+   */
+  | "geofence"
   /** Invite a worker and let them in from the link. */
   | "workerInvite"
   // --- Payroll ------------------------------------------------------------
-  /** Sign in is refused outside the site boundary. */
-  | "geofence"
+  /**
+   * Sign in and out typed by hand, with no location check.
+   *
+   * Paid, and deliberately the wrong way round from how it looks: this is the
+   * override for when GPS will not fix or a site sits underground, and it puts
+   * an unverified row in the payroll export. That belongs with the plans that
+   * have an audit trail to explain it.
+   */
+  | "manualSignInOut"
   /** Scan a site code to sign in, and show a worker code. */
   | "qr"
   /** Hours export, rates, overtime. */
@@ -52,10 +66,10 @@ export type Feature =
 /** The lowest plan that includes each feature. */
 const MINIMUM: Record<Feature, Plan> = {
   today: "free",
-  manualSignInOut: "free",
+  geofence: "free",
   workerInvite: "free",
 
-  geofence: "payroll",
+  manualSignInOut: "payroll",
   qr: "payroll",
   payrollExport: "payroll",
   expenses: "payroll",
