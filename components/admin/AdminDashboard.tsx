@@ -24,6 +24,7 @@ import SitesTab from "./SitesTab"
 import { adminNavGroups, tabBadge, DEFAULT_TAB, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
 import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
+import BillingTab from "./tabs/BillingTab"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/Button"
 import { EmptyState } from "@/components/ui/EmptyState"
@@ -2304,6 +2305,13 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           {activeTab === "defects" && <DefectsTab />}
         {activeTab === "schedule" && <ScheduleTab />}
         {activeTab === "calendar" && <CalendarTab />}
+        {activeTab === "billing" && (
+          <BillingTab
+            company={company}
+            teamMembers={teamMembers}
+            onOpenPortal={handleOpenBillingPortal}
+          />
+        )}
         {activeTab === "settings" && <SettingsTab />}
 
         {activeTab === "support" && <SupportTab />}

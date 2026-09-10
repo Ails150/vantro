@@ -22,6 +22,7 @@
 import type { LucideIcon } from "lucide-react"
 import {
   BadgeCheck, Banknote, Bell, BookOpen, Briefcase, Building2, Calendar,
+  CreditCard,
   CalendarClock, ChartColumn, FileSearch, Footprints, Gauge, LayoutDashboard,
   LifeBuoy, ListChecks, Map, MapPinned, Settings, TrendingUp, TriangleAlert,
   Users, Wrench,
@@ -88,6 +89,7 @@ const setupTabsGroup: AdminTab[] = [
   { id: "checklists", label: "Checklist templates", icon: ListChecks },
   { id: "analytics", label: "Analytics", icon: ChartColumn },
   { id: "performance", label: "Performance", icon: Gauge },
+  { id: "billing", label: "Billing", icon: CreditCard },
   { id: "settings", label: "Settings", icon: Settings },
   { id: "support", label: "Support", icon: LifeBuoy },
 ]
