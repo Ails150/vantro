@@ -32,7 +32,12 @@ test.describe("smoke", () => {
     // The nav landed on Today, which is the default admin view. Targeted by id:
     // the sidebar has a zone header and a tab both labelled "Today".
     await expect(page.getByTestId("nav-overview")).toHaveAttribute("aria-current", "page")
-    await expect(page.getByRole("heading", { name: "Today" })).toBeVisible()
+    // The panel's own title is "Overview"; only the nav entry reads "Today".
+    // Pinned to level 1 and exact, because an unanchored "Today" also matches
+    // the "Needs you today" and "Hours today" section headings.
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Overview", exact: true }),
+    ).toBeVisible()
   })
 
   test("an admin can create a job", async ({ page }) => {
@@ -71,6 +76,9 @@ test.describe("smoke", () => {
   })
 
   test("an admin can generate an audit pack", async ({ page }) => {
+    // The config's 60s per-test ceiling would abort before the expect below
+    // could use its own budget, so raise the test's own timeout past it.
+    test.setTimeout(240_000)
     await login(page)
     await openTab(page, "audit")
 
@@ -85,6 +93,12 @@ test.describe("smoke", () => {
     await select.selectOption({ index: 1 })
 
     await page.getByTestId("audit-generate").click()
+
+    // The pack opens on the Daily view, and the signed identity block only
+    // renders under Compliance. The old assertion waited on footer copy from
+    // that same block without ever switching to it, which is why it timed out
+    // rather than failing fast: the content was never going to appear.
+    await page.getByRole("button", { name: "Compliance", exact: true }).click()
 
     // Assert on the pack reference, not the footer copy. The reference is the
     // signed identity of the pack (integrity.reference, VTR-YYYYMMDD-XXXXXXXX)
