@@ -21,9 +21,14 @@ export type NavGroup = {
 /**
  * Collapsible sidebar.
  *
- * Active state is an accent BAR, never a filled block: a 2px rule flush to the
- * left edge plus ink-weight text. The old treatment (bg-teal-100 + a 4px
- * border) read as a chip and fought the hairline layout.
+ * 240px expanded. Group labels 11px, items 14px.
+ *
+ * Active state is an accent BAR plus accent TEXT, never a filled block: a 2px
+ * rule flush to the left edge and the label in accent ink. The old treatment
+ * (bg-teal-100 + a 4px border) read as a chip and fought the layout.
+ *
+ * The rail sits on the page ground (surface-0) rather than white, so the white
+ * cards in the content column are the only white on screen.
  *
  * Collapsed, the rail is icon-only at 64px and labels move to native tooltips.
  */
@@ -46,7 +51,7 @@ export function SideNav({
 }) {
   return (
     <aside
-      className={`relative shrink-0 border-r border-line bg-canvas transition-[width] duration-base ease-out ${
+      className={`relative shrink-0 border-r border-line bg-surface-0 transition-[width] duration-base ease-out ${
         collapsed ? "w-16" : "w-60"
       }`}
     >
@@ -110,7 +115,7 @@ export function SideNav({
                               collapsed ? "justify-center px-0" : "px-3"
                             } ${
                               active
-                                ? "font-medium text-ink"
+                                ? "font-medium text-accent-ink"
                                 : "text-ink-muted hover:bg-surface-hover hover:text-ink"
                             }`}
                           >
@@ -121,7 +126,7 @@ export function SideNav({
                             />
                             {!collapsed && <span className="truncate">{item.label}</span>}
                             {!collapsed && !!item.badge && (
-                              <span className="ml-auto num rounded-full bg-surface px-1.5 py-0.5 text-[11px] font-medium text-ink-muted">
+                              <span className="ml-auto num rounded-full border border-line bg-surface-1 px-1.5 text-[11px] font-medium leading-[17px] text-ink-muted">
                                 {item.badge}
                               </span>
                             )}

@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Fraunces } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 import Script from "next/script";
 import "./globals.css";
 
-// Body face. Geist across the whole product, at 400/500/600.
+// The product has ONE face: Geist, at 400/500/600.
+//
+// There used to be a Fraunces display serif for page titles and hero numerals.
+// It has been removed outright -- weight and size carry the hierarchy instead,
+// which is how Linear and Vercel do it, and it saves a second font request.
 // Loaded variable rather than as three static cuts: the variable file covers
 // the full range in one request, and every weight the UI uses sits inside it.
 const geistSans = Geist({
@@ -15,25 +19,6 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
-});
-
-/**
- * Display face, for page titles and hero numerals only.
- *
- * next/font/google self-hosts at build time -- the files are emitted into the
- * app bundle and served same-origin from /_next/static/media, so the
- * `font-src 'self'` in vercel.json already covers them. That CSP only rules out
- * a third-party CDN such as Fontshare; it does not force self-hosting by hand.
- *
- * Variable, with the optical-size axis requested so titles and large numerals
- * can be tuned independently. Weight 600 comes from the variable wght axis via
- * .font-display / .font-display-num in globals.css.
- */
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
-  subsets: ["latin"],
-  axes: ["opsz"],
-  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -57,7 +42,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>

@@ -594,8 +594,11 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       return { jobId: j.id, jobName: j.name, rag, onSite, assigned: assigned.length, openBlockers: jobAlerts.length, pendingQA: jobPendingQA.length, daysSinceActivity: Math.floor(daysSinceActivity) }
     }).sort((a: any, b: any) => { const order: any = { red: 0, amber: 1, green: 2 }; return order[a.rag] - order[b.rag] })
 
-    // Attendance with minutes late
-    const attendanceWithTime: Array<{ installerName: string; jobName: string; minsLate: number }> = []
+    // Attendance with minutes late.
+    // expectedStart and userId are carried through for presentation only: the
+    // "not signed in yet" table shows the shift time each person was due, and
+    // must never flag the viewer's own account as late.
+    const attendanceWithTime: Array<{ userId: string; installerName: string; initials: string; jobTitle: string; jobName: string; expectedStart: string; minsLate: number }> = []
     for (const job of activeJobs) {
       const assigned = localAssignments.filter((a: any) => a.job_id === job.id)
       const shiftStart = job.start_time || '08:00'
@@ -605,7 +608,15 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       for (const a of assigned) {
         if (!signedInUserIds.has(a.user_id)) {
           const member = (teamMembers || []).find((m: any) => m.id === a.user_id)
-          if (member) attendanceWithTime.push({ installerName: member.name, jobName: job.name, minsLate })
+          if (member) attendanceWithTime.push({
+            userId: member.id,
+            installerName: member.name,
+            initials: member.initials || String(member.name || "?").split(" ").map((p: string) => p[0] || "").join("").toUpperCase().slice(0, 2),
+            jobTitle: member.role || "",
+            jobName: job.name,
+            expectedStart: shiftStart,
+            minsLate,
+          })
         }
       }
     }
@@ -1223,6 +1234,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       expandedGroups={expandedGroups}
       onToggleGroup={toggleGroup}
       onSiteCount={signins.length}
+      companyName={company?.name}
+      notificationCount={overviewData.unresolvedAlertCount}
+      onNotifications={() => switchTab("alerts")}
       headerRight={
         <SettingsMenu
           user={user}
@@ -1246,6 +1260,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             overviewData={overviewData}
             teamMembers={teamMembers}
             pendingQA={pendingQA}
+            currentUserId={userData?.id}
             onNavigate={setActiveTab}
           />
         )}

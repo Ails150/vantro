@@ -4,8 +4,8 @@ import * as React from "react"
 import { motion } from "framer-motion"
 import { pageVariants } from "./motion"
 
-// Page scaffolding. Layout comes from whitespace and hairlines -- there is no
-// card wrapper here on purpose, because the brief rules out boxy card grids.
+// Page scaffolding. The container itself lives in ./Card -- this file is the
+// title block, the untitled section wrapper and the plain figure.
 
 /** Animated tab panel wrapper. */
 export function PageTransition({
@@ -22,7 +22,7 @@ export function PageTransition({
   )
 }
 
-/** Page title block. The display face appears here and nowhere else. */
+/** Page title block. Geist 600 at 24px; there is no second face. */
 export function PageHeader({
   title,
   description,
@@ -35,7 +35,7 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-4 pb-6">
       <div className="min-w-0">
-        <h1 className="font-display text-2xl leading-tight text-ink">{title}</h1>
+        <h1 className="t-page-title text-ink">{title}</h1>
         {description && <p className="mt-1 text-sm text-ink-muted">{description}</p>}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
@@ -59,7 +59,7 @@ export function Section({
     <section className={`border-t border-line pt-6 ${className}`}>
       {(title || actions) && (
         <div className="mb-4 flex items-center justify-between gap-4">
-          {title && <h2 className="text-sm font-semibold text-ink">{title}</h2>}
+          {title && <h2 className="t-section-title text-ink">{title}</h2>}
           {actions}
         </div>
       )}
@@ -68,7 +68,7 @@ export function Section({
   )
 }
 
-/** Hero figure. The only other place the display face is allowed. */
+/** A plain figure, for places that are not the overview tile grid. */
 export function Stat({
   label,
   value,
@@ -86,8 +86,8 @@ export function Stat({
       onClick={onClick}
       className={`block text-left ${onClick ? "group cursor-pointer" : ""}`}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-ink-subtle">{label}</p>
-      <p className="font-display-num mt-1 text-3xl text-ink group-hover:text-accent-ink transition-colors duration-fast ease-out">
+      <p className="text-xs font-medium text-ink-muted">{label}</p>
+      <p className="t-num mt-1 text-[28px] leading-none text-ink group-hover:text-accent-ink transition-colors duration-fast ease-out">
         {value}
       </p>
       {hint && <p className="mt-1 text-xs text-ink-muted">{hint}</p>}

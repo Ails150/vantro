@@ -19,11 +19,15 @@
   /* Type ------------------------------------------------------------------ */
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman",
-    serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
 
   /* Surfaces -- light only ------------------------------------------------ */
+  /* Two steps, and the order matters: the page ground is the DARKER of the
+     two. Cards are pure white sitting on an off-white app ground, which is the
+     only reason a 1px hairline is enough to make a card read as a card. A white
+     page with white cards needs shadows to separate them; this does not. */
+  --color-surface-0: #f7f8fa;
+  --color-surface-1: #ffffff;
   --color-canvas: #ffffff;
   --color-surface: #fbfbfc;
   --color-surface-hover: #f6f7f9;
@@ -55,8 +59,9 @@
   --color-ok: #067647;
   --color-ok-wash: #ecfdf3;
 
-  /* One radius token ------------------------------------------------------ */
+  /* Radius: 8px for controls, 12px for cards ------------------------------ */
   --radius-md: 8px;
+  --radius-card: 12px;
 
   /* One elevation token --------------------------------------------------- */
   --shadow-elev: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
@@ -90,23 +95,31 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Display face is reserved for page titles and hero numerals only.
-   Fraunces is variable, so weight 600 comes off the real wght axis rather than
-   being synthesised, and opsz is driven per size below. */
-.font-display {
-  font-family: var(--font-display);
+/* Type scale. Geist is the only face in the product -- there is no display
+   serif. Weight and size do the work a second family used to do.
+
+   These exist as classes rather than inline utilities because the sizes are
+   deliberate (24 / 15 / 28) and sit off Tailwind's default steps, and because
+   every figure in the admin must carry tabular-nums or columns of numbers
+   jitter as they tick. */
+.t-page-title {
+  font-size: 24px;
+  line-height: 1.25;
   font-weight: 600;
-  font-variation-settings: "opsz" 32;
+  letter-spacing: -0.02em;
+}
+
+.t-section-title {
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
-.font-display-num {
-  font-family: var(--font-display);
+/* Every number on the dashboard. Tabular figures are the point: a stat that
+   changes from 8 to 11 must not shift the characters around it. */
+.t-num {
   font-weight: 600;
-  /* Larger optical size for hero numerals: Fraunces tightens spacing and
-     sharpens contrast as opsz rises, which is what makes a big figure read as
-     deliberate rather than merely scaled up. */
-  font-variation-settings: "opsz" 96;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
 }

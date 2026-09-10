@@ -2,31 +2,52 @@
 
 import * as React from "react"
 import { motion } from "framer-motion"
-import { ArrowRight } from "lucide-react"
+import {
+  AlertTriangle,
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  ClipboardCheck,
+  Circle,
+  UserPlus,
+  Wrench,
+} from "lucide-react"
 import { isFieldOrSupervisor } from "@/lib/roles"
-import { PageTransition, PageHeader, Section, Stat } from "@/components/ui/Page"
-import { EmptyState } from "@/components/ui/EmptyState"
+import { PageTransition, PageHeader } from "@/components/ui/Page"
+import { Card, StatTile, IconCircle, Avatar } from "@/components/ui/Card"
+import { Button } from "@/components/ui/Button"
+import { Table, TBody, TR, TD } from "@/components/ui/Table"
 import { listVariants, itemVariants } from "@/components/ui/motion"
 
-// Overview tab, lifted out of AdminDashboard with its behaviour unchanged.
-// Every figure still comes from the `overviewData` memo computed by the parent;
-// nothing here fetches, and no query was touched.
+// Overview tab. Look and feel only -- every figure still comes from the
+// `overviewData` memo computed by the parent, nothing here fetches, and no
+// query was touched.
 //
-// Visually this drops the previous six-card grid (rounded-2xl + border + shadow
-// on every zone). Zones are now separated by hairlines and whitespace, which is
-// what makes a dashboard read as one surface rather than a pile of boxes.
+// The model is Linear and Vercel, not a magazine: one face (Geist), white
+// cards on an off-white ground, colour confined to icons and the one accent
+// bar. There is no display serif and no hero numeral.
 
 type Props = {
   overviewData: any
   teamMembers: any[]
   pendingQA: any[]
+  /** The viewer. Their own row is never flagged late -- see LateNote. */
+  currentUserId?: string
   onNavigate: (tab: string) => void
 }
 
-const severityDot: Record<string, string> = {
-  high: "bg-danger",
-  medium: "bg-warn",
-  low: "bg-ink-subtle",
+/** Action-queue icons. Colour lands here and nowhere else on the row. */
+const actionIcon: Record<string, any> = {
+  qa: ClipboardCheck,
+  blockers: AlertTriangle,
+  staffing: UserPlus,
+  trades: Wrench,
+}
+
+const severityTone: Record<string, "danger" | "warn" | "neutral"> = {
+  high: "danger",
+  medium: "warn",
+  low: "neutral",
 }
 
 /** Inline "go to tab" affordance. Ghost-button semantics without the chrome. */
@@ -46,13 +67,16 @@ function GoTo({ label, onClick }: { label: string; onClick: () => void }) {
   )
 }
 
-/** A row in one of the overview lists. Hairline separated, hover feedback. */
+/**
+ * A row inside a list card. Padding matches the card's 16px gutter so the
+ * hairline between rows runs the full width of the card.
+ */
 function Row({ children, onClick }: { children: React.ReactNode; onClick?: () => void }) {
   return (
     <motion.li
       variants={itemVariants}
       onClick={onClick}
-      className={`flex items-center justify-between gap-4 border-b border-line py-3 last:border-0 transition-colors duration-fast ease-out hover:bg-surface-hover ${
+      className={`flex items-center justify-between gap-4 border-b border-line px-4 py-3 last:border-0 transition-colors duration-fast ease-out hover:bg-surface-hover ${
         onClick ? "cursor-pointer" : ""
       }`}
     >
@@ -61,7 +85,53 @@ function Row({ children, onClick }: { children: React.ReactNode; onClick?: () =>
   )
 }
 
-export default function DashboardTab({ overviewData, teamMembers, pendingQA, onNavigate }: Props) {
+/** Week-on-week delta. Direction only -- no colour, it is not a status. */
+function Delta({ now, prev, unit = "" }: { now: number; prev: number; unit?: string }) {
+  if (prev === 0 && now === 0) return <span>Same as last week</span>
+  const diff = now - prev
+  if (diff === 0) return <span>Same as last week</span>
+  const Icon = diff > 0 ? ArrowUpRight : ArrowDownRight
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Icon size={12} className="shrink-0" />
+      <span className="num">
+        {Math.abs(diff)}
+        {unit}
+      </span>
+      <span>vs last week</span>
+    </span>
+  )
+}
+
+/**
+ * Lateness. Muted by default; amber only past half an hour, because a few
+ * minutes after the shift time is noise, not a problem. Never amber for the
+ * viewer's own account -- an admin sitting in the office is not "late".
+ */
+function LateNote({ minsLate, isSelf }: { minsLate: number; isSelf: boolean }) {
+  if (minsLate <= 0) return <span className="text-xs text-ink-subtle">Due now</span>
+  const label = minsLate >= 60 ? `${Math.floor(minsLate / 60)}h ${minsLate % 60}m late` : `${minsLate}m late`
+  const amber = minsLate > 30 && !isSelf
+  return (
+    <span className={`num text-xs ${amber ? "font-medium text-warn" : "text-ink-muted"}`}>{label}</span>
+  )
+}
+
+/** "08:00" -> "08:00". Kept as a function so a bad value degrades to a dash. */
+function shiftTime(value?: string) {
+  if (!value) return "—"
+  const [h, m] = String(value).split(":")
+  if (h === undefined || m === undefined) return "—"
+  return `${h.padStart(2, "0")}:${m.slice(0, 2).padStart(2, "0")}`
+}
+
+export default function DashboardTab({
+  overviewData,
+  teamMembers,
+  pendingQA,
+  currentUserId,
+  onNavigate,
+}: Props) {
   const peopleThisWeek = React.useMemo(() => {
     return (teamMembers || [])
       .filter((m: any) => isFieldOrSupervisor(m.role) && m.is_active !== false)
@@ -69,58 +139,128 @@ export default function DashboardTab({ overviewData, teamMembers, pendingQA, onN
       .sort((a: any, b: any) => b.hours - a.hours)
   }, [teamMembers, overviewData.installerHoursThisWeek])
 
+  // Age of the oldest queued QA, for the first tile's foot line.
+  const oldestQA = React.useMemo(() => {
+    if (!pendingQA || pendingQA.length === 0) return null
+    const oldest = pendingQA.reduce((acc: any, q: any) =>
+      !acc || new Date(q.created_at) < new Date(acc.created_at) ? q : acc, null)
+    if (!oldest?.created_at) return null
+    const hours = Math.floor((Date.now() - new Date(oldest.created_at).getTime()) / 3600000)
+    return hours >= 24 ? `${Math.floor(hours / 24)}d` : `${hours}h`
+  }, [pendingQA])
+
   const tiles = [
-    { label: "QA approvals", value: pendingQA.length, tab: "approvals" },
-    { label: "Open alerts", value: overviewData.unresolvedAlertCount, tab: "alerts" },
-    { label: "Alerts >7d", value: overviewData.oldAlertCount, tab: "alerts" },
-    { label: "Jobs completed", value: overviewData.jobsCompletedThisWeek, tab: "jobs" },
+    {
+      label: "QA approvals",
+      value: pendingQA.length,
+      tab: "approvals",
+      foot: oldestQA ? `Oldest ${oldestQA} waiting` : "Nothing waiting",
+    },
+    {
+      label: "Open alerts",
+      value: overviewData.unresolvedAlertCount,
+      tab: "alerts",
+      foot:
+        overviewData.oldAlertCount > 0
+          ? `${overviewData.oldAlertCount} over 7 days`
+          : "All under 7 days",
+    },
+    {
+      label: "Alerts over 7d",
+      value: overviewData.oldAlertCount,
+      tab: "alerts",
+      foot: `Of ${overviewData.unresolvedAlertCount} open`,
+    },
+    {
+      label: "Jobs completed",
+      value: overviewData.jobsCompletedThisWeek,
+      tab: "jobs",
+      foot: (
+        <Delta
+          now={overviewData.jobsCompletedThisWeek}
+          prev={overviewData.jobsCompletedLastWeek}
+        />
+      ),
+    },
   ]
 
   const maxWeekHours = Math.max(...peopleThisWeek.map((p: any) => p.hours), 40)
-  const sparkMax = Math.max(...overviewData.sparkline, 1)
+  const barMax = Math.max(...overviewData.sparkline, 1)
+  const actionItems = overviewData.actionItems as any[]
+  const visibleActions = actionItems.slice(0, 4)
+  const notSignedIn = overviewData.attendanceWithTime as any[]
 
   return (
     <PageTransition>
       <PageHeader title="Overview" description="What needs you today, and where the work stands." />
 
-      {/* Headline figures. The display face is used here and in the page title only. */}
-      <div className="grid grid-cols-2 gap-6 border-t border-line pt-6 md:grid-cols-4">
+      {/* Four tiles, 12px gutters. Label, figure, one line of context. */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {tiles.map((t) => (
-          <Stat key={t.label} label={t.label} value={t.value} onClick={() => onNavigate(t.tab)} />
+          <StatTile
+            key={t.label}
+            label={t.label}
+            value={t.value}
+            foot={t.foot}
+            onClick={() => onNavigate(t.tab)}
+          />
         ))}
       </div>
 
-      {/* Action queue */}
-      <Section title="Needs you today" className="mt-8">
-        {overviewData.actionItems.length === 0 ? (
-          <EmptyState line="Nothing needs your attention right now." />
+      {/* Action queue. Four rows at most -- past that it is a list, not a queue. */}
+      <Card
+        title="Needs you today"
+        className="mt-4"
+        padded={false}
+        actions={
+          actionItems.length > 0 ? (
+            <GoTo label="View all" onClick={() => onNavigate("alerts")} />
+          ) : undefined
+        }
+      >
+        {actionItems.length === 0 ? (
+          <Quiet line="Nothing needs your attention right now." />
         ) : (
           <motion.ul initial="hidden" animate="visible" variants={listVariants}>
-            {overviewData.actionItems.map((item: any) => (
-              <Row key={item.key} onClick={() => onNavigate(item.tab)}>
-                <div className="flex min-w-0 items-center gap-3">
-                  <span
-                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                      severityDot[item.severity] || severityDot.low
-                    }`}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm text-ink">{item.label}</p>
-                    {item.sub && <p className="mt-0.5 truncate text-xs text-ink-muted">{item.sub}</p>}
+            {visibleActions.map((item: any) => {
+              const Icon = actionIcon[item.key] || Circle
+              return (
+                <Row key={item.key} onClick={() => onNavigate(item.tab)}>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <IconCircle tone={severityTone[item.severity] || "neutral"}>
+                      <Icon size={15} />
+                    </IconCircle>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-ink">{item.label}</p>
+                      {item.sub && (
+                        <p className="mt-0.5 truncate text-xs text-ink-muted">{item.sub}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
-                <ArrowRight size={14} className="shrink-0 text-ink-subtle" />
-              </Row>
-            ))}
+                  <ArrowRight size={14} className="shrink-0 text-ink-subtle" />
+                </Row>
+              )
+            })}
           </motion.ul>
         )}
-      </Section>
+      </Card>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* On site now */}
-        <Section title="On site now" actions={<GoTo label="Map" onClick={() => onNavigate("map")} />}>
+        <Card
+          title="On site now"
+          padded={false}
+          actions={<GoTo label="Map" onClick={() => onNavigate("map")} />}
+        >
           {overviewData.onSiteNow.length === 0 ? (
-            <EmptyState line="Nobody signed in yet today." />
+            <div className="flex flex-col items-center justify-center gap-3 px-6 pb-8 pt-4 text-center">
+              <p className="max-w-[34ch] text-sm leading-relaxed text-ink-muted">
+                No one on site yet. Workers appear here the moment they sign in.
+              </p>
+              <Button variant="secondary" size="sm" onClick={() => onNavigate("team")}>
+                Share invite link
+              </Button>
+            </div>
           ) : (
             <motion.ul
               initial="hidden"
@@ -138,9 +278,7 @@ export default function DashboardTab({ overviewData, teamMembers, pendingQA, onN
                 return (
                   <Row key={idx}>
                     <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-wash text-[11px] font-medium text-accent-ink">
-                        {p.initials}
-                      </span>
+                      <Avatar initials={p.initials} tone="accent" />
                       <div className="min-w-0">
                         <p className="truncate text-sm text-ink">{p.name}</p>
                         <p className="truncate text-xs text-ink-muted" title={p.jobName}>
@@ -156,37 +294,42 @@ export default function DashboardTab({ overviewData, teamMembers, pendingQA, onN
               })}
             </motion.ul>
           )}
-        </Section>
+        </Card>
 
-        {/* Hours today */}
-        <Section title="Hours today">
-          <div className="flex items-end justify-between gap-6">
-            <Stat label="Live" value={overviewData.liveHours + "h"} />
-            <Stat label="Signed out" value={overviewData.todayHours + "h"} />
-            <Stat label="This week" value={overviewData.hoursThisWeek + "h"} />
+        {/* Hours today: three figures, then the week under them. */}
+        <Card title="Hours today">
+          <div className="grid grid-cols-3 gap-3">
+            <Figure label="Live" value={overviewData.liveHours + "h"} />
+            <Figure label="Signed out" value={overviewData.todayHours + "h"} />
+            <Figure label="This week" value={overviewData.hoursThisWeek + "h"} />
           </div>
-          <div className="mt-6 flex h-12 items-end gap-1">
+
+          <div className="mt-6 flex h-24 items-end gap-1.5">
             {overviewData.sparkline.map((v: number, idx: number) => {
               const isToday = idx === overviewData.sparkline.length - 1
               return (
-                <div key={idx} className="flex h-full flex-1 flex-col justify-end" title={v + "h"}>
+                <div
+                  key={idx}
+                  className="flex h-full flex-1 flex-col justify-end"
+                  title={`${overviewData.sparklineLabels[idx]}: ${v}h`}
+                >
                   <motion.div
                     initial={{ height: 0 }}
-                    animate={{ height: (v / sparkMax) * 100 + "%" }}
+                    animate={{ height: Math.max(2, (v / barMax) * 100) + "%" }}
                     transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1], delay: idx * 0.02 }}
-                    className={`w-full rounded-sm ${isToday ? "bg-accent" : "bg-line-strong"}`}
+                    className={`w-full rounded-t-[3px] bg-accent ${isToday ? "" : "opacity-40"}`}
                   />
                 </div>
               )
             })}
           </div>
-          <div className="mt-1 flex gap-1">
+          <div className="mt-2 flex gap-1.5 border-t border-line pt-2">
             {overviewData.sparklineLabels.map((lbl: string, idx: number) => (
               <div
                 key={idx}
-                className={`flex-1 text-center text-[10px] ${
+                className={`flex-1 text-center text-[11px] ${
                   idx === overviewData.sparklineLabels.length - 1
-                    ? "text-accent-ink"
+                    ? "font-medium text-ink"
                     : "text-ink-subtle"
                 }`}
               >
@@ -194,62 +337,64 @@ export default function DashboardTab({ overviewData, teamMembers, pendingQA, onN
               </div>
             ))}
           </div>
-        </Section>
+        </Card>
       </div>
 
       {/* Not signed in yet */}
-      {overviewData.attendanceWithTime.length > 0 && (
-        <Section
+      {notSignedIn.length > 0 && (
+        <Card
           title="Not signed in yet"
-          className="mt-8"
-          actions={
-            <span className="num text-xs text-ink-muted">
-              {overviewData.attendanceWithTime.length}
-            </span>
-          }
+          className="mt-4"
+          padded={false}
+          actions={<span className="num text-xs text-ink-muted">{notSignedIn.length}</span>}
         >
-          <p className="-mt-2 mb-3 text-xs text-ink-muted">
+          <p className="-mt-1 px-4 pb-3 text-xs text-ink-muted">
             Assigned to active jobs but no sign-in recorded today
           </p>
-          <motion.ul initial="hidden" animate="visible" variants={listVariants}>
-            {overviewData.attendanceWithTime.slice(0, 9).map((g: any, idx: number) => (
-              <Row key={idx}>
-                <div className="min-w-0">
-                  <p className="truncate text-sm text-ink" title={g.installerName}>
-                    {g.installerName}
-                  </p>
-                  <p className="truncate text-xs text-ink-muted" title={g.jobName}>
-                    {g.jobName}
-                  </p>
-                </div>
-                {g.minsLate > 0 && (
-                  <span className="num shrink-0 text-xs font-medium text-warn">
-                    {g.minsLate}m late
-                  </span>
-                )}
-              </Row>
-            ))}
-          </motion.ul>
-          {overviewData.attendanceWithTime.length > 9 && (
-            <p className="mt-2 text-xs text-ink-subtle">
-              + {overviewData.attendanceWithTime.length - 9} more
+          <Table>
+            <TBody>
+              {notSignedIn.slice(0, 9).map((g: any, idx: number) => (
+                <TR key={idx}>
+                  <TD>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar initials={g.initials || "?"} />
+                      <span className="truncate text-sm text-ink" title={g.installerName}>
+                        {g.installerName}
+                      </span>
+                    </div>
+                  </TD>
+                  <TD className="hidden sm:table-cell">
+                    <span className="truncate text-sm text-ink-muted" title={g.jobName}>
+                      {g.jobName}
+                    </span>
+                  </TD>
+                  <TD numeric className="text-xs text-ink-muted">
+                    Due {shiftTime(g.expectedStart)}
+                  </TD>
+                  <TD numeric>
+                    <LateNote minsLate={g.minsLate} isSelf={g.userId === currentUserId} />
+                  </TD>
+                </TR>
+              ))}
+            </TBody>
+          </Table>
+          {notSignedIn.length > 9 && (
+            <p className="border-t border-line px-4 py-2.5 text-xs text-ink-subtle">
+              + {notSignedIn.length - 9} more
             </p>
           )}
-        </Section>
+        </Card>
       )}
 
       {/* Jobs at a glance */}
-      <Section
+      <Card
         title="Jobs at a glance"
-        className="mt-8"
+        className="mt-4"
+        padded={false}
         actions={<GoTo label="All jobs" onClick={() => onNavigate("jobs")} />}
       >
         {overviewData.jobRAG.length === 0 ? (
-          <EmptyState
-            line="No active jobs yet."
-            actionLabel="Create a job"
-            onAction={() => onNavigate("jobs")}
-          />
+          <Quiet line="No active jobs yet." actionLabel="Create a job" onAction={() => onNavigate("jobs")} />
         ) : (
           <motion.ul initial="hidden" animate="visible" variants={listVariants}>
             {overviewData.jobRAG.map((j: any) => {
@@ -283,20 +428,16 @@ export default function DashboardTab({ overviewData, teamMembers, pendingQA, onN
             })}
           </motion.ul>
         )}
-      </Section>
+      </Card>
 
-      <div className="mt-8 grid grid-cols-1 gap-8 md:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         {/* People this week */}
-        <Section
+        <Card
           title="People this week"
           actions={<GoTo label="Payroll" onClick={() => onNavigate("payroll")} />}
         >
           {peopleThisWeek.length === 0 ? (
-            <EmptyState
-              line="No team members yet."
-              actionLabel="Add someone"
-              onAction={() => onNavigate("team")}
-            />
+            <Quiet line="No team members yet." actionLabel="Add someone" onAction={() => onNavigate("team")} />
           ) : (
             <motion.ul
               initial="hidden"
@@ -325,12 +466,12 @@ export default function DashboardTab({ overviewData, teamMembers, pendingQA, onN
               })}
             </motion.ul>
           )}
-        </Section>
+        </Card>
 
         {/* Recent activity */}
-        <Section title="Recent activity">
+        <Card title="Recent activity" padded={false}>
           {overviewData.recentActivity.length === 0 ? (
-            <EmptyState line="No recent sign-in activity." />
+            <Quiet line="No recent sign-in activity." />
           ) : (
             <motion.ul initial="hidden" animate="visible" variants={listVariants}>
               {overviewData.recentActivity.map((ev: any, idx: number) => (
@@ -365,8 +506,43 @@ export default function DashboardTab({ overviewData, teamMembers, pendingQA, onN
               ))}
             </motion.ul>
           )}
-        </Section>
+        </Card>
       </div>
     </PageTransition>
+  )
+}
+
+/** One of the three figures in the hours card. */
+function Figure({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-ink-muted">{label}</p>
+      <p className="t-num mt-1.5 text-[22px] leading-none text-ink">{value}</p>
+    </div>
+  )
+}
+
+/**
+ * Empty state inside a card. Softer than the page-level EmptyState: less
+ * vertical air, because a card has its own edges to do the framing.
+ */
+function Quiet({
+  line,
+  actionLabel,
+  onAction,
+}: {
+  line: string
+  actionLabel?: string
+  onAction?: () => void
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 px-6 pb-8 pt-4 text-center">
+      <p className="max-w-[34ch] text-sm leading-relaxed text-ink-muted">{line}</p>
+      {actionLabel && onAction && (
+        <Button variant="secondary" size="sm" onClick={onAction}>
+          {actionLabel}
+        </Button>
+      )}
+    </div>
   )
 }

@@ -22,6 +22,18 @@ export default function SettingsMenu({ user, userData, company, onSiteRulesClick
   const ref = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
+  // Header avatar. Falls back to the email's first letter, then to a dash --
+  // an empty circle in the header reads as a broken image.
+  const initials =
+    String(userData?.name || "")
+      .split(" ")
+      .map((p: string) => p[0] || "")
+      .join("")
+      .toUpperCase()
+      .slice(0, 2) ||
+    String(user?.email || "")[0]?.toUpperCase() ||
+    "-"
+
   // Close on click outside
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -49,14 +61,11 @@ export default function SettingsMenu({ user, userData, company, onSiteRulesClick
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="w-9 h-9 rounded-full border border-gray-200 hover:border-teal-300 hover:bg-gray-50 flex items-center justify-center text-gray-500 hover:text-gray-900 transition-colors"
-        aria-label="Settings"
-        title="Settings"
+        className="flex h-8 w-8 items-center justify-center rounded-full bg-surface text-[11px] font-medium text-ink-muted transition-colors duration-fast ease-out hover:bg-surface-hover hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink/30"
+        aria-label="Account and settings"
+        title={userData?.name || user?.email || "Account"}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
+        {initials}
       </button>
 
       {open && (
