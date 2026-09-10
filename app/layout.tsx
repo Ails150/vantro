@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist, Geist_Mono, Fraunces } from "next/font/google"
 import Script from "next/script";
 import "./globals.css";
 const geistSans = Geist({
@@ -9,6 +9,15 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+// Display face. Variable, with the optical-size axis requested so page titles
+// and hero numerals can be tuned per size. Weight 600 comes from the variable
+// wght axis via CSS (.font-display / .font-display-num in globals.css).
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  axes: ["opsz"],
+  display: "swap",
 });
 export const metadata: Metadata = {
   title: "Vantro",
@@ -31,7 +40,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
     >
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>

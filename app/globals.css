@@ -1,1 +1,123 @@
 @import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Vantro admin design tokens.
+
+   Light theme only -- there is no dark variant and no near-black surface.
+   The brand's dark base (#0B0F14) appears as INK (text/icons) only, never as
+   a background.
+
+   Deliberate omission: Tailwind v4's `--spacing` base is left at its default
+   0.25rem. Overriding it here would silently reflow every page in the app
+   (login, onboarding, installer views), not just the admin. The 8pt grid is
+   instead expressed as the --space-* tokens below, which map exactly onto the
+   EVEN Tailwind steps -- p-2 = 8px, p-4 = 16px, p-6 = 24px, p-8 = 32px.
+   Rule for admin UI: only ever use even steps.
+--------------------------------------------------------------------------- */
+
+@theme {
+  /* Type ------------------------------------------------------------------ */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* Surfaces -- light only ------------------------------------------------ */
+  --color-canvas: #ffffff;
+  --color-surface: #fbfbfc;
+  --color-surface-hover: #f6f7f9;
+
+  /* Hairlines ------------------------------------------------------------- */
+  --color-line: #eaecf0;
+  --color-line-strong: #dfe3e9;
+
+  /* Ink ------------------------------------------------------------------- */
+  --color-ink: #0b0f14;
+  --color-ink-muted: #5b6673;
+  --color-ink-subtle: #8a94a1;
+
+  /* Brand accent -- ONE hue, used sparingly.
+     --color-accent is the brand teal for fills, active bars and indicators.
+     --color-accent-ink is the darkened teal required for text and icons:
+     #00C896 on white is ~1.9:1 contrast, far below the 4.5:1 minimum, so it
+     must never carry text. The wash is for the rare tinted background. */
+  --color-accent: #00c896;
+  --color-accent-ink: #00795b;
+  --color-accent-wash: #e9fbf5;
+
+  /* Status -- NOT brand colour. Reserved for alert/blocker/QA semantics
+     that already exist in the data model. */
+  --color-danger: #b42318;
+  --color-danger-wash: #fef3f2;
+  --color-warn: #b54708;
+  --color-warn-wash: #fffaeb;
+  --color-ok: #067647;
+  --color-ok-wash: #ecfdf3;
+
+  /* One radius token ------------------------------------------------------ */
+  --radius-md: 8px;
+
+  /* One elevation token --------------------------------------------------- */
+  --shadow-elev: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.06);
+
+  /* Motion -- 150-250ms, ease-out, no bounce ------------------------------ */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --duration-slow: 250ms;
+}
+
+/* 8pt scale, for arbitrary values and inline styles where a utility will not do. */
+:root {
+  --space-1: 0.5rem;   /*  8px */
+  --space-2: 1rem;     /* 16px */
+  --space-3: 1.5rem;   /* 24px */
+  --space-4: 2rem;     /* 32px */
+  --space-5: 2.5rem;   /* 40px */
+  --space-6: 3rem;     /* 48px */
+  --space-8: 4rem;     /* 64px */
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Display face is reserved for page titles and hero numerals only.
+   opsz is driven manually so large numerals do not pick up the high-contrast
+   display cut intended for headlines. */
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "opsz" 32;
+  letter-spacing: -0.01em;
+}
+
+.font-display-num {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-variation-settings: "opsz" 96;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* Numeric table cells: tabular figures so columns align on the decimal. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
