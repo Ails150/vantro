@@ -100,6 +100,10 @@ export function SideNav({
                           <button
                             type="button"
                             onClick={() => onSelect(item.id)}
+                            // Stable hook for tests. Labels collide - a zone
+                            // header and a nav item can both read "Today" - so
+                            // targeting by accessible name is ambiguous.
+                            data-testid={`nav-${item.id}`}
                             title={collapsed ? item.label : undefined}
                             aria-current={active ? "page" : undefined}
                             className={`flex w-full items-center gap-3 rounded-md py-2 text-sm transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink/30 ${
