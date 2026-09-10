@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
+import { PageTransition, PageHeader, Section } from "@/components/ui/Page"
 import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 
 export default function SettingsTab() {
@@ -59,23 +60,21 @@ export default function SettingsTab() {
   }
 
   if (loading)
-    return <div className="text-center py-12 text-gray-400">Loading settings...</div>
+    return <div className="text-center py-12 text-ink-subtle">Loading settings...</div>
 
   const inp =
-    "w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-400 text-sm"
+    "w-full rounded-md border border-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-subtle transition-colors duration-fast ease-out focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-ink/20"
 
   return (
-    <div className="space-y-6 max-w-xl">
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="font-semibold">Site rules</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Working hours, overrides and time off live in the Scheduler tab.
-          </p>
-        </div>
-        <div className="px-6 py-5 space-y-5">
+    <PageTransition className="max-w-xl">
+      <PageHeader
+        title="Settings"
+        description="Working hours, overrides and time off live in the Scheduler tab."
+      />
+      <Section title="Site rules">
+        <div className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink mb-1">
               Grace period (minutes)
             </label>
             <select
@@ -90,14 +89,14 @@ export default function SettingsTab() {
               <option value={90}>1.5 hours</option>
               <option value={120}>2 hours</option>
             </select>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-ink-subtle mt-1">
               After sign-out time + grace period, hours are calculated to the
               last on-site GPS location.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-ink mb-1">
               Geofence radius (metres)
             </label>
             <select
@@ -107,7 +106,7 @@ export default function SettingsTab() {
             >
               {GEOFENCE_RADIUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-ink-subtle mt-1">
               Installers must be within this distance of the job site to sign
               in and out.
             </p>
@@ -115,7 +114,7 @@ export default function SettingsTab() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink mb-1">
                 Default shift start
               </label>
               <input
@@ -126,7 +125,7 @@ export default function SettingsTab() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-ink mb-1">
                 Default sign-out
               </label>
               <input
@@ -137,16 +136,16 @@ export default function SettingsTab() {
               />
             </div>
           </div>
-          <p className="text-xs text-gray-400 -mt-3">
+          <p className="text-xs text-ink-subtle -mt-3">
             New jobs pre-fill with these times. You can override them per job.
           </p>
 
-          <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100">
+          <div className="flex items-start justify-between gap-4 pt-2 border-t border-line">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-ink">
                 Background GPS tracking
               </label>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-ink-subtle mt-1">
                 Log GPS breadcrumbs every 30 minutes while signed in, even when
                 the app is in the background. Required for full compliance trail.
               </p>
@@ -156,26 +155,26 @@ export default function SettingsTab() {
               onClick={() => setBackgroundGps(!backgroundGps)}
               className={
                 "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors " +
-                (backgroundGps ? "bg-teal-400" : "bg-gray-200")
+                (backgroundGps ? "bg-accent" : "bg-surface-hover")
               }
               aria-pressed={backgroundGps}
               aria-label="Toggle background GPS tracking"
             >
               <span
                 className={
-                  "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform " +
+                  "inline-block h-4 w-4 transform rounded-full bg-canvas shadow transition-transform " +
                   (backgroundGps ? "translate-x-6" : "translate-x-1")
                 }
               />
             </button>
           </div>
 
-          <div className="flex items-start justify-between gap-4 pt-2 border-t border-gray-100">
+          <div className="flex items-start justify-between gap-4 pt-2 border-t border-line">
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-ink">
                 Auto-approve sick leave
               </label>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-ink-subtle mt-1">
                 When on, installers' same-day sick requests are approved
                 immediately and admins can review later. When off, every
                 request goes to the approval queue.
@@ -186,14 +185,14 @@ export default function SettingsTab() {
               onClick={() => setSickAutoApprove(!sickAutoApprove)}
               className={
                 "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors " +
-                (sickAutoApprove ? "bg-teal-400" : "bg-gray-200")
+                (sickAutoApprove ? "bg-accent" : "bg-surface-hover")
               }
               aria-pressed={sickAutoApprove}
               aria-label="Toggle auto-approve sick leave"
             >
               <span
                 className={
-                  "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform " +
+                  "inline-block h-4 w-4 transform rounded-full bg-canvas shadow transition-transform " +
                   (sickAutoApprove ? "translate-x-6" : "translate-x-1")
                 }
               />
@@ -204,19 +203,19 @@ export default function SettingsTab() {
             <button
               onClick={save}
               disabled={saving}
-              className="bg-teal-400 hover:bg-teal-500 text-white font-bold rounded-xl px-6 py-2.5 text-sm transition-colors disabled:opacity-50"
+              className="bg-accent hover:bg-accent-ink text-white font-bold rounded-md px-6 py-2.5 text-sm transition-colors disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save settings"}
             </button>
             {saved && (
-              <span className="text-sm text-teal-600 font-medium">
+              <span className="text-sm text-accent-ink font-medium">
                 Settings saved
               </span>
             )}
-            {error && <span className="text-sm text-red-500">{error}</span>}
+            {error && <span className="text-sm text-danger">{error}</span>}
           </div>
         </div>
-      </div>
-    </div>
+      </Section>
+    </PageTransition>
   )
 }
