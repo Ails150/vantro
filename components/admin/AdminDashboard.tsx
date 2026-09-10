@@ -1174,6 +1174,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const fieldLabel = "mb-1.5 block text-xs font-medium text-ink-muted"
   const chip = "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium bg-accent-wash text-accent-ink"
   const chipMuted = "inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium bg-surface-hover text-ink-muted"
+  // Button classes matching the three Button variants, for the places a plain
+  // <button> keeps its own handlers and swapping the element would be churn.
+  const btnBase = "inline-flex items-center justify-center gap-2 rounded-md h-9 px-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-fast ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink/30 disabled:opacity-45 disabled:pointer-events-none"
+  const btnPrimary = btnBase + " bg-accent text-white shadow-elev hover:bg-accent-ink"
+  const btnSecondary = btnBase + " bg-canvas text-ink border border-line-strong hover:bg-surface-hover"
+  const panel = "border-t border-line pt-6"
   const itemTypeOptions = [
     { value: "tick", label: "Tick only" },
     { value: "photo", label: "Photo required" },
@@ -1636,7 +1642,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         )}
 
         {activeTab === "team" && (
-          <div className="space-y-5">
+          <PageTransition>
+            <PageHeader title="Team" description="Who works for you, what they can reach, and who is still to accept an invite." />
             {/* installer_limit_enforced_v1 banner */}
             {/* banner_data_source_fix_v1: read from company prop, not userData.companies */}
 
@@ -1646,13 +1653,13 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               if (limit && active > limit) {
                 const over = active - limit
                 return (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800 flex items-start justify-between gap-4">
+                  <div className="rounded-md border border-warn/30 bg-warn-wash p-4 text-sm text-warn flex items-start justify-between gap-4">
                     <div>
                       <strong>You're {over} over your plan limit of {limit} installers.</strong> Existing users will keep working. To add more, upgrade your plan or remove a user.
                     </div>
                     <button
                       onClick={handleOpenBillingPortal}
-                      className="flex-shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
+                      className="flex-shrink-0 bg-warn hover:bg-warn text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors whitespace-nowrap"
                     >
                       Upgrade plan →
                     </button>
@@ -1663,17 +1670,17 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             })()}
             {/* csv_import_v1 */}
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowCsvImport(true)} className={btnGhost}>Import CSV</button>
-              <button onClick={() => { setShowAddMember(true); setFormError("") }} className={btn}>+ Add member</button>
+              <button onClick={() => setShowCsvImport(true)} className={btnSecondary}>Import CSV</button>
+              <button onClick={() => { setShowAddMember(true); setFormError("") }} className={btnPrimary}>+ Add member</button>
             </div>
             {showCsvImport && (
-              <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
+              <div className="border-t border-line pt-6 space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="font-semibold">Import team from CSV</h3>
-                    <p className="text-sm text-gray-500">Upload a CSV with columns: name, email, role. Existing emails are skipped.</p>
+                    <p className="text-sm text-ink-muted">Upload a CSV with columns: name, email, role. Existing emails are skipped.</p>
                   </div>
-                  <button onClick={downloadSampleCsv} className="text-sm text-teal-600 hover:underline">Download template</button>
+                  <button onClick={downloadSampleCsv} className="text-sm text-accent-ink hover:underline">Download template</button>
                 </div>
                 {!csvResults && csvRows.length === 0 && (
                   <div>
@@ -1681,17 +1688,17 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       type="file"
                       accept=".csv,text/csv"
                       onChange={(e) => { const f = e.target.files?.[0]; if (f) handleCsvFile(f) }}
-                      className="block w-full text-sm border border-gray-200 rounded-md p-3"
+                      className="block w-full text-sm border border-line-strong rounded-md p-3"
                     />
-                    {csvError && <p className="text-sm text-red-600 mt-2">{csvError}</p>}
+                    {csvError && <p className="text-sm text-danger mt-2">{csvError}</p>}
                   </div>
                 )}
                 {!csvResults && csvRows.length > 0 && (
                   <div>
-                    <p className="text-sm text-gray-600 mb-2">{csvRows.length} row(s) ready to import:</p>
-                    <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto">
+                    <p className="text-sm text-ink-muted mb-2">{csvRows.length} row(s) ready to import:</p>
+                    <div className="border border-line-strong rounded-md max-h-64 overflow-y-auto">
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-xs text-gray-500">
+                        <thead className="bg-surface text-xs text-ink-muted">
                           <tr>
                             <th className="px-3 py-2 text-left">Name</th>
                             <th className="px-3 py-2 text-left">Email</th>
@@ -1700,7 +1707,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         </thead>
                         <tbody>
                           {csvRows.map((r, i) => (
-                            <tr key={i} className="border-t border-gray-100">
+                            <tr key={i} className="border-t border-line">
                               <td className="px-3 py-2">{r.name}</td>
                               <td className="px-3 py-2">{r.email}</td>
                               <td className="px-3 py-2">{r.role}</td>
@@ -1709,26 +1716,26 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         </tbody>
                       </table>
                     </div>
-                    {csvError && <p className="text-sm text-red-600 mt-2">{csvError}</p>}
+                    {csvError && <p className="text-sm text-danger mt-2">{csvError}</p>}
                     <div className="flex gap-3 mt-4">
-                      <button onClick={bulkImport} disabled={csvImporting} className={btn}>
+                      <button onClick={bulkImport} disabled={csvImporting} className={btnPrimary}>
                         {csvImporting ? "Importing..." : `Import ${csvRows.length} member(s)`}
                       </button>
-                      <button onClick={() => setCsvRows([])} className={btnGhost}>Choose different file</button>
-                      <button onClick={resetCsvImport} className={btnGhost}>Cancel</button>
+                      <button onClick={() => setCsvRows([])} className={btnSecondary}>Choose different file</button>
+                      <button onClick={resetCsvImport} className={btnSecondary}>Cancel</button>
                     </div>
                   </div>
                 )}
                 {csvResults && (
                   <div>
                     <div className="flex gap-4 mb-3 text-sm">
-                      <span className="text-teal-600">Created: {csvResults.summary?.created || 0}</span>
-                      <span className="text-gray-500">Skipped: {csvResults.summary?.skipped || 0}</span>
-                      <span className="text-red-600">Errors: {csvResults.summary?.errored || 0}</span>
+                      <span className="text-accent-ink">Created: {csvResults.summary?.created || 0}</span>
+                      <span className="text-ink-muted">Skipped: {csvResults.summary?.skipped || 0}</span>
+                      <span className="text-danger">Errors: {csvResults.summary?.errored || 0}</span>
                     </div>
-                    <div className="border border-gray-200 rounded-md max-h-64 overflow-y-auto">
+                    <div className="border border-line-strong rounded-md max-h-64 overflow-y-auto">
                       <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-xs text-gray-500">
+                        <thead className="bg-surface text-xs text-ink-muted">
                           <tr>
                             <th className="px-3 py-2 text-left">Row</th>
                             <th className="px-3 py-2 text-left">Name</th>
@@ -1739,33 +1746,33 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         </thead>
                         <tbody>
                           {(csvResults.results || []).map((r: any, i: number) => (
-                            <tr key={i} className="border-t border-gray-100">
+                            <tr key={i} className="border-t border-line">
                               <td className="px-3 py-2">{r.row}</td>
                               <td className="px-3 py-2">{r.name}</td>
                               <td className="px-3 py-2">{r.email}</td>
-                              <td className={"px-3 py-2 " + (r.status === "created" ? "text-teal-600" : r.status === "skipped" ? "text-gray-500" : "text-red-600")}>{r.status}</td>
-                              <td className="px-3 py-2 text-gray-500">{r.message || ""}</td>
+                              <td className={"px-3 py-2 " + (r.status === "created" ? "text-accent-ink" : r.status === "skipped" ? "text-ink-muted" : "text-danger")}>{r.status}</td>
+                              <td className="px-3 py-2 text-ink-muted">{r.message || ""}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                     <div className="flex gap-3 mt-4">
-                      <button onClick={resetCsvImport} className={btn}>Done</button>
+                      <button onClick={resetCsvImport} className={btnPrimary}>Done</button>
                     </div>
                   </div>
                 )}
               </div>
             )}
             {showAddMember && (
-              <div className="bg-white border border-teal-200 rounded-2xl p-6 space-y-4 shadow-sm">
+              <div className="border-t border-line pt-6 space-y-4">
                 <h3 className="font-semibold">New team member</h3>
-                <p className="text-sm text-gray-500">They will receive an email invite to set up their account.</p>
-                <input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="Full name" className={inp}/>
-                <input value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="Email address" type="email" className={inp}/>
+                <p className="text-sm text-ink-muted">They will receive an email invite to set up their account.</p>
+                <input value={memberName} onChange={e => setMemberName(e.target.value)} placeholder="Full name" className={field}/>
+                <input value={memberEmail} onChange={e => setMemberEmail(e.target.value)} placeholder="Email address" type="email" className={field}/>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Role</label>
-                  <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={inp}>
+                  <label className="block text-sm font-medium text-ink-muted mb-1">Role</label>
+                  <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={field}>
                     <option value="installer">Installer - PIN app access only</option>
                     <option value="foreman">Supervisor - PIN app + alert emails</option>
                     <option value="subcontractor">Subcontractor - PIN app, sees only their assigned jobs</option>
@@ -1784,31 +1791,31 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     />
                   </div>
                 )}
-                {formError && <p className="text-sm text-red-500">{formError}</p>}
+                {formError && <p className="text-sm text-danger">{formError}</p>}
                 <div className="flex gap-3">
-                  <button onClick={addMember} disabled={saving} className={btn}>{saving ? "Saving..." : "Save and send invite"}</button>
-                  <button onClick={() => setShowAddMember(false)} className={btnGhost}>Cancel</button>
+                  <button onClick={addMember} disabled={saving} className={btnPrimary}>{saving ? "Saving..." : "Save and send invite"}</button>
+                  <button onClick={() => setShowAddMember(false)} className={btnSecondary}>Cancel</button>
                 </div>
               </div>
             )}
             {/* Team filters */}
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="bg-canvas border border-line-strong rounded-md p-4 shadow-sm space-y-3">
               <div className="flex flex-wrap items-center gap-3">
                 <input
                   type="text"
                   value={teamSearch}
                   onChange={e => setTeamSearch(e.target.value)}
                   placeholder="Search by name or email..."
-                  className="flex-1 min-w-[200px] max-w-md border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400"
+                  className="flex-1 min-w-[200px] max-w-md border border-line-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:border-accent"
                 />
                 {teamSearch && (
-                  <button onClick={() => setTeamSearch("")} className="text-xs text-gray-500 hover:text-gray-700">Clear</button>
+                  <button onClick={() => setTeamSearch("")} className="text-xs text-ink-muted hover:text-ink">Clear</button>
                 )}
               </div>
 
               {/* Role chips */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-gray-500 mr-1">Role:</span>
+                <span className="text-xs text-ink-muted mr-1">Role:</span>
                 {(["all", "installer", "foreman", "subcontractor", "admin"] as const).map(r => {
                   const count = teamCounts.byRole[r] || 0
                   const active = teamRoleFilter === r
@@ -1816,7 +1823,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <button
                       key={r}
                       onClick={() => setTeamRoleFilter(r)}
-                      className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+                      className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-accent-ink text-white" : "bg-surface-hover text-ink-muted hover:bg-surface-hover")}
                     >
                       {r === "all" ? "All" : roleLabel(r)} {count}
                     </button>
@@ -1826,7 +1833,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
               {/* Status chips */}
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs text-gray-500 mr-1">Status:</span>
+                <span className="text-xs text-ink-muted mr-1">Status:</span>
                 {(["all", "active", "inactive"] as const).map(s => {
                   const count = s === "all" ? teamMembers.length : s === "active" ? teamCounts.active : teamCounts.inactive
                   const active = teamStatusFilter === s
@@ -1834,7 +1841,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <button
                       key={s}
                       onClick={() => setTeamStatusFilter(s)}
-                      className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+                      className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-accent-ink text-white" : "bg-surface-hover text-ink-muted hover:bg-surface-hover")}
                     >
                       {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)} {count}
                     </button>
@@ -1845,10 +1852,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               {/* Trade chips - only show when multi-trade enabled and trades exist */}
               {multiTradeEnabled && companyTrades.filter(t => t.enabled).length > 0 && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-gray-500 mr-1">Trade:</span>
+                  <span className="text-xs text-ink-muted mr-1">Trade:</span>
                   <button
                     onClick={() => setTeamTradeFilter("all")}
-                    className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (teamTradeFilter === "all" ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+                    className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (teamTradeFilter === "all" ? "bg-accent-ink text-white" : "bg-surface-hover text-ink-muted hover:bg-surface-hover")}
                   >
                     All {teamMembers.length}
                   </button>
@@ -1859,7 +1866,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       <button
                         key={t.trade_key}
                         onClick={() => setTeamTradeFilter(t.trade_key)}
-                        className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-teal-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+                        className={"text-xs px-3 py-1 rounded-full font-medium transition-colors " + (active ? "bg-accent-ink text-white" : "bg-surface-hover text-ink-muted hover:bg-surface-hover")}
                       >
                         {t.label} {count}
                       </button>
@@ -1872,10 +1879,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             <div className="mb-5">
               <EmailAlertPrefs />
             </div>
-            <div className={card}>
+            <div className={panel}>
               <div className={cardHeader}>
                 <span className="font-semibold">Team members</span>
-                <span className="text-xs text-gray-500 ml-2">{filteredTeamMembers.length} of {teamMembers.length}</span>
+                <span className="text-xs text-ink-muted ml-2">{filteredTeamMembers.length} of {teamMembers.length}</span>
               </div>
               {filteredTeamMembers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>{teamMembers.length === 0 ? "No team members yet" : "No matches"}</div>
               : (
@@ -1890,27 +1897,27 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         return t ? t.label : tk
                       })
                       const menuOpen = openMenuMemberId === m.id
-                      const roleBadgeCls = roleColors[m.role] || "bg-gray-100 text-gray-600"
+                      const roleBadgeCls = roleColors[m.role] || "bg-surface-hover text-ink-muted"
                       return (
                         <React.Fragment key={m.id}>
                         <div
-                          className={"relative border rounded-2xl p-4 transition-colors flex flex-col min-h-[180px] " + (!isActive ? "bg-gray-50 border-gray-200 opacity-75" : (!m.pin_hash && isFieldRole(m.role)) ? "bg-red-50 border-red-200 hover:border-red-300" : "bg-white border-gray-200 hover:border-teal-300")}
+                          className={"relative border rounded-md p-4 transition-colors flex flex-col min-h-[180px] " + (!isActive ? "bg-surface border-line-strong opacity-75" : (!m.pin_hash && isFieldRole(m.role)) ? "bg-danger-wash border-danger/30 hover:border-red-300" : "bg-canvas border-line-strong hover:border-accent")}
                         >
                           <div className="flex items-start gap-3 mb-3">
-                            <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0 " + (isActive ? "bg-gray-100 text-gray-900" : "bg-gray-100 text-gray-400")}>
+                            <div className={"w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0 " + (isActive ? "bg-surface-hover text-ink" : "bg-surface-hover text-ink-subtle")}>
                               {m.initials}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className={"font-semibold text-sm truncate " + (isActive ? "" : "text-gray-400")} title={m.name}>{m.name}</div>
-                              <div className="text-xs text-gray-500 truncate" title={m.email}>{m.email || "No email"}</div>
+                              <div className={"font-semibold text-sm truncate " + (isActive ? "" : "text-ink-subtle")} title={m.name}>{m.name}</div>
+                              <div className="text-xs text-ink-muted truncate" title={m.email}>{m.email || "No email"}</div>
                             </div>
                             <span className={"text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 " + roleBadgeCls}>{roleLabel(m.role)}</span>
                           </div>
 
                           {(!isActive || (!m.pin_hash && isFieldRole(m.role))) && (
                             <div className="flex flex-wrap gap-1.5 mb-3">
-                              {!isActive && <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium">Suspended</span>}
-                              {!m.pin_hash && isFieldRole(m.role) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-50 text-red-700 font-medium">PIN not set</span>}
+                              {!isActive && <span className="text-[10px] px-2 py-0.5 rounded-full bg-warn-wash text-warn font-medium">Suspended</span>}
+                              {!m.pin_hash && isFieldRole(m.role) && <span className="text-[10px] px-2 py-0.5 rounded-full bg-danger-wash text-danger font-medium">PIN not set</span>}
                             </div>
                           )}
 
@@ -1921,23 +1928,23 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                   <span key={idx} className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">{label}</span>
                                 ))
                               ) : (
-                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-dashed border-gray-300">No trades set</span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-hover text-ink-muted border border-dashed border-line-strong">No trades set</span>
                               )}
                             </div>
                           )}
 
                           {isInstFm && (
-                            <div className="flex items-center gap-2 pt-3 mt-auto border-t border-gray-100">
+                            <div className="flex items-center gap-2 pt-3 mt-auto border-t border-line">
                               <button
                                 onClick={() => editingScheduleId === m.id ? setEditingScheduleId(null) : openSchedule(m)}
-                                className={"flex-1 text-xs rounded-lg px-3 py-1.5 transition-colors " + (editingScheduleId === m.id ? "border border-teal-400 text-teal-600 bg-teal-50" : "border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600")}
+                                className={"flex-1 text-xs rounded-lg px-3 py-1.5 transition-colors " + (editingScheduleId === m.id ? "border border-accent text-accent-ink bg-accent-wash" : "border border-line-strong text-ink-muted hover:border-accent hover:text-accent-ink")}
                               >
                                 {editingScheduleId === m.id ? "Close" : "Schedule"}
                               </button>
                               <div className="relative">
                                 <button
                                   onClick={() => setOpenMenuMemberId(menuOpen ? null : m.id)}
-                                  className="text-xs border border-gray-200 text-gray-600 hover:border-gray-300 rounded-lg px-2.5 py-1.5 transition-colors"
+                                  className="text-xs border border-line-strong text-ink-muted hover:border-line-strong rounded-lg px-2.5 py-1.5 transition-colors"
                                   aria-label="More actions"
                                 >
                                   ...
@@ -1948,12 +1955,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                       className="fixed inset-0 z-10"
                                       onClick={() => setOpenMenuMemberId(null)}
                                     />
-                                    <div className="absolute right-0 bottom-full mb-1 z-20 bg-white border border-gray-200 rounded-xl shadow-lg py-1 w-44">
-                                      <button onClick={() => { resendInvite(m.email, m.name); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50">Resend invite</button>
-                                      <button onClick={() => { resetPin(m.id); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 hover:bg-gray-50">Reset PIN</button>
-                                      <button onClick={() => { toggleActive(m.id, isActive); setOpenMenuMemberId(null) }} className={"w-full text-left text-xs px-3 py-2 hover:bg-gray-50 " + (isActive ? "text-amber-600" : "text-teal-600")}>{isActive ? "Suspend" : "Reactivate"}</button>
-                                      <div className="border-t border-gray-100 my-1"></div>
-                                      <button onClick={() => { removeMember(m.id, m.auth_user_id, m.name); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 text-red-600 hover:bg-red-50">Remove</button>
+                                    <div className="absolute right-0 bottom-full mb-1 z-20 bg-canvas border border-line-strong rounded-md shadow-lg py-1 w-44">
+                                      <button onClick={() => { resendInvite(m.email, m.name); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 hover:bg-surface">Resend invite</button>
+                                      <button onClick={() => { resetPin(m.id); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 hover:bg-surface">Reset PIN</button>
+                                      <button onClick={() => { toggleActive(m.id, isActive); setOpenMenuMemberId(null) }} className={"w-full text-left text-xs px-3 py-2 hover:bg-surface " + (isActive ? "text-amber-600" : "text-accent-ink")}>{isActive ? "Suspend" : "Reactivate"}</button>
+                                      <div className="border-t border-line my-1"></div>
+                                      <button onClick={() => { removeMember(m.id, m.auth_user_id, m.name); setOpenMenuMemberId(null) }} className="w-full text-left text-xs px-3 py-2 text-danger hover:bg-danger-wash">Remove</button>
                                     </div>
                                   </>
                                 )}
@@ -1963,10 +1970,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           {/* Superadmin can delete ANY member (admin, subcontractor, installer,
                               foreman) — never themselves or the superadmin account. */}
                           {viewerIsSuperadmin && !m.is_superadmin && m.id !== userData?.id && (
-                            <div className={"flex items-center gap-2 pt-3 border-t border-gray-100 " + (isInstFm ? "" : "mt-auto")}>
+                            <div className={"flex items-center gap-2 pt-3 border-t border-line " + (isInstFm ? "" : "mt-auto")}>
                               <button
                                 onClick={() => removeMember(m.id, m.auth_user_id, m.name)}
-                                className="flex-1 text-xs rounded-lg px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                                className="flex-1 text-xs rounded-lg px-3 py-1.5 border border-danger/30 text-danger hover:bg-danger-wash transition-colors"
                               >
                                 Delete
                               </button>
@@ -1974,7 +1981,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           )}
                         </div>
                         {editingScheduleId === m.id && (
-                          <div className="col-span-full bg-gray-50 border border-gray-200 rounded-2xl">
+                          <div className="col-span-full bg-surface border border-line-strong rounded-md">
                             <MemberSchedule
                               member={m}
                               onSave={async (schedule) => {
@@ -1999,9 +2006,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 </>
               )}
             </div>
-          </div>
+          </PageTransition>
         )}
-
         {activeTab === "checklists" && (
           <div className="space-y-5">
             <div className="flex justify-end gap-2 items-center">
