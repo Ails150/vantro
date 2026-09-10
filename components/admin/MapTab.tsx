@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { APIProvider, Map, Marker, InfoWindow, useMap } from "@vis.gl/react-google-maps"
 
+import { formatTime } from "@/lib/format-time"
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || ""
 const GOOGLE_MAP_ID = process.env.NEXT_PUBLIC_GOOGLE_MAP_ID || ""
 
@@ -286,7 +287,7 @@ export default function MapTab() {
           <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#111827" }}>Live site map</h3>
           <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280" }}>
             {rows.length} team member{rows.length !== 1 ? "s" : ""} · {data.jobs.length} active job{data.jobs.length !== 1 ? "s" : ""}
-            {lastUpdated && ` · Updated ${lastUpdated.toLocaleTimeString("en-GB")}`}
+            {lastUpdated && ` · Updated ${formatTime(lastUpdated)}`}
           </p>
         </div>
         <button onClick={load} style={{ padding: "6px 14px", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8, color: "#0f6e56", fontSize: 12, cursor: "pointer", fontWeight: 500 }}>
@@ -412,7 +413,7 @@ export default function MapTab() {
                           <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>{selected.data.hoursOnSite}</div>
                         )}
                         <div style={{ fontSize: 11, color: "#999", marginTop: 4 }}>
-                          {selected.data.posSource === "gps" ? "Last seen: " : "Signed in: "}{selected.data.logged_at ? new Date(selected.data.logged_at).toLocaleTimeString("en-GB") : "-"}
+                          {selected.data.posSource === "gps" ? "Last seen: " : "Signed in: "}{selected.data.logged_at ? formatTime(selected.data.logged_at) : "-"}
                         </div>
                       </>
                     )}

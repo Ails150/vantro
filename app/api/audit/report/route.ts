@@ -6,6 +6,7 @@ import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { fetchAuditData } from "@/lib/audit/data"
 import { createPackRecord, type PackIntegrity } from "@/lib/audit/pack"
 
+import { formatDateTime, formatIn, formatTime } from "@/lib/format-time"
 type AnyRow = Record<string, any>
 
 // ---------------- Helpers ----------------
@@ -134,7 +135,7 @@ function groupDiaryByDay(entries: any[]): Array<{ date: string; label: string; e
     if (!d.created_at) continue
     const dt = new Date(d.created_at)
     const dateKey = dt.toISOString().slice(0, 10) // YYYY-MM-DD
-    const label = dt.toLocaleDateString("en-GB", {
+    const label = formatIn(dt, {
       weekday: "long", day: "2-digit", month: "long", year: "numeric"
     })
     if (!groups[dateKey]) groups[dateKey] = { date: dateKey, label, entries: [] }
@@ -146,7 +147,7 @@ function groupDiaryByDay(entries: any[]): Array<{ date: string; label: string; e
 function fmtDateTime(s: string | null | undefined): string {
   if (!s) return "—"
   try {
-    return new Date(s).toLocaleString("en-GB", {
+    return formatIn(s, {
       day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
     })
   } catch { return String(s) }
@@ -155,7 +156,7 @@ function fmtDateTime(s: string | null | undefined): string {
 function fmtDate(s: string | null | undefined): string {
   if (!s) return "—"
   try {
-    return new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+    return formatIn(s, { day: "2-digit", month: "short", year: "numeric" })
   } catch { return String(s) }
 }
 
@@ -434,7 +435,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
       : d.ai_alert_type === "issue" ? `<span class="chip chip-warn">Issue</span>` : ""
     const photos = (d.photo_urls || []).map((p: string) => `<img class="thumb" src="${escapeHtml(p)}" alt="">`).join("")
     const time = d.created_at
-      ? new Date(d.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+      ? formatTime(d.created_at)
       : ""
     return `
       <div class="card ${d.ai_alert_type === "blocker" ? "card-bad" : d.ai_alert_type === "issue" ? "card-warn" : ""}">
@@ -485,7 +486,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   const renderVariationCard = (v: any, idx: number) => {
     const ref = 'VAR-' + String(idx + 1).padStart(3, '0')
     const time = v.created_at
-      ? new Date(v.created_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      ? formatIn(v.created_at, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
       : ''
     const sd = v.source_diary
     const sourcePhotos = sd && Array.isArray(sd.photo_urls) ? sd.photo_urls : []
@@ -727,7 +728,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
 
   <dl class="meta">
     <dt>Period</dt><dd>${escapeHtml(periodStr)}</dd>
-    <dt>Generated</dt><dd>${escapeHtml(generated.toLocaleString("en-GB"))}</dd>
+    <dt>Generated</dt><dd>${escapeHtml(formatDateTime(generated))}</dd>
     <dt>Produced by</dt><dd>${escapeHtml(company?.name || "Vantro")} · via Vantro</dd>
   </dl>
 

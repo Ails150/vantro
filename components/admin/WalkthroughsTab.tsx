@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 
+import { formatDate, formatIn, formatTime } from "@/lib/format-time"
 type Clip = {
   id: string
   sequence_number: number
@@ -249,7 +250,7 @@ export default function WalkthroughsTab() {
                         {w.job?.name || "Unknown job"}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {w.installer?.name || "Unknown installer"} · {recorded.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} · {recorded.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                        {w.installer?.name || "Unknown installer"} · {formatIn(recorded, { day: "numeric", month: "short", year: "numeric" })} · {formatTime(recorded)}
                         {w.clips?.length > 0 && ` · ${w.clips.length} clip${w.clips.length === 1 ? "" : "s"}`}
                       </div>
                     </div>
@@ -404,7 +405,7 @@ export default function WalkthroughsTab() {
 
                     {w.approver?.name && w.approval_status === "approved" && (
                       <div className="text-xs text-emerald-700">
-                        Approved by {w.approver.name} on {w.approved_at ? new Date(w.approved_at).toLocaleDateString("en-GB") : "?"}
+                        Approved by {w.approver.name} on {w.approved_at ? formatDate(w.approved_at) : "?"}
                       </div>
                     )}
                   </div>

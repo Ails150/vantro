@@ -1,22 +1,21 @@
 ﻿"use client"
 import { useState, useEffect, useMemo } from "react"
 
+import { formatDate, formatIn, formatTime } from "@/lib/format-time"
 interface Props {
   companyId: string
   teamMembers: any[]
 }
 
-function formatTime(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
-}
-
-function formatDate(iso: string) {
+// Not a format so much as a label: the two most recent days get named rather
+// than dated, because "Yesterday" is what someone reading a shift list wants.
+function formatDayLabel(iso: string) {
   const d = new Date(iso)
   const today = new Date()
   const yest = new Date(); yest.setDate(today.getDate() - 1)
   if (d.toDateString() === today.toDateString()) return "Today"
   if (d.toDateString() === yest.toDateString()) return "Yesterday"
-  return d.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" })
+  return formatIn(d, { weekday: "short", day: "2-digit", month: "short" })
 }
 
 type FilterId = "all" | "on_site" | "early" | "no_signout" | "complete"
@@ -180,7 +179,7 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
                             const dates = group.entries.map((e: any) => new Date(e.signed_in_at)).sort((a, b) => a.getTime() - b.getTime());
                             const first = dates[0];
                             const last = dates[dates.length - 1];
-                            const fmt = (d: Date) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+                            const fmt = (d: Date) => formatIn(d, { day: '2-digit', month: 'short' });
                             if (first.toDateString() === last.toDateString()) return fmt(first);
                             return fmt(first) + ' – ' + fmt(last);
                           })()}</span>
@@ -201,7 +200,7 @@ export default function ComplianceTab({ companyId, teamMembers }: Props) {
                             <div key={s.id} className={"px-5 py-4 border-l-4 " + border}>
                               <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
                                 <div className="flex items-center gap-3">
-                                  <div className="text-xs font-semibold text-gray-900 bg-gray-100 px-2 py-1 rounded-md">{formatDate(s.signed_in_at)}</div>
+                                  <div className="text-xs font-semibold text-gray-900 bg-gray-100 px-2 py-1 rounded-md">{formatDayLabel(s.signed_in_at)}</div>
                                   <div className="text-xs text-gray-500">{s.jobs?.name}{s.jobs?.address ? " — " + s.jobs.address : ""}</div>
                                 </div>
                                 <span className={"text-xs px-3 py-1 rounded-full font-semibold border " + badge.bg + " " + badge.border + " " + badge.text}>{badge.label}</span>

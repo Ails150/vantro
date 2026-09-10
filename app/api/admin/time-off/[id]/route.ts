@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
+import { formatIn } from "@/lib/format-time"
 const TYPE_LABELS: Record<string, string> = {
   annual_leave: "annual leave",
   sick: "sick leave",
@@ -48,21 +49,21 @@ async function sendPushNotification(
 }
 
 function formatDateRange(start: string, end: string): string {
-  if (start === end) return formatDate(start)
+  if (start === end) return formatLeaveDate(start)
   const s = new Date(start + "T00:00:00Z")
   const e = new Date(end + "T00:00:00Z")
   if (
     s.getUTCMonth() === e.getUTCMonth() &&
     s.getUTCFullYear() === e.getUTCFullYear()
   ) {
-    return `${s.getUTCDate()}\u2013${e.getUTCDate()} ${s.toLocaleDateString("en-GB", { month: "short" })}`
+    return `${s.getUTCDate()}\u2013${e.getUTCDate()} ${formatIn(s, { month: "short" })}`
   }
-  return `${formatDate(start)} \u2013 ${formatDate(end)}`
+  return `${formatLeaveDate(start)} \u2013 ${formatLeaveDate(end)}`
 }
 
-function formatDate(iso: string): string {
+function formatLeaveDate(iso: string): string {
   const d = new Date(iso + "T00:00:00Z")
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+  return formatIn(d, { day: "numeric", month: "short" })
 }
 
 export async function PATCH(

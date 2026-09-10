@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 
+import { formatDateTime } from "@/lib/format-time"
 type Signal = "green" | "yellow" | "red" | "unknown"
 
 type Job = {
@@ -234,7 +235,7 @@ export default function JobProgressTab() {
 
       <div className="text-xs text-gray-400 text-center pt-2">
         {data.cached ? "Showing cached results · " : ""}
-        Generated {new Date(data.generated_at).toLocaleString("en-GB")}
+        Generated {formatDateTime(data.generated_at)}
       </div>
     </div>
   )

@@ -1,6 +1,7 @@
 ﻿"use client"
 import { useState, useEffect } from "react"
 
+import { formatIn } from "@/lib/format-time"
 export default function DefectsTab() {
   const [defects, setDefects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -88,7 +89,7 @@ export default function DefectsTab() {
                   </div>
                 )}
                 {d.resolution_note && <p className={"text-xs mt-2 " + sub}>Resolution: {d.resolution_note}</p>}
-                <p className={"text-xs mt-1 " + sub}>{new Date(d.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                <p className={"text-xs mt-1 " + sub}>{formatIn(d.created_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
               </div>
               <div className="flex-shrink-0">
                 {d.status === "open" ? (

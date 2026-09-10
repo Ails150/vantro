@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import UpgradeAIAuditPack from "./UpgradeAIAuditPack"
 import { can, type Plan } from "@/lib/plan"
 
+import { formatDateTime, formatIn, formatTime } from "@/lib/format-time"
 interface Props {
   jobs: any[]
   /** Entitlement comes from the plan now, not a per-company audit flag. */
@@ -599,7 +600,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                     {reportV2.timeline.map((d: any, i: number) => {
                       const events = (d.signins || 0) + (d.diary || 0) + (d.qa || 0) + (d.defects || 0) + ((d.walkthroughs || []).length || 0)
                       const intensity = events === 0 ? "bg-surface-hover" : events < 3 ? "bg-accent-wash" : events < 6 ? "bg-accent-wash" : "bg-accent"
-                      const dateLabel = new Date(d.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })
+                      const dateLabel = formatIn(d.date, { weekday: "short", day: "numeric" })
                       return (
                         <div key={i} className="flex-1 min-w-[60px] text-center" title={`${dateLabel}: ${d.signins} sign-ins, ${d.diary} diary, ${(d.walkthroughs||[]).length} walk & talks, ${d.qa} QA, ${d.blockers} blockers, ${d.photos} photos`}>
                           <div className={"h-12 rounded " + intensity + " flex flex-col items-center justify-center text-xs text-white font-medium"}>
@@ -633,7 +634,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                         w.sentiment === "confident" ? "text-emerald-700 bg-emerald-50" :
                         "text-ink-muted bg-surface"
                       const installerName = w.installer?.name || "Installer"
-                      const recorded = new Date(w.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+                      const recorded = formatIn(w.created_at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
                       const clipsCount = (w.clips || []).length
                       return (
                         <div key={w.id} className={"border rounded-md p-4 " + (isApproved ? "border-emerald-200 bg-emerald-50/30" : isRejected ? "border-danger/30 bg-danger-wash/30 opacity-60" : "border-line-strong bg-canvas")}>
@@ -847,7 +848,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                                   <div key={day} className="border border-line rounded-md overflow-hidden">
                                     <div className="px-3 py-1.5 bg-surface border-b border-line flex items-center justify-between">
                                       <span className="text-xs font-semibold text-ink">
-                                        {dayDate.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                                        {formatIn(dayDate, { weekday: "short", day: "numeric", month: "short" })}
                                       </span>
                                       <span className="text-[10px] text-ink-muted">{entries.length} entries · {dayPhotos} photos</span>
                                     </div>
@@ -855,7 +856,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                                       {entries.map((e: any) => (
                                         <div key={e.id} className="px-3 py-2 flex items-start gap-2.5">
                                           <div className="text-[10px] text-ink-subtle flex-shrink-0 w-10 pt-0.5">
-                                            {new Date(e.created_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                            {formatTime(e.created_at)}
                                           </div>
                                           <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-1.5 mb-0.5">
@@ -1020,7 +1021,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                     ) : (
                       <div className="grid grid-cols-3 gap-1.5">
                         {photos.slice(0, PHOTO_LIMIT).map((p, i) => (
-                          <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" title={new Date(p.date).toLocaleString("en-GB") + " · " + p.source}>
+                          <a key={i} href={p.url} target="_blank" rel="noopener noreferrer" title={formatDateTime(p.date) + " · " + p.source}>
                             <img src={p.url} alt="" className="w-full h-20 object-cover rounded border border-line-strong hover:opacity-80" />
                           </a>
                         ))}
@@ -1053,7 +1054,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                   <div><strong>Job:</strong> {reportV2.job?.name}</div>
                   <div><strong>Address:</strong> {reportV2.job?.address}</div>
                   <div><strong>Period:</strong> {reportV2.period?.from || "all time"} to {reportV2.period?.to || "now"}</div>
-                  <div><strong>Generated:</strong> {new Date(reportV2.generated || Date.now()).toLocaleString("en-GB")}</div>
+                  <div><strong>Generated:</strong> {formatDateTime(reportV2.generated || Date.now())}</div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-line-strong text-xs text-ink leading-relaxed">
                   <p className="font-semibold mb-2">SWORN STATEMENT</p>
@@ -1097,8 +1098,8 @@ export default function AuditTab({ jobs, plan }: Props) {
                         return (
                           <tr key={s.id} className="border-t border-line">
                             <td className="px-2 py-1">{s.users?.name || "Unknown"}</td>
-                            <td className="px-2 py-1 text-ink-muted">{inT.toLocaleString("en-GB")}</td>
-                            <td className="px-2 py-1 text-ink-muted">{outT ? outT.toLocaleString("en-GB") : "—"}</td>
+                            <td className="px-2 py-1 text-ink-muted">{formatDateTime(inT)}</td>
+                            <td className="px-2 py-1 text-ink-muted">{outT ? formatDateTime(outT) : "—"}</td>
                             <td className="px-2 py-1 text-right text-ink-muted">{s.distance_from_site_metres != null ? s.distance_from_site_metres + "m" : "—"}</td>
                             <td className="px-2 py-1 text-right text-ink-muted">{s.sign_out_distance_metres != null ? s.sign_out_distance_metres + "m" : "—"}</td>
                             <td className="px-2 py-1 text-right font-semibold">{hrs}</td>
@@ -1132,7 +1133,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                               <td className="px-2 py-1">3.{i+1}.{j+1} {it.label}</td>
                               <td className="px-2 py-1">{it.state || "pending"}</td>
                               <td className="px-2 py-1">{it.signedOffBy || "—"}</td>
-                              <td className="px-2 py-1">{it.signedOffAt ? new Date(it.signedOffAt).toLocaleString("en-GB") : "—"}</td>
+                              <td className="px-2 py-1">{it.signedOffAt ? formatDateTime(it.signedOffAt) : "—"}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1164,7 +1165,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                             <td className="px-2 py-1">{so.deliverable || "—"}</td>
                             <td className="px-2 py-1">{so.item || "—"}</td>
                             <td className="px-2 py-1">{so.by || "—"}</td>
-                            <td className="px-2 py-1">{so.at ? new Date(so.at).toLocaleString("en-GB") : "—"}</td>
+                            <td className="px-2 py-1">{so.at ? formatDateTime(so.at) : "—"}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1182,7 +1183,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                   {reportV2.issues?.blockers?.length === 0 && <div className="text-xs text-ink-muted italic">None recorded.</div>}
                   {reportV2.issues?.blockers?.map((b: any, j: number) => (
                     <div key={b.id} className="text-xs mb-3 pb-2 border-b border-line last:border-0">
-                      <div className="font-semibold mb-0.5">4.1.{j+1} · {new Date(b.created_at).toLocaleString("en-GB")} · {b.users?.name || "Unknown"}</div>
+                      <div className="font-semibold mb-0.5">4.1.{j+1} · {formatDateTime(b.created_at)} · {b.users?.name || "Unknown"}</div>
                       {b.entry_text && <div className="text-ink whitespace-pre-wrap">“{b.entry_text}”</div>}
                       {b.ai_summary && b.ai_summary !== b.entry_text && <div className="text-ink-muted italic mt-0.5">AI: {b.ai_summary}</div>}
                       {b.photo_urls && b.photo_urls.length > 0 && (
@@ -1204,7 +1205,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                   {reportV2.issues?.issues?.length === 0 && <div className="text-xs text-ink-muted italic">None recorded.</div>}
                   {reportV2.issues?.issues?.map((iss: any, j: number) => (
                     <div key={iss.id} className="text-xs mb-3 pb-2 border-b border-line last:border-0">
-                      <div className="font-semibold mb-0.5">4.2.{j+1} · {new Date(iss.created_at).toLocaleString("en-GB")} · {iss.users?.name || "Unknown"}</div>
+                      <div className="font-semibold mb-0.5">4.2.{j+1} · {formatDateTime(iss.created_at)} · {iss.users?.name || "Unknown"}</div>
                       {iss.entry_text && <div className="text-ink whitespace-pre-wrap">“{iss.entry_text}”</div>}
                       {iss.ai_summary && iss.ai_summary !== iss.entry_text && <div className="text-ink-muted italic mt-0.5">AI: {iss.ai_summary}</div>}
                       {iss.photo_urls && iss.photo_urls.length > 0 && (
@@ -1229,7 +1230,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="font-semibold">4.3.{j+1}</span>
                         <span className={"px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (df.severity === "high" || df.severity === "critical" ? "bg-danger-wash text-danger" : df.severity === "medium" ? "bg-warn-wash text-warn" : "bg-surface-hover text-ink-muted")}>{df.severity || "unspecified"}</span>
-                        <span className="text-ink-muted">{new Date(df.created_at).toLocaleString("en-GB")}</span>
+                        <span className="text-ink-muted">{formatDateTime(df.created_at)}</span>
                         <span className="text-ink-muted">· {df.users?.name || "Unknown"}</span>
                         <span className={"ml-auto px-1.5 py-0.5 text-[10px] font-semibold rounded uppercase " + (df.status === "resolved" ? "bg-ok-wash text-ok" : "bg-surface-hover text-ink")}>{df.status || "open"}</span>
                       </div>
@@ -1263,7 +1264,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                   <div>· Records cannot be silently altered. Identity fields are immutable, sign-out position and expense receipts are write-once, and any other change to evidence appends a new hash linked to the one it replaces.</div>
                   <div>· Photos and videos are hashed from their bytes at upload, not from their address.</div>
                   <div>· This pack lists every record it covers in a signed manifest, summarised as one Merkle root.</div>
-                  <div>· Generated {new Date(reportV2.generated || Date.now()).toLocaleString("en-GB")} · source database Supabase, EU region.</div>
+                  <div>· Generated {formatDateTime(reportV2.generated || Date.now())} · source database Supabase, EU region.</div>
 
                   {reportV2.integrity?.error && (
                     <div className="mt-3 pt-2 border-t border-warn/40 bg-warn-wash -mx-2 px-2 py-2 rounded">
@@ -1355,7 +1356,7 @@ export default function AuditTab({ jobs, plan }: Props) {
                         {reportV2.adminLog.map((r: any) => (
                           <tr key={r.id} className="border-b border-line last:border-0">
                             <td className="py-1.5 pr-3 whitespace-nowrap">
-                              {r.created_at ? new Date(r.created_at).toLocaleString("en-GB") : "—"}
+                              {r.created_at ? formatDateTime(r.created_at) : "—"}
                             </td>
                             <td className="py-1.5 pr-3">{r.users?.name || "—"}</td>
                             <td className="py-1.5 pr-3">{String(r.action || "").replace(/_/g, " ")}</td>

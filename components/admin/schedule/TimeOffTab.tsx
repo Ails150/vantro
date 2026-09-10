@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { formatIn } from "@/lib/format-time"
 type TimeOffEntry = {
   id: string
   user_id: string
@@ -45,7 +46,7 @@ const TYPE_COLOR: Record<string, { bg: string; text: string }> = {
 
 function formatDateShort(iso: string) {
   const d = new Date(iso + "T00:00:00")
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+  return formatIn(d, { day: "numeric", month: "short" })
 }
 
 function formatRange(start: string, end: string, isHalfDay: boolean) {

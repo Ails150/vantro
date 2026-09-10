@@ -41,6 +41,7 @@ import { analyzeAllJobs, jobsNeedingAttention, summarizeJobStaffing } from "@/li
 import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 import { FIELD_FOREMAN_SUBBIE, isFieldOrSupervisor, isFieldRole } from '@/lib/roles'
 
+import { formatIn } from "@/lib/format-time"
 // Parse lat/lng out of a pasted Google Maps link or a raw "lat,lng" / "lat lng" string.
 function parseCoordsFromInput(raw: string): { lat: number; lng: number } | null {
   const s = (raw || "").trim()
@@ -2237,7 +2238,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="font-semibold text-sm">{d.users?.name || "Unknown"}</span>
                           <span className="text-xs font-medium text-gray-700">{d.jobs?.name || "Unknown job"}</span>
-                          <span className={"text-xs " + sub}>{new Date(d.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                          <span className={"text-xs " + sub}>{formatIn(d.created_at, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                           {d.ai_alert_type === 'blocker' && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">BLOCKER</span>}
                           {d.ai_alert_type === 'issue' && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
                           {d.ai_variation_detected && <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded-full font-bold" title="AI detected this as a possible client variation">VARIATION</span>}
@@ -2279,7 +2280,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                           <div className="mt-3 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs bg-teal-500 text-white px-2 py-0.5 rounded-full font-semibold">Replied</span>
-                              {d.replied_at && <span className="text-xs text-teal-700">{new Date(d.replied_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
+                              {d.replied_at && <span className="text-xs text-teal-700">{formatIn(d.replied_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>}
                             </div>
                             <p className="text-sm text-teal-900">{d.reply || localReplies[d.id]}</p>
                           </div>
@@ -2422,7 +2423,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                                     {a.alert_type === "blocker" && <span className="text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full font-bold">BLOCKER</span>}
                                     {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
                                     {a.users?.name && <span className="text-xs text-gray-500">logged by {a.users.name}</span>}
-                                    <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                                    <span className={"text-xs " + sub}>{formatIn(a.created_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                                   </div>
                                   <div className="text-sm text-gray-700">{a.message}</div>
                                 </div>
@@ -2452,7 +2453,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-600 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">ISSUE</span>}
                         <span className={"text-xs font-semibold " + (a.alert_type === "blocker" ? "text-red-600" : "text-gray-700")}>{a.jobs?.name}</span>
                         {a.users?.name && <span className="text-xs text-gray-400">logged by {a.users.name}</span>}
-                        <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                        <span className={"text-xs " + sub}>{formatIn(a.created_at, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                       <div className="text-sm text-gray-700">{a.message}</div>
                       {Array.isArray(a.diary_entries?.photo_urls) && a.diary_entries.photo_urls.length > 0 && (
@@ -2502,12 +2503,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                         {a.alert_type === "issue" && <span className="text-xs bg-amber-50 text-amber-400 border border-amber-100 px-2 py-0.5 rounded-full">ISSUE</span>}
                         <span className="text-xs font-medium text-gray-500">{a.jobs?.name}</span>
                         <span className={"text-xs " + sub}>{a.users?.name}</span>
-                        <span className={"text-xs " + sub}>{new Date(a.created_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        <span className={"text-xs " + sub}>{formatIn(a.created_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
                       </div>
                       <p className="text-sm text-gray-500">{a.message}</p>
                       {a.resolution_note && (
                         <div className="mt-2 bg-teal-50 border border-teal-100 rounded-lg px-3 py-2 text-xs text-teal-700">
-                          <strong>Resolution:</strong> {a.resolution_note} <span className="text-gray-400 ml-2">{a.resolved_at ? new Date(a.resolved_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</span>
+                          <strong>Resolution:</strong> {a.resolution_note} <span className="text-gray-400 ml-2">{a.resolved_at ? formatIn(a.resolved_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : ""}</span>
                         </div>
                       )}
                     </div>

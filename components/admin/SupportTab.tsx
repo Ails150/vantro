@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useRef, useState } from "react"
 
+import { formatDateTime } from "@/lib/format-time"
 type Ticket = {
   id: string
   title: string
@@ -117,7 +118,7 @@ export default function SupportTab() {
                   {t.screenshot_url && (
                     <a href={t.screenshot_url} target="_blank" rel="noreferrer" className="text-xs text-teal-600 underline mt-1 inline-block">View screenshot</a>
                   )}
-                  <div className="text-xs text-gray-400 mt-1">{new Date(t.created_at).toLocaleString()}</div>
+                  <div className="text-xs text-gray-400 mt-1">{formatDateTime(t.created_at)}</div>
                 </div>
                 <span className={"text-xs px-3 py-1 rounded-full font-medium flex-shrink-0 " + (STATUS_STYLE[t.status] || "bg-gray-100 text-gray-500")}>
                   {STATUS_LABEL[t.status] || t.status}

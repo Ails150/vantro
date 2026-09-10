@@ -1,6 +1,7 @@
 ﻿"use client"
 import { useState, useEffect } from "react"
 
+import { formatIn } from "@/lib/format-time"
 interface Props { pendingQA: any[]; onRefresh: () => void }
 
 export default function ApprovalsTab({ pendingQA, onRefresh }: Props) {
@@ -104,7 +105,7 @@ export default function ApprovalsTab({ pendingQA, onRefresh }: Props) {
                       <div className={"text-sm " + sub}>{qa.jobs?.name} — {qa.jobs?.address}</div>
                     </div>
                   </div>
-                  <div className={"text-xs " + sub}>Submitted {new Date(qa.submitted_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                  <div className={"text-xs " + sub}>Submitted {formatIn(qa.submitted_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
                 </div>
                 <div className="flex gap-2 flex-shrink-0">
                   <button onClick={() => setExpanded(expanded === qa.id ? null : qa.id)} className="text-sm border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-xl px-3 py-2">
@@ -189,7 +190,7 @@ export default function ApprovalsTab({ pendingQA, onRefresh }: Props) {
               <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold flex-shrink-0">{qa.users?.initials || "?"}</div>
               <div className="flex-1">
                 <div className="font-medium text-sm">{qa.users?.name} — {qa.jobs?.name}</div>
-                <div className={"text-xs text-gray-500"}>{new Date(qa.reviewed_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                <div className={"text-xs text-gray-500"}>{formatIn(qa.reviewed_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
                 {qa.rejection_note && <div className="text-xs text-red-500 mt-0.5">Rejected: {qa.rejection_note}</div>}
               </div>
               <a href={`/api/qa/checklist-pdf?jobId=${qa.job_id}&userId=${qa.user_id}`} target="_blank" rel="noopener noreferrer" className="text-xs border border-gray-200 text-gray-600 hover:border-teal-300 hover:text-teal-600 rounded-lg px-2.5 py-1.5">Sign-off PDF</a>

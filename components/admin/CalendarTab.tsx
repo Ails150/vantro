@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 
+import { formatIn } from "@/lib/format-time"
 interface Installer {
   id: string
   name: string
@@ -301,9 +302,9 @@ export default function CalendarTab() {
     const end = weekDates[weekDates.length - 1]
     const sameMonth = start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
     if (sameMonth) {
-      return `${start.getDate()} – ${end.getDate()} ${start.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`
+      return `${start.getDate()} – ${end.getDate()} ${formatIn(start, { month: "long", year: "numeric" })}`
     }
-    return `${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`
+    return `${formatIn(start, { day: "numeric", month: "short" })} – ${formatIn(end, { day: "numeric", month: "short", year: "numeric" })}`
   }, [weekDates])
 
   const today = new Date()
@@ -387,7 +388,7 @@ export default function CalendarTab() {
                   const dateStr = fmtDate(d)
                   const isToday = dateStr === todayStr
                   const ph = (data?.public_holidays || []).find((h) => h.date === dateStr)
-                  const dayName = d.toLocaleDateString("en-GB", { weekday: "short" })
+                  const dayName = formatIn(d, { weekday: "short" })
                   const dayNum = d.getDate()
                   const isWeekend = i >= 5
                   return (

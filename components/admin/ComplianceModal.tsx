@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { formatDate } from "@/lib/format-time"
 interface Props {
   open: boolean
   onClose: () => void
@@ -85,7 +86,7 @@ export default function ComplianceModal({ open, onClose }: Props) {
   if (!open) return null
 
   const accepted = data?.company?.dpa_accepted_at
-  const acceptedDate = accepted ? new Date(accepted).toLocaleDateString("en-GB") : null
+  const acceptedDate = accepted ? formatDate(accepted) : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

@@ -18,6 +18,7 @@ import {
   type EvidenceHashRow,
   type PackManifest,
 } from "@/lib/audit/manifest"
+import { formatDateTime } from "@/lib/format-time"
 
 export const dynamic = "force-dynamic"
 
@@ -158,7 +159,7 @@ export default async function VerifyPage({
           </div>
           <div style={{ fontSize: 13, color: "#555", marginTop: 4 }}>
             <span style={mono}>{result.ref}</span>
-            {result.generatedAt && <> · issued {new Date(result.generatedAt).toLocaleString("en-GB")}</>}
+            {result.generatedAt && <> · issued {formatDateTime(result.generatedAt)}</>}
             {typeof result.evidenceCount === "number" && <> · {result.evidenceCount} evidence records</>}
           </div>
 

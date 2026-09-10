@@ -3,6 +3,7 @@ import { useState, useEffect } from "react"
 import { PayrollExpenseRow } from "@/components/admin/PayrollExpenseRow"
 import { isFieldRole } from '@/lib/roles'
 
+import { formatIn, formatTime } from "@/lib/format-time"
 interface Props { teamMembers: any[] }
 
 function getWeekRange(offset = 0) {
@@ -89,7 +90,7 @@ export default function PayrollTab({ teamMembers }: Props) {
     const days: Record<string, number> = {}
     ss.forEach((s: any) => {
       if (!s.signed_in_at || !s.signed_out_at) return
-      const day = new Date(s.signed_in_at).toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" })
+      const day = formatIn(s.signed_in_at, { weekday: "short", day: "2-digit", month: "short" })
       days[day] = (days[day] || 0) + (new Date(s.signed_out_at).getTime() - new Date(s.signed_in_at).getTime()) / 3600000
     })
     return days
@@ -184,8 +185,8 @@ export default function PayrollTab({ teamMembers }: Props) {
                         ) : (
                           <div className="flex justify-between items-center">
                             <div>
-                              <div className="text-xs text-gray-600">{new Date(s.signed_in_at).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
-                              <div className="text-xs text-gray-400">{s.signed_out_at ? "Out: " + new Date(s.signed_out_at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "Not signed out"}</div>
+                              <div className="text-xs text-gray-600">{formatIn(s.signed_in_at, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</div>
+                              <div className="text-xs text-gray-400">{s.signed_out_at ? "Out: " + formatTime(s.signed_out_at) : "Not signed out"}</div>
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-semibold">{s.signed_out_at ? ((new Date(s.signed_out_at).getTime() - new Date(s.signed_in_at).getTime()) / 3600000).toFixed(1) + "h" : "-"}</span>

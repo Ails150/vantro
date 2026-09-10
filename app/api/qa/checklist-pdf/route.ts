@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
+import { formatDateTime, formatIn } from "@/lib/format-time"
 // Completed Quality Checklist sign-off sheet — the Fieldwire replacement.
 // Renders a printable HTML page (browser "Save as PDF") showing every checklist
 // item with installer initials/date, RFL initials/date, result, hold-point flags,
@@ -21,7 +22,7 @@ function escapeHtml(s: any): string {
 function fmtDate(s: string | null | undefined): string {
   if (!s) return "—"
   try {
-    return new Date(s).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+    return formatIn(s, { day: "2-digit", month: "short", year: "numeric" })
   } catch { return String(s) }
 }
 
@@ -236,7 +237,7 @@ export async function GET(request: Request) {
   <dl class="meta">
     ${job.contractor ? `<dt>Contractor</dt><dd>${escapeHtml(job.contractor)}</dd>` : ""}
     <dt>Installer${installers.length === 1 ? "" : "s"}</dt><dd>${installers.length ? escapeHtml(installers.join(", ")) : "—"}</dd>
-    <dt>Generated</dt><dd>${escapeHtml(generated.toLocaleString("en-GB"))}</dd>
+    <dt>Generated</dt><dd>${escapeHtml(formatDateTime(generated))}</dd>
     <dt>Produced by</dt><dd>${escapeHtml(company?.name || "Vantro")} · via Vantro</dd>
   </dl>
 

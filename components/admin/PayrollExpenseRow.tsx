@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { formatIn } from "@/lib/format-time"
 interface Expense {
   id: string
   amount: number
@@ -144,7 +145,7 @@ export function PayrollExpenseRow({ userId, userName, weekStart }: PayrollExpens
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 mt-0.5">
-                  {new Date(expense.submitted_at).toLocaleDateString("en-GB", {
+                  {formatIn(expense.submitted_at, {
                     weekday: "short",
                     day: "numeric",
                     month: "short",

@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
+import { formatDateTime } from "@/lib/format-time"
 export default function ClientPortal() {
   const router = useRouter()
   const [data, setData] = useState<any>(null)
@@ -71,7 +72,7 @@ export default function ClientPortal() {
               <div key={e.id} style={{ background: "#1a2635", borderRadius: 12, padding: 16, marginBottom: 10, borderLeft: e.ai_alert_type === "blocker" ? "3px solid #f87171" : e.ai_alert_type === "issue" ? "3px solid #fbbf24" : "none" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                   <span style={{ color: "#00d4a0", fontSize: 12, fontWeight: 600 }}>{e.users?.name}</span>
-                  <span style={{ color: "#4d6478", fontSize: 11 }}>{new Date(e.created_at).toLocaleString("en-GB")}</span>
+                  <span style={{ color: "#4d6478", fontSize: 11 }}>{formatDateTime(e.created_at)}</span>
                 </div>
                 {e.entry_text && e.entry_text !== "📷 Photo entry" && <p style={{ color: "#fff", fontSize: 14, margin: "0 0 8px" }}>{e.entry_text}</p>}
                 {e.photo_urls && e.photo_urls.length > 0 && (
@@ -102,7 +103,7 @@ export default function ClientPortal() {
                   <div>
                     <div style={{ color: "#fff", fontWeight: 600, fontSize: 14 }}>{s.users?.name}</div>
                     <div style={{ color: "#4d6478", fontSize: 12, marginTop: 4 }}>
-                      In: {inTime.toLocaleString("en-GB")} {outTime ? `· Out: ${outTime.toLocaleString("en-GB")}` : "· Still on site"}
+                      In: {formatDateTime(inTime)} {outTime ? `· Out: ${formatDateTime(outTime)}` : "· Still on site"}
                     </div>
                   </div>
                   {hours && <div style={{ color: "#00d4a0", fontWeight: 700, fontSize: 16 }}>{hours}h</div>}
@@ -121,7 +122,7 @@ export default function ClientPortal() {
               <div key={i} style={{ background: "#1a2635", borderRadius: 12, padding: 16, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div>
                   <div style={{ color: "#fff", fontSize: 14 }}>{q.checklist_items?.label}</div>
-                  <div style={{ color: "#4d6478", fontSize: 12, marginTop: 2 }}>{q.users?.name} · {new Date(q.created_at).toLocaleString("en-GB")}</div>
+                  <div style={{ color: "#4d6478", fontSize: 12, marginTop: 2 }}>{q.users?.name} · {formatDateTime(q.created_at)}</div>
                 </div>
                 <div style={{ color: q.result === "pass" ? "#00d4a0" : "#f87171", fontWeight: 700, fontSize: 13 }}>{q.result?.toUpperCase()}</div>
               </div>

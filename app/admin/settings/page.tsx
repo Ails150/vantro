@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
+import { formatIn } from "@/lib/format-time"
 type Status = {
   company: { id: string; name: string }
   plan: { key: string; name: string; price: number; installerLimit: number }
@@ -103,7 +104,7 @@ export default function SettingsPage() {
   if (loading) return <div className="p-8">Loading…</div>
   if (!status) return <div className="p-8 text-red-600">{error || 'No data'}</div>
 
-  const fmtDate = (ts: number) => new Date(ts * 1000).toLocaleDateString('en-GB', {
+  const fmtDate = (ts: number) => formatIn(ts * 1000, {
     day: 'numeric', month: 'long', year: 'numeric'
   })
 

@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/Button"
 import { Table, TBody, TR, TD } from "@/components/ui/Table"
 import { listVariants, itemVariants } from "@/components/ui/motion"
 
+import { formatIn, formatTime } from "@/lib/format-time"
 // Overview tab. Look and feel only -- every figure still comes from the
 // `overviewData` memo computed by the parent, nothing here fetches, and no
 // query was touched.
@@ -506,10 +507,10 @@ export default function DashboardTab({
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="num text-xs text-ink">
-                      {ev.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {formatTime(ev.time)}
                     </p>
                     <p className="num text-[10px] text-ink-subtle">
-                      {ev.time.toLocaleDateString([], { day: "numeric", month: "short" })}
+                      {formatIn(ev.time, { day: "numeric", month: "short" })}
                     </p>
                   </div>
                 </Row>

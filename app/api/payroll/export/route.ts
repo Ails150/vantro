@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
+import { formatDate, formatDateTime } from "@/lib/format-time"
 // Payroll CSV export with row locking.
 //   GET  /api/payroll/export?from=ISO&to=ISO&preview=true   â†’ preview totals (no lock)
 //   POST /api/payroll/export  body: { from, to }            â†’ finalise + return CSV (locks rows)
@@ -207,9 +208,9 @@ export async function POST(request: Request) {
       csvEscape(s.users?.name || ""),
       csvEscape(s.users?.email || ""),
       csvEscape(s.jobs?.name || ""),
-      csvEscape(signedIn ? signedIn.toLocaleDateString("en-GB") : ""),
-      csvEscape(signedIn ? signedIn.toLocaleString("en-GB") : ""),
-      csvEscape(signedOut ? signedOut.toLocaleString("en-GB") : ""),
+      csvEscape(signedIn ? formatDate(signedIn) : ""),
+      csvEscape(signedIn ? formatDateTime(signedIn) : ""),
+      csvEscape(signedOut ? formatDateTime(signedOut) : ""),
       csvEscape(hours.toFixed(2)),
       csvEscape(s.auto_closed ? "Yes" : "No"),
       csvEscape(s.flagged ? "Yes" : "No"),

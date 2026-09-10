@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 
+import { formatIn } from "@/lib/format-time"
 type OverviewData = {
   today: string
   week_start: string
@@ -47,7 +48,7 @@ const TYPE_LABEL: Record<string, string> = {
 
 function formatDateShort(iso: string) {
   const d = new Date(iso + "T00:00:00")
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+  return formatIn(d, { day: "numeric", month: "short" })
 }
 
 function formatRange(start: string, end: string) {
