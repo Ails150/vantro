@@ -25,6 +25,10 @@
     {
       "path": "/api/cron/free-retention",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-report",
+      "schedule": "0 16,17 * * 5"
     }
   ],
   "headers": [
