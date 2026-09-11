@@ -1247,6 +1247,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           userData={userData}
           company={company}
           onSiteRulesClick={() => setActiveTab("settings")}
+          onBillingClick={() => switchTab("billing")}
         />
       }
       banner={

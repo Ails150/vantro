@@ -30,11 +30,18 @@ type Props = {
   onOpenPortal: () => void
 }
 
-/** What the Stripe subscription says about an in-flight cancellation. */
-type CancelState = {
+/**
+ * What /api/billing/status says. Absent until it answers, and absent for good
+ * if it fails -- every read of it below degrades to saying nothing rather than
+ * to guessing.
+ */
+type BillingStatus = {
+  /** 'trialing' | 'active' | 'past_due' | 'cancelled' | ... straight from us. */
+  status: string | null
+  trialDaysRemaining: number | null
   cancelAtPeriodEnd: boolean
-  /** Unix seconds. The day access actually stops. */
-  endsAt: number | null
+  /** Unix seconds. Renewal day, or the day access stops once cancelling. */
+  periodEnd: number | null
 }
 
 /** What each plan gets, in the customer's words rather than feature flags. */
@@ -70,16 +77,16 @@ export default function BillingTab({
 }: Props) {
   const [working, setWorking] = React.useState<Plan | null>(null)
   const [error, setError] = React.useState<string | null>(null)
-  const [cancelState, setCancelState] = React.useState<CancelState | null>(null)
+  const [billing, setBilling] = React.useState<BillingStatus | null>(null)
   const [confirmingCancel, setConfirmingCancel] = React.useState(false)
   const [cancelBusy, setCancelBusy] = React.useState(false)
 
   const plan = toPlan(company?.plan)
   const retention = historyDays(plan)
 
-  // Cancellation state lives in Stripe, not in our companies row, so it is read
-  // rather than assumed. A failure here leaves cancelState null and the panel
-  // simply does not claim anything about a pending cancellation.
+  // Subscription state lives in Stripe, not in our companies row, so it is read
+  // rather than assumed. A failure leaves `billing` null and every line below
+  // that depends on it simply does not render.
   React.useEffect(() => {
     if (plan === "free") return
     let alive = true
@@ -88,11 +95,13 @@ export default function BillingTab({
         const res = await fetch("/api/billing/status")
         if (!res.ok) return
         const data = await res.json()
+        if (!alive) return
         const stripe = data?.subscription?.stripe
-        if (!alive || !stripe) return
-        setCancelState({
-          cancelAtPeriodEnd: !!stripe.cancel_at_period_end,
-          endsAt: stripe.cancel_at ?? stripe.current_period_end ?? null,
+        setBilling({
+          status: data?.subscription?.status ?? null,
+          trialDaysRemaining: data?.subscription?.trialDaysRemaining ?? null,
+          cancelAtPeriodEnd: !!stripe?.cancel_at_period_end,
+          periodEnd: stripe?.cancel_at ?? stripe?.current_period_end ?? null,
         })
       } catch {}
     })()
@@ -113,10 +122,12 @@ export default function BillingTab({
         setError(data?.error || "Could not change your cancellation. Try the billing portal.")
         return
       }
-      setCancelState({
+      setBilling((prev) => ({
+        status: prev?.status ?? null,
+        trialDaysRemaining: prev?.trialDaysRemaining ?? null,
         cancelAtPeriodEnd: !!data.cancel_at_period_end,
-        endsAt: data.cancel_at ?? cancelState?.endsAt ?? null,
-      })
+        periodEnd: data.cancel_at ?? prev?.periodEnd ?? null,
+      }))
       setConfirmingCancel(false)
     } catch {
       setError("Could not reach billing. Check your connection and try again.")
@@ -130,6 +141,29 @@ export default function BillingTab({
   const activeWorkers = (teamMembers || []).filter(
     (m: any) => (isFieldRole(m.role) || m.role === "foreman") && m.is_active !== false
   ).length
+
+  const installerLimit: number | null = company?.installer_limit ?? null
+  const overLimit = installerLimit != null && activeWorkers > installerLimit
+
+  // Trial days, renewal date and payment trouble all used to live on
+  // /admin/settings. They are one sentence, not a second page.
+  const subscriptionLine = (() => {
+    if (plan === "free") return null
+    if (!billing) return null
+    if (billing.cancelAtPeriodEnd) {
+      return `Cancelled. Access ends ${formatEndDate(billing.periodEnd)}.`
+    }
+    if (billing.status === "trial" || billing.status === "trialing") {
+      return billing.trialDaysRemaining != null
+        ? `Trial, ${billing.trialDaysRemaining} ${billing.trialDaysRemaining === 1 ? "day" : "days"} left.`
+        : "On trial."
+    }
+    if (billing.status === "past_due") {
+      return "Payment failed. Update your card in the billing portal to avoid losing access."
+    }
+    if (billing.periodEnd) return `Renews ${formatEndDate(billing.periodEnd)}.`
+    return null
+  })()
 
   async function choose(next: Plan) {
     if (next === plan) return
@@ -178,13 +212,30 @@ export default function BillingTab({
           value={PLANS[plan].name}
           hint={plan === "free" ? "No card on file" : `${formatPrice(PLANS[plan].price)}/month`}
         />
-        <Stat label="Workers" value={activeWorkers} hint="Active on the app" />
+        <Stat
+          label="Workers"
+          value={installerLimit ? `${activeWorkers} / ${installerLimit}` : activeWorkers}
+          hint={
+            overLimit
+              ? "Over your plan limit"
+              : installerLimit
+                ? "Active, against your limit"
+                : "Active on the app"
+          }
+        />
         <Stat
           label="History"
           value={retention === null ? "Kept" : `${retention} days`}
           hint={retention === null ? "No time limit" : "Older shifts are deleted nightly"}
         />
       </div>
+
+      {/* One line for the state of the subscription: what it is doing, and the
+          next date that matters. This and the plan cards below are the only
+          place either is stated -- /admin/settings used to say it all a second
+          time, in a second style, reading a tier shape the plan migration had
+          already made obsolete. */}
+      {subscriptionLine && <p className="mt-4 text-sm text-ink-muted">{subscriptionLine}</p>}
 
       {plan === "free" && (
         <div className="mt-6 rounded-md border border-warn/30 bg-warn-wash p-4">
@@ -346,11 +397,11 @@ export default function BillingTab({
           nothing stops today, nothing is deleted, and it can be undone. */}
       {plan !== "free" && (
         <Section title="Cancel" className="mt-8">
-          {cancelState?.cancelAtPeriodEnd ? (
+          {billing?.cancelAtPeriodEnd ? (
             <div className="space-y-3">
               <p className="text-sm text-ink">
                 Cancelled. {PLANS[plan].name} runs until{" "}
-                <span className="num">{formatEndDate(cancelState.endsAt)}</span>, then this
+                <span className="num">{formatEndDate(billing.periodEnd)}</span>, then this
                 company moves to Free. Your jobs, people and history stay where they are.
               </p>
               <Button
@@ -367,7 +418,7 @@ export default function BillingTab({
               <p className="text-sm font-medium text-ink">Cancel {PLANS[plan].name}?</p>
               <ul className="mt-2 space-y-1.5">
                 {[
-                  "You keep " + PLANS[plan].name + " until " + formatEndDate(cancelState?.endsAt) + ", the period you have already paid for.",
+                  "You keep " + PLANS[plan].name + " until " + formatEndDate(billing?.periodEnd) + ", the period you have already paid for.",
                   "There is no notice period and no cancellation fee.",
                   "After that this company moves to Free. Nothing is deleted.",
                   "You can undo this at any point before then.",

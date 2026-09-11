@@ -54,7 +54,8 @@ export async function POST() {
   try {
     const portalSession = await getStripe().billingPortal.sessions.create({
       customer: customerId!,
-      return_url: `${appUrl}/admin/settings`,
+      // The Billing tab is the only plan and cancel surface now.
+      return_url: `${appUrl}/admin?tab=billing`,
     })
     return NextResponse.json({ url: portalSession.url })
   } catch (err: any) {

@@ -12,9 +12,10 @@ interface Props {
   userData: any
   company: any
   onSiteRulesClick: () => void
+  onBillingClick: () => void
 }
 
-export default function SettingsMenu({ user, userData, company, onSiteRulesClick }: Props) {
+export default function SettingsMenu({ user, userData, company, onSiteRulesClick, onBillingClick }: Props) {
   const [open, setOpen] = useState(false)
   const [showAccount, setShowAccount] = useState(false)
   const [showCompany, setShowCompany] = useState(false)
@@ -98,12 +99,12 @@ export default function SettingsMenu({ user, userData, company, onSiteRulesClick
             Compliance
           </button>
 
-          <a href="/admin/settings" className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 text-gray-700">
+          <button onClick={go(onBillingClick)} className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 text-gray-700">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/>
             </svg>
             Billing & subscription
-          </a>
+          </button>
 
           <button onClick={go(onSiteRulesClick)} className="w-full px-4 py-2.5 text-left text-sm hover:bg-gray-50 flex items-center gap-3 text-gray-700">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
