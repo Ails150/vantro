@@ -9,6 +9,7 @@ import {
   ArrowDownRight,
   ClipboardCheck,
   Circle,
+  Share2,
   UserPlus,
   Wrench,
 } from "lucide-react"
@@ -203,7 +204,11 @@ export default function DashboardTab({
 
   return (
     <PageTransition>
-      <PageHeader title="Overview" description="What needs you today, and where the work stands." />
+      <PageHeader
+        title="Overview"
+        description="What needs you today, and where the work stands."
+        actions={<ShareInviteButton />}
+      />
 
       {/* The one upgrade line on this page, and only on Free.
           It leads with what Free already does -- sign in is geofenced, so the
@@ -274,9 +279,7 @@ export default function DashboardTab({
               <p className="max-w-[34ch] text-sm leading-relaxed text-ink-muted">
                 No one on site yet. Workers appear here the moment they sign in.
               </p>
-              <Button variant="secondary" size="sm" onClick={() => onNavigate("team")}>
-                Share invite link
-              </Button>
+              <ShareInviteButton />
             </div>
           ) : (
             <motion.ul
@@ -530,6 +533,56 @@ export default function DashboardTab({
 }
 
 /**
+ * Share the team's join link over WhatsApp.
+ *
+ * WhatsApp because that is where a crew already is. The alternative -- type six
+ * email addresses into an invite form -- is the step at which a free trial
+ * stops having any workers on it, and a supervisor standing in a site cabin is
+ * not going to do it.
+ *
+ * The link is fetched on press rather than on mount: most visits to this page
+ * are not invitations, and minting a token for every one of them is work
+ * nobody asked for.
+ */
+function ShareInviteButton() {
+  const [busy, setBusy] = React.useState(false)
+  const [error, setError] = React.useState<string | null>(null)
+
+  async function share() {
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/invite-link")
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.url) {
+        setError(data?.error || "Could not build an invite link.")
+        return
+      }
+      const text =
+        `Join ${data.companyName} on Vantro. Tap the link, put your name in, ` +
+        `and you are signed in: ${data.url}`
+      // wa.me with no number opens the contact picker, which is what "share
+      // with the lads" means -- it is not a message to one known person.
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener")
+    } catch {
+      setError("Could not reach Vantro. Check your connection.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <Button variant="secondary" size="sm" onClick={share} disabled={busy}>
+        <Share2 size={14} className="text-accent-ink" />
+        {busy ? "Building link…" : "Share invite on WhatsApp"}
+      </Button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
+  )
+}
+
+/**
  * Free-plan line. One sentence, one link, no box: it sits between the title
  * and the figures, and must not compete with either.
  */
@@ -541,9 +594,9 @@ function FreePlanLine({ onNavigate }: { onNavigate: (tab: string) => void }) {
         Free
       </span>
       <span>
-        Sign in is geofenced, so these hours are verified. Shifts older than{" "}
-        <span className="num">{days}</span> days are deleted, and payroll export and QR
-        codes need a paid plan.
+        Sign in is geofenced, so these hours are verified. History kept{" "}
+        <span className="num">{days}</span> days — older shifts are deleted nightly.
+        Payroll export and QR codes need a paid plan.
       </span>
       <button
         type="button"

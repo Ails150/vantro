@@ -6,6 +6,55 @@ import { PLANS } from '@/lib/billing'
 import type { Plan } from '@/lib/plan'
 import { generateSlug, getInitials, defaultSchedule as makeDefaultSchedule } from '@/lib/provisioning'
 
+/**
+ * Email a one-tap sign-in link.
+ *
+ * generateLink only mints the URL -- Supabase does not send it when called
+ * through the admin API -- so it goes out through Resend like every other
+ * email the product sends, and looks like one.
+ */
+async function sendMagicLink(
+  service: any,
+  email: string,
+  appUrl: string,
+): Promise<{ ok: boolean; detail?: string }> {
+  const { data, error } = await service.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+    options: { redirectTo: `${appUrl}/auth/callback?next=/admin` },
+  })
+  const link = data?.properties?.action_link
+  if (error || !link) return { ok: false, detail: error?.message || 'no action link' }
+
+  const key = process.env.RESEND_API_KEY
+  if (!key) return { ok: false, detail: 'RESEND_API_KEY is not set' }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: 'Vantro <noreply@getvantro.com>',
+        to: email,
+        subject: 'Your Vantro sign-in link',
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+          <div style="background:#00C896;width:40px;height:40px;border-radius:8px;text-align:center;line-height:40px;margin-bottom:24px">
+            <span style="color:#07100D;font-weight:800;font-size:1rem">V</span>
+          </div>
+          <h2 style="color:#0A1A14;font-size:1.4rem;margin-bottom:12px">Your account is ready</h2>
+          <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">Tap the button to sign in. There is no password to set.</p>
+          <a href="${link}" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700">Sign in to Vantro</a>
+          <p style="color:#888;font-size:12px;margin-top:24px">This link expires in one hour. Request a new one from the sign-in page at any time.</p>
+        </div>`,
+      }),
+    })
+    if (!res.ok) return { ok: false, detail: `resend ${res.status}` }
+    return { ok: true }
+  } catch (err: any) {
+    return { ok: false, detail: err?.message || String(err) }
+  }
+}
+
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
   if (!key) throw new Error('STRIPE_SECRET_KEY is not configured')
@@ -21,7 +70,13 @@ function getStripe(): Stripe {
  *
  * This means: if the user abandons checkout, no orphan company exists in our DB.
  *
- * Body: { email, password, companyName, yourName, teamSize, plan }
+ * Body (free):  { email, companyName, plan: 'free' }
+ * Body (paid):  { email, password, companyName, yourName, teamSize, plan }
+ *
+ * Free asks for two fields and no password: there is nothing to set, because
+ * signing in is a magic link. Everything else is derived -- the admin's name
+ * comes off the email local part until they change it, and headcount stopped
+ * picking a price when the plans changed.
  */
 export async function POST(request: Request) {
   // Rate limit: 3 signups per IP per hour, prevents Stripe/Supabase pollution
@@ -39,26 +94,42 @@ export async function POST(request: Request) {
   }
 
   const { email, password, companyName, yourName, teamSize, plan } = body
+  const isFree = (plan as Plan) === 'free'
 
-  // Validation
-  if (!email || !password) {
-    return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
-  }
-  if (password.length < 8) {
-    return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+  // Validation. Free is the two-field path, so only the two fields are
+  // required; the paid path still needs everything Stripe and the webhook
+  // depend on.
+  if (!email?.trim()) {
+    return NextResponse.json({ error: 'Email is required' }, { status: 400 })
   }
   if (!companyName?.trim()) {
     return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
   }
-  if (!yourName?.trim()) {
-    return NextResponse.json({ error: 'Your name is required' }, { status: 400 })
-  }
-  if (!teamSize || teamSize < 1 || teamSize > 100) {
-    return NextResponse.json({ error: 'Team size must be between 1 and 100' }, { status: 400 })
-  }
   if (!PLANS[plan as Plan]) {
     return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
   }
+  if (!isFree) {
+    if (!password) {
+      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
+    }
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+    }
+    if (!yourName?.trim()) {
+      return NextResponse.json({ error: 'Your name is required' }, { status: 400 })
+    }
+    if (!teamSize || teamSize < 1 || teamSize > 100) {
+      return NextResponse.json({ error: 'Team size must be between 1 and 100' }, { status: 400 })
+    }
+  }
+
+  // "john.smith@" -> "John Smith". A placeholder they can correct in Account,
+  // not a guess we hide: it is better than an empty name on every alert email.
+  const derivedName = String(email).split('@')[0]
+    .replace(/[._-]+/g, ' ')
+    .replace(/\b\w/g, (c: string) => c.toUpperCase())
+    .trim() || 'Admin'
+  const adminDisplayName = (yourName?.trim() || derivedName)
 
   const tier = PLANS[plan as Plan]
   const service = await createServiceClient()
@@ -69,13 +140,15 @@ export async function POST(request: Request) {
   // (Email confirmation can happen post-Stripe if you want — for now we keep things simple)
   const { data: authData, error: authError } = await service.auth.admin.createUser({
     email,
-    password,
+    // Free accounts have no password at all. Generating a throwaway one would
+    // leave an unknown credential on the account that nobody can rotate.
+    ...(isFree ? {} : { password }),
     email_confirm: true, // Auto-confirm; we'll trust Stripe's verification of the email
     user_metadata: {
-      full_name: yourName.trim(),
+      full_name: adminDisplayName,
       company_name: companyName.trim(),
       pending_plan: plan,
-      pending_team_size: teamSize,
+      ...(isFree ? {} : { pending_team_size: teamSize }),
     },
   })
 
@@ -121,7 +194,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not create your company' }, { status: 500 })
     }
 
-    const adminName = yourName.trim()
+    const adminName = adminDisplayName
     const { error: userErr } = await service.from('users').insert({
       company_id: company.id,
       auth_user_id: authUserId,
@@ -139,7 +212,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not create your account' }, { status: 500 })
     }
 
-    return NextResponse.json({ ok: true, plan: 'free', companyId: company.id })
+    // There is no password and no checkout, so the only way in is the link.
+    // A failure to send is fatal to the signup from the user's point of view,
+    // so it is reported rather than logged and swallowed.
+    const sent = await sendMagicLink(service, email.toLowerCase().trim(), appUrl)
+    if (!sent.ok) {
+      console.error('[signup] magic link failed:', sent.detail)
+      return NextResponse.json({
+        error: 'Your account is ready but we could not send the sign-in link',
+        detail: 'Try signing in from the login page, which will send a fresh one.',
+      }, { status: 502 })
+    }
+
+    return NextResponse.json({ ok: true, plan: 'free', companyId: company.id, emailSent: true })
   }
 
   // Step 2: Create Stripe customer immediately so we can attach metadata
@@ -149,7 +234,7 @@ export async function POST(request: Request) {
     metadata: {
       auth_user_id: authUserId,
       company_name: companyName.trim(),
-      admin_name: yourName.trim(),
+      admin_name: adminDisplayName,
       plan,
       team_size: String(teamSize),
     },
@@ -172,7 +257,7 @@ export async function POST(request: Request) {
         metadata: {
           auth_user_id: authUserId,
           company_name: companyName.trim(),
-          admin_name: yourName.trim(),
+          admin_name: adminDisplayName,
           admin_email: email.toLowerCase().trim(),
           plan,
           team_size: String(teamSize),
