@@ -203,7 +203,13 @@ export async function POST(request: Request) {
       company_id: job.company_id,
       lat,
       lng,
-      accuracy_metres: accuracy,
+      // Rounded here, not trusted from the client: accuracy_metres is an
+      // integer column, and a shift row with no accuracy on it cannot be
+      // argued about afterwards -- "how sure was the phone?" is the first
+      // question asked when a sign in is disputed.
+      accuracy_metres: accuracy != null && Number.isFinite(Number(accuracy))
+        ? Math.round(Number(accuracy))
+        : null,
       distance_from_site_metres: distanceMetres,
       within_range: withinRange,
       expected_sign_out_time: finalExpectedSignOut,

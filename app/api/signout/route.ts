@@ -84,7 +84,11 @@ export async function POST(request: Request) {
     signed_out_method: 'manual',
     sign_out_lat: lat || null,
     sign_out_lng: lng || null,
-    sign_out_accuracy_metres: accuracy ? Math.round(accuracy) : null,
+    // `accuracy ? ...` dropped a legitimate 0 m fix to null. Rare, but 0 is
+    // the best possible reading, not a missing one.
+    sign_out_accuracy_metres: accuracy != null && Number.isFinite(Number(accuracy))
+      ? Math.round(Number(accuracy))
+      : null,
     sign_out_distance_metres: distanceMetres,
     sign_out_within_range: withinRange,
     hours_worked: hoursWorked,
