@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { processWalkthrough } from "../upload-clip/route"
+import { authoriseCron } from "@/lib/cron-auth"
 
 export const maxDuration = 300
 
 // Cron-triggered: catches walkthroughs that got stuck (Vercel killed function, network dropout, etc)
 export async function GET(request: Request) {
   // Verify cron secret
-  const authHeader = request.headers.get("authorization")
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cron = authoriseCron(request)
+  if (!cron.ok) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

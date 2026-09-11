@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { runNotificationEngine } from "@/lib/scheduling/notificationEngine"
+import { authoriseCron } from "@/lib/cron-auth"
 
 // Dry-run preview of what the notification cron would do RIGHT NOW.
 // Doesn't send pushes, doesn't write to DB.
@@ -13,14 +14,14 @@ import { runNotificationEngine } from "@/lib/scheduling/notificationEngine"
 //   /api/notifications/cron-debug?key=<CRON_SECRET>
 
 export async function GET(request: Request) {
+  // Also accepts ?key= so it can be opened in a browser. Both paths go
+  // through the same check, which refuses outright when CRON_SECRET is unset
+  // rather than matching the string "undefined".
   const url = new URL(request.url)
   const queryKey = url.searchParams.get("key")
-  const authHeader = request.headers.get("authorization")
-  const expected = `Bearer ${process.env.CRON_SECRET}`
-  const ok =
-    authHeader === expected ||
-    (queryKey && queryKey === process.env.CRON_SECRET)
-  if (!ok) {
+  const viaHeader = authoriseCron(request).ok
+  const viaQuery = !!process.env.CRON_SECRET && queryKey === process.env.CRON_SECRET
+  if (!viaHeader && !viaQuery) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

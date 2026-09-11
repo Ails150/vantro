@@ -17,6 +17,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { PLANS } from '@/lib/billing'
 import { toPlan } from '@/lib/plan'
+import { authoriseCron } from "@/lib/cron-auth"
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -25,8 +26,8 @@ function getStripe(): Stripe {
 }
 
 export async function GET(request: Request) {
-  const auth = request.headers.get('authorization')
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  const cron = authoriseCron(request)
+  if (!cron.ok) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
