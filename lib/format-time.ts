@@ -117,3 +117,79 @@ export function formatDateTimeLong(value: DateLike): string {
     hour12: false,
   })
 }
+
+// ---------------------------------------------------------------------------
+// Week boundaries.
+//
+// A payroll week is a wall-clock week in Europe/London, not a UTC week. Under
+// BST, London midnight is 23:00 UTC the day before, so a naive
+// `new Date(weekStart + "T00:00:00Z")` silently pulls an hour of Sunday-evening
+// work into the wrong week for half the year -- and the week a shift lands in
+// decides which timesheet it is paid on.
+// ---------------------------------------------------------------------------
+
+/** How far Europe/London is ahead of UTC, in minutes, at a given instant. */
+function londonOffsetMinutes(at: Date): number {
+  const parts = Object.fromEntries(
+    formatter({
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+    })
+      .formatToParts(at)
+      .map((p) => [p.type, p.value]),
+  ) as Record<string, string>
+  const asIfUTC = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour) % 24, Number(parts.minute), Number(parts.second),
+  )
+  return (asIfUTC - at.getTime()) / 60000
+}
+
+/**
+ * The instant at which a given London calendar day begins.
+ *
+ * DST in the UK switches at 01:00, never at midnight, so reading the offset at
+ * the UTC guess and subtracting it lands on the right instant without needing
+ * a second pass.
+ */
+export function londonMidnight(dateOnly: string): Date {
+  const guess = new Date(`${dateOnly}T00:00:00Z`)
+  if (Number.isNaN(guess.getTime())) throw new Error(`invalid date: ${dateOnly}`)
+  return new Date(guess.getTime() - londonOffsetMinutes(guess) * 60000)
+}
+
+/** "2026-09-11" for a Date, as London sees the calendar. */
+export function londonDateOnly(value: DateLike): string {
+  const d = toDate(value)
+  if (!d) return ""
+  const parts = Object.fromEntries(
+    formatter({ year: "numeric", month: "2-digit", day: "2-digit" })
+      .formatToParts(d)
+      .map((p) => [p.type, p.value]),
+  ) as Record<string, string>
+  return `${parts.year}-${parts.month}-${parts.day}`
+}
+
+/**
+ * The Monday of the London week containing `value`, as "YYYY-MM-DD".
+ *
+ * Monday because that is the week ISO-8601 and UK payroll both use; taking
+ * Sunday would move every Sunday shift into the previous week's timesheet.
+ */
+export function isoWeekStart(value: DateLike): string {
+  const dateOnly = londonDateOnly(value)
+  if (!dateOnly) throw new Error("invalid date for week start")
+  const weekdayName = formatIn(londonMidnight(dateOnly), { weekday: "short" })
+  const index = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].indexOf(weekdayName)
+  if (index < 0) throw new Error(`unrecognised weekday: ${weekdayName}`)
+  const monday = new Date(londonMidnight(dateOnly).getTime())
+  monday.setUTCDate(monday.getUTCDate() - index)
+  return londonDateOnly(monday)
+}
+
+/** Add whole London days to a "YYYY-MM-DD", returning "YYYY-MM-DD". */
+export function addDays(dateOnly: string, days: number): string {
+  const d = londonMidnight(dateOnly)
+  d.setUTCDate(d.getUTCDate() + days)
+  return londonDateOnly(d)
+}

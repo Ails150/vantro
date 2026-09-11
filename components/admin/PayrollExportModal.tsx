@@ -30,6 +30,8 @@ export default function PayrollExportModal({ open, onClose, onExported }: Props)
   const [byInstaller, setByInstaller] = useState<InstallerSummary[]>([])
   const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [xeroBusy, setXeroBusy] = useState(false)
+  const [xeroDone, setXeroDone] = useState<string | null>(null)
   const [error, setError] = useState("")
   const [confirmOpen, setConfirmOpen] = useState(false)
 
@@ -72,6 +74,38 @@ export default function PayrollExportModal({ open, onClose, onExported }: Props)
       setError(err?.message || "Network error")
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Xero timesheets are a different operation from the locking CSV export:
+  // safe to repeat, and keyed on the week rather than a free date range.
+  async function doXeroExport() {
+    setXeroBusy(true)
+    setError("")
+    try {
+      const res = await fetch("/api/payroll/xero", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ weekStart: from }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error || "Xero export failed")
+        return
+      }
+      const ref = res.headers.get("X-Timesheet-Ref") || "vantro-timesheet"
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = ref + ".csv"
+      a.click()
+      URL.revokeObjectURL(url)
+      setXeroDone(res.headers.get("X-Week-Start"))
+    } catch (err: any) {
+      setError(err?.message || "Network error")
+    } finally {
+      setXeroBusy(false)
     }
   }
 
@@ -123,6 +157,33 @@ export default function PayrollExportModal({ open, onClose, onExported }: Props)
         <div className="flex-1 overflow-y-auto px-6 py-5">
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-5 text-sm text-amber-800">
             <strong>Important:</strong> Exporting locks all timesheets in this date range. Once locked, sign-in/out times cannot be edited.
+          </div>
+
+          {/* Xero. Above the locking export because it is the safe one: it
+              can be run as often as you like and re-running a week updates
+              that week's timesheet rather than issuing a second. */}
+          <div className="border border-gray-200 rounded-lg px-4 py-3 mb-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-900">Xero timesheet</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  The payroll week containing the From date. Re-exporting a week updates
+                  that timesheet, it never creates a second one, and nothing is locked.
+                </p>
+              </div>
+              <button
+                onClick={doXeroExport}
+                disabled={xeroBusy || !from}
+                className="shrink-0 px-4 py-2 border border-gray-200 hover:bg-gray-50 rounded-lg text-sm disabled:opacity-50"
+              >
+                {xeroBusy ? "Building…" : "Download for Xero"}
+              </button>
+            </div>
+            {xeroDone && (
+              <p className="text-xs text-teal-700 mt-2">
+                Timesheet for the week starting {xeroDone} downloaded.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-5">
