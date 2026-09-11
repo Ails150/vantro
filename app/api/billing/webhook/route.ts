@@ -82,8 +82,24 @@ export async function POST(request: Request) {
         break
       }
       case 'customer.subscription.deleted': {
+        // The period the customer paid for has now ended, so this is where a
+        // cancellation actually takes effect.
+        //
+        // plan: 'free' is the part that was missing. Without it a cancelled
+        // company kept plan: 'payroll' forever -- subscription_status said
+        // 'cancelled' but every gate in the app resolves through companies.plan
+        // via lib/plan.ts, so they kept payroll features indefinitely and never
+        // paid again. Nothing is deleted here: the rows stay, and the free
+        // retention window is applied by the nightly job, which is what lets
+        // Billing promise that cancelling keeps your data.
         const sub = event.data.object as Stripe.Subscription
-        await service.from('companies').update({ subscription_status: 'cancelled', ai_audit_enabled: false, stripe_ai_audit_subscription_item_id: null }).eq('stripe_subscription_id', sub.id)
+        await service.from('companies').update({
+          plan: 'free',
+          subscription_status: 'cancelled',
+          ai_audit_enabled: false,
+          stripe_ai_audit_subscription_item_id: null,
+        }).eq('stripe_subscription_id', sub.id)
+        console.log('[webhook] subscription ended, company moved to free:', sub.id)
         break
       }
       case 'invoice.payment_failed': {

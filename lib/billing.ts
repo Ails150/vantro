@@ -21,7 +21,7 @@ export const PLANS = {
     price: 0,
     /** No Stripe object. A free company never becomes a customer. */
     priceId: null as string | null,
-    blurb: "Manual sign in and out, and today's board.",
+    blurb: "Geofenced sign in and out, and today's board.",
   },
   payroll: {
     name: "Payroll",

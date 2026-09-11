@@ -25,6 +25,7 @@ import { adminNavGroups, tabBadge, DEFAULT_TAB, type AdminTab, type TabBadgeCoun
 import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
 import { toPlan } from "@/lib/plan"
+import { type SupportContacts } from "@/lib/support"
 import BillingTab from "./tabs/BillingTab"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/Button"
@@ -71,9 +72,11 @@ interface Props {
   user: any; userData: any; company: any; jobs: any[]; signins: any[]; alerts: any[]
   pendingQA: any[]; teamMembers: any[]; jobAssignments: any[]
   checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string; trialExpiredAndUnpaid?: boolean
+  /** Read from env on the server -- this component cannot read it itself. */
+  support: SupportContacts
 }
 
-export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid }: Props) {
+export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid, support }: Props) {
   // Which tabs this company sees. The nav arrays are data in nav/tabs.ts and
   // the hide list is data in lib/vertical.ts, so the render below stays a map
   // over an array and nothing here knows why a tab is missing.
@@ -2327,6 +2330,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           <BillingTab
             company={company}
             teamMembers={teamMembers}
+            support={support}
+            onOpenSupportTab={() => setActiveTab("support")}
             onOpenPortal={handleOpenBillingPortal}
           />
         )}

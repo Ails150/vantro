@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server'
 import AdminDashboard from '@/components/admin/AdminDashboard'
 import SupportBanner from '@/components/support/SupportBanner'
 import { getCallerContext } from '@/lib/company-context'
+import { getSupportContacts } from '@/lib/support'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -153,6 +154,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         jobAssignments={jobAssignmentsResult.data || []}
         checklistTemplates={checklistTemplatesResult.data || []}
         diaryEntries={diaryEntriesResult.data || []}
+        support={getSupportContacts()}
         defaultTab={params.tab || "overview"}
       />
     </>
