@@ -26,6 +26,7 @@ import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
 import { toPlan } from "@/lib/plan"
 import { type SupportContacts } from "@/lib/support"
+import { useNow } from "@/components/ui/useNow"
 import BillingTab from "./tabs/BillingTab"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/Button"
@@ -74,9 +75,15 @@ interface Props {
   checklistTemplates: any[]; diaryEntries: any[]; resolvedAlerts: any[]; defaultTab: string; trialExpiredAndUnpaid?: boolean
   /** Read from env on the server -- this component cannot read it itself. */
   support: SupportContacts
+  /** Server render timestamp. Every relative time below is measured from it. */
+  serverNow: number
 }
 
-export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid, support }: Props) {
+export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid, support, serverNow }: Props) {
+  // One clock for the whole dashboard. It reads `serverNow` on the first
+  // render -- matching the server HTML exactly -- then switches to the real
+  // clock after hydration and ticks once a minute.
+  const nowMs = useNow(serverNow)
   // Which tabs this company sees. The nav arrays are data in nav/tabs.ts and
   // the hide list is data in lib/vertical.ts, so the render below stays a map
   // over an array and nothing here knows why a tab is missing.
@@ -412,7 +419,12 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   // Overview triage view: derived data
   // ============================================================
   const overviewData = useMemo(() => {
-    const now = new Date()
+    // Measured from the shared clock, NOT from a fresh Date(). This memo runs
+    // on the server and again in the browser, and "9h 31m late" computed a
+    // second apart is a different string -- which threw the whole tree away on
+    // every load (Sentry e4a10aa82ed64f15b4fb996e02e3a194, reported against
+    // LateNote, whose minsLate comes from here).
+    const now = new Date(nowMs)
     const startOfToday = new Date(now); startOfToday.setHours(0,0,0,0)
     const startOfWeek = new Date(now)
     const day = startOfWeek.getDay()
@@ -665,7 +677,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       unresolvedAlertCount,
       oldAlertCount,
     }
-  }, [jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults, teamMembers])
+  }, [nowMs, jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults, teamMembers])
 
   const supabase = createClient()
 
@@ -1267,12 +1279,19 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             pendingQA={pendingQA}
             currentUserId={userData?.id}
             plan={toPlan(company?.plan)}
+            nowMs={nowMs}
             onNavigate={setActiveTab}
           />
         )}
 
         {activeTab === "analytics" && <AnalyticsTab companyId={userData.company_id} teamMembers={teamMembers} jobs={jobs} />}
-        {activeTab === "approvals" && <ApprovalsTab key={Date.now().toString()} pendingQA={pendingQA} onRefresh={() => router.refresh()} />}
+        {/* No key={Date.now()}. ApprovalsTab fetches its own list on mount and
+            ignores the pendingQA prop, so the key was a way to force a refetch --
+            but it changed on EVERY parent render, remounting the tab constantly and
+            discarding half-typed remedial notes. The conditional above already
+            mounts it fresh each time the tab is opened, which is when a refetch is
+            actually wanted. */}
+        {activeTab === "approvals" && <ApprovalsTab pendingQA={pendingQA} onRefresh={() => router.refresh()} />}
 
         {activeTab === "jobs" && (
           <PageTransition>
@@ -2197,7 +2216,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
               </div>
             </div>
             {(() => {
-              const now = Date.now()
+              const now = nowMs
               const q = diarySearch.trim().toLowerCase()
               const filtered = diaryEntries.filter((d: any) => {
                 if (diaryJobFilter !== 'all' && (d.jobs?.name || '') !== diaryJobFilter) return false
@@ -2355,8 +2374,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                       const sod = new Date(); sod.setHours(0,0,0,0)
                       return ts >= sod.getTime()
                     }
-                    if (f === '7d') return ts > Date.now() - 7*86400000
-                    if (f === '30d') return ts > Date.now() - 30*86400000
+                    if (f === '7d') return ts > nowMs - 7*86400000
+                    if (f === '30d') return ts > nowMs - 30*86400000
                     return true
                   })
                   const count = filtered.length
@@ -2379,8 +2398,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                   const sod = new Date(); sod.setHours(0,0,0,0)
                   return ts >= sod.getTime()
                 }
-                if (alertFilter === '7d') return ts > Date.now() - 7*86400000
-                if (alertFilter === '30d') return ts > Date.now() - 30*86400000
+                if (alertFilter === '7d') return ts > nowMs - 7*86400000
+                if (alertFilter === '30d') return ts > nowMs - 30*86400000
                 return true
               })
               if (filtered.length === 0) {

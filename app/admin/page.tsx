@@ -155,6 +155,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         checklistTemplates={checklistTemplatesResult.data || []}
         diaryEntries={diaryEntriesResult.data || []}
         support={getSupportContacts()}
+        // Stamped once, on the server, so the first client render agrees with
+        // the HTML it is hydrating. See components/ui/useNow.
+        serverNow={Date.now()}
         defaultTab={params.tab || "overview"}
       />
     </>

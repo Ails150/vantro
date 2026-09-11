@@ -37,6 +37,11 @@ type Props = {
   currentUserId?: string
   /** Drives the one upgrade line on this page. */
   plan?: Plan
+  /**
+   * The shared clock, from AdminDashboard. Every elapsed time on this page is
+   * measured from it so the first render matches the server HTML.
+   */
+  nowMs: number
   onNavigate: (tab: string) => void
 }
 
@@ -135,6 +140,7 @@ export default function DashboardTab({
   pendingQA,
   currentUserId,
   plan = "free",
+  nowMs,
   onNavigate,
 }: Props) {
   const peopleThisWeek = React.useMemo(() => {
@@ -150,9 +156,9 @@ export default function DashboardTab({
     const oldest = pendingQA.reduce((acc: any, q: any) =>
       !acc || new Date(q.created_at) < new Date(acc.created_at) ? q : acc, null)
     if (!oldest?.created_at) return null
-    const hours = Math.floor((Date.now() - new Date(oldest.created_at).getTime()) / 3600000)
+    const hours = Math.floor((nowMs - new Date(oldest.created_at).getTime()) / 3600000)
     return hours >= 24 ? `${Math.floor(hours / 24)}d` : `${hours}h`
-  }, [pendingQA])
+  }, [pendingQA, nowMs])
 
   const tiles = [
     {
@@ -282,7 +288,7 @@ export default function DashboardTab({
               {overviewData.onSiteNow.map((p: any, idx: number) => {
                 const mins = Math.max(
                   0,
-                  Math.floor((Date.now() - new Date(p.signedInAt).getTime()) / 60000)
+                  Math.floor((nowMs - new Date(p.signedInAt).getTime()) / 60000)
                 )
                 const h = Math.floor(mins / 60)
                 const m = mins % 60
