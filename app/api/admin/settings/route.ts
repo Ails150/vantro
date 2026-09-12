@@ -22,6 +22,9 @@ const FIELDS = [
   "sick_auto_approve",
   "default_start_time",
   "default_sign_out_time",
+  "notification_quiet_start",
+  "notification_quiet_end",
+  "notification_weekend_push",
 ] as const
 
 export async function GET() {
@@ -102,6 +105,31 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `${key} must be in HH:MM format` }, { status: 400 })
       }
     }
+  }
+
+  // Notification quiet hours. Defaults are 19:00 -> 06:00 with no weekend
+  // pushes; the window may wrap midnight, so end <= start is valid and is not
+  // rejected here. Unlike the shift times above these are NOT NULL: clearing
+  // them would mean "no quiet hours", and losing the setting should not be a
+  // way to start pushing at 3am.
+  for (const key of ["notification_quiet_start", "notification_quiet_end"] as const) {
+    if (body[key] !== undefined) {
+      const v = body[key]
+      if (typeof v === "string" && /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(v)) {
+        updates[key] = v
+      } else {
+        return NextResponse.json({ error: `${key} must be a time in HH:MM format` }, { status: 400 })
+      }
+    }
+  }
+  if (body.notification_weekend_push !== undefined) {
+    if (typeof body.notification_weekend_push !== "boolean") {
+      return NextResponse.json(
+        { error: "notification_weekend_push must be true or false" },
+        { status: 400 },
+      )
+    }
+    updates.notification_weekend_push = body.notification_weekend_push
   }
 
   if (body.country_code !== undefined) {

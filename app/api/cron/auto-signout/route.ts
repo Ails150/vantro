@@ -51,8 +51,13 @@ export async function GET(request: Request) {
     // Hard cap: nobody works a single shift longer than this.
     if (ageHours > MAX_SHIFT_HOURS) {
       const closeAt = new Date(signedInAt.getTime() + 8 * 3600000)
-      await closeSignin(service, s.id, closeAt, signedInAt, "max_shift_duration")
-      results.push({ signinId: s.id, action: "closed", reason: "max_shift_duration", ageHours: ageHours.toFixed(1) })
+      const closed = await closeSignin(service, s.id, closeAt, signedInAt, "max_shift_duration")
+      results.push({
+        signinId: s.id,
+        action: closed ? "closed" : "close_failed",
+        reason: "max_shift_duration",
+        ageHours: ageHours.toFixed(1),
+      })
       continue
     }
 
@@ -68,8 +73,13 @@ export async function GET(request: Request) {
         }
         const threshold = expectedSignOut.getTime() + SHIFT_END_GRACE_HOURS * 3600000
         if (now.getTime() > threshold) {
-          await closeSignin(service, s.id, expectedSignOut, signedInAt, "shift_ended")
-          results.push({ signinId: s.id, action: "closed", reason: "shift_ended", ageHours: ageHours.toFixed(1) })
+          const closed = await closeSignin(service, s.id, expectedSignOut, signedInAt, "shift_ended")
+          results.push({
+            signinId: s.id,
+            action: closed ? "closed" : "close_failed",
+            reason: "shift_ended",
+            ageHours: ageHours.toFixed(1),
+          })
           continue
         }
       }
@@ -78,19 +88,41 @@ export async function GET(request: Request) {
     results.push({ signinId: s.id, action: "skip", reason: "within_shift_window", ageHours: ageHours.toFixed(1) })
   }
 
+  const failed = results.filter(r => r.action === "close_failed").length
+  if (failed > 0) {
+    console.error("[cron] auto-signout could not close", failed, "shift(s) - see rejections above")
+  }
+
   return NextResponse.json({
     ok: true,
     runAt: now.toISOString(),
     totalOpen: openSignins?.length || 0,
     closed: results.filter(r => r.action === "closed").length,
+    closeFailed: failed,
     skipped: results.filter(r => r.action === "skip").length,
     results,
   })
 }
 
-async function closeSignin(service: any, signinId: string, signedOutAt: Date, signedInAt: Date, reason: string) {
+// Returns whether the shift actually closed.
+//
+// This used to be fire-and-forget. From 2026-09-04 the evidence write-once
+// trigger rejected every one of these UPDATEs (signed_out_method defaulted to
+// 'manual', so 'auto' was a rewrite, not a first write - see
+// 20260912090000_signout_method_not_write_once.sql). The error went nowhere,
+// the route reported "closed", and the 14-hour safety net was dead for eight
+// days without a single line in the logs. An unreported failure here is worse
+// than a loud one: this is the last thing standing between a stuck shift and a
+// wrong timesheet.
+async function closeSignin(
+  service: any,
+  signinId: string,
+  signedOutAt: Date,
+  signedInAt: Date,
+  reason: string,
+): Promise<boolean> {
   const hoursWorked = (signedOutAt.getTime() - signedInAt.getTime()) / 3600000
-  await service
+  const { data, error } = await service
     .from("signins")
     .update({
       signed_out_at: signedOutAt.toISOString(),
@@ -101,4 +133,17 @@ async function closeSignin(service: any, signinId: string, signedOutAt: Date, si
       flagged: true,
     })
     .eq("id", signinId)
+    .is("signed_out_at", null)
+    .select("id")
+
+  if (error) {
+    console.error("[cron] auto-signout UPDATE rejected - shift left open", {
+      signinId,
+      reason,
+      code: error.code,
+      message: error.message,
+    })
+    return false
+  }
+  return Array.isArray(data) && data.length > 0
 }

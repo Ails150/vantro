@@ -19,6 +19,10 @@ export async function GET(request: Request) {
       auto_closed: result.auto_closed,
       time_off_skipped: result.time_off_skipped,
       duplicate_skipped: result.duplicate_skipped,
+      // Deliberately not sent, by rule. A run where this climbs and reminders
+      // stays at zero is quiet hours working, not a broken cron -- the same
+      // decisions are in notification_log with the reason attached.
+      suppressed: result.suppressed,
     })
     return NextResponse.json({ success: true, ...result })
   } catch (err: any) {

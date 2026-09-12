@@ -7,21 +7,35 @@ import { config as loadEnv } from "dotenv"
 loadEnv({ path: ".env.e2e" })
 
 export default defineConfig({
-  testDir: "./tests/e2e",
-  // The suite touches a live tenant, so specs must not race each other for the
-  // same rows. One worker, in order.
-  workers: 1,
-  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["github"], ["list"]] : [["list"]],
-  timeout: 60_000,
   expect: { timeout: 15_000 },
   use: {
-    baseURL: process.env.E2E_BASE_URL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "off",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      // Pure logic. No browser, no server, no tenant -- so these run anywhere,
+      // including on a machine with no .env.e2e, and they run in parallel.
+      // `npx playwright test --project=unit` is the fast gate.
+      name: "unit",
+      testDir: "./tests/unit",
+      fullyParallel: true,
+      timeout: 10_000,
+      retries: 0,
+    },
+    {
+      // The suite touches a live tenant, so specs must not race each other for
+      // the same rows. One worker, in order.
+      name: "chromium",
+      testDir: "./tests/e2e",
+      workers: 1,
+      fullyParallel: false,
+      timeout: 60_000,
+      retries: process.env.CI ? 1 : 0,
+      use: { ...devices["Desktop Chrome"], baseURL: process.env.E2E_BASE_URL },
+    },
+  ],
 })

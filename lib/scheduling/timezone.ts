@@ -16,6 +16,8 @@ export type LocalNow = {
   minute: number
   /** YYYY-MM-DD in the company's local timezone */
   dateStr: string
+  /** Day of week in the company's local timezone: 0 = Sunday .. 6 = Saturday */
+  dayIndex: number
   /** Local minutes since midnight (hour*60 + minute) */
   minutesOfDay: number
   /** UTC instant the local "today midnight" corresponds to (for date-bounded queries) */
@@ -64,8 +66,13 @@ export function nowInTimezone(tz: string | null | undefined, when: Date = new Da
   const dateStr = `${yyyy}-${mm}-${dd}`
   const minutesOfDay = hour * 60 + minute
   const todayUtcMidnight = localMidnightToUtc(dateStr, zone)
+  // Weekday of the LOCAL calendar date. Deriving it from the formatted date
+  // parts rather than from `when.getDay()` matters at the edges: 23:30 Saturday
+  // in London is already Sunday in Helsinki, and a weekend rule that reads the
+  // server's day gets that backwards for half the platform.
+  const dayIndex = new Date(Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd))).getUTCDay()
 
-  return { tz: zone, hour, minute, dateStr, minutesOfDay, todayUtcMidnight }
+  return { tz: zone, hour, minute, dateStr, dayIndex, minutesOfDay, todayUtcMidnight }
 }
 
 /**

@@ -1,17 +1,28 @@
 // app/api/installer/geofence-exit/route.ts
 //
 // Mobile fires this when iOS Region Monitoring detects the installer has
-// crossed the site boundary leaving the geofence. We:
-// 1. Find the installer's open signin for this job
-// 2. Log the exit breadcrumb, while the signin is still open -- closing it
-//    seals the GPS trail into one hash, and this ping has to be inside it
-// 3. Close it with signed_out_at = exitedAt (the moment they crossed)
-// 4. Capture lat/lng of the exit point
-// 5. Flag as auto_signed_out so admin can distinguish from manual sign-out
+// crossed the site boundary leaving the geofence.
 //
-// This is the ONLY background-fired endpoint - all other sign-outs are
-// manual (installer taps "Sign Out") and go through the regular sign-out
-// route.
+// WHAT THIS USED TO DO, AND WHY IT NO LONGER DOES
+// It closed the shift immediately, on that one event. A single region-exit
+// callback is not evidence someone went home: iOS fires it on a bad fix, on a
+// cell-tower handover, on a phone that briefly lost GPS inside a steel-framed
+// building. The cost of being wrong is a worker's afternoon disappearing off
+// their timesheet, and they find out from a push telling them they were signed
+// out while they are standing on site.
+//
+// The rule now is the one in lib/notifications/rules.ts: at least two fixes,
+// every one of them outside the fence with a known accuracy better than 100m,
+// spanning at least ten continuous minutes, and only against an open shift.
+// One event cannot satisfy that by construction, so this endpoint no longer
+// decides anything. It records the crossing as a breadcrumb and the
+// notifications cron evaluates the run on its next tick.
+//
+// The accuracy of this fix is no longer recorded as 0. The mobile client does
+// not send one, and 0 does not mean "perfect", it means "not measured" -- and
+// under an accuracy-gated rule a fabricated 0 is the one value that would let
+// an untrustworthy fix sign somebody out. Absent accuracy is stored as null,
+// which the dwell rule treats as unusable.
 
 import { verifyFieldToken } from "@/lib/auth"
 import { NextResponse } from "next/server"
@@ -28,7 +39,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 })
   }
 
-  const { jobId, lat, lng, exitedAt } = body
+  const { jobId, lat, lng, exitedAt, accuracy } = body
   if (!jobId || typeof lat !== "number" || typeof lng !== "number") {
     return NextResponse.json({ error: "Missing jobId/lat/lng" }, { status: 400 })
   }
@@ -60,88 +71,52 @@ export async function POST(request: Request) {
     })
   }
 
+  // Clamp a crossing that claims to predate the sign-in or postdate now. Clock
+  // skew and replayed queued events both produce these.
   const signedInAt = new Date(signin.signed_in_at)
-  let signedOutAt = exitTime
-
-  // Sanity check - if exit time is somehow BEFORE signed_in_at, clamp
-  // to signed_in_at (zero-hours shift). This shouldn't happen but
-  // protects against clock skew / replay.
-  if (signedOutAt < signedInAt) {
-    signedOutAt = signedInAt
-  }
-
-  // Also clamp to now if exit time is in the future
+  let loggedAt = exitTime
+  if (loggedAt < signedInAt) loggedAt = signedInAt
   const now = new Date()
-  if (signedOutAt > now) {
-    signedOutAt = now
-  }
+  if (loggedAt > now) loggedAt = now
 
-  const hoursWorked = Math.max(
-    0,
-    (signedOutAt.getTime() - signedInAt.getTime()) / 3600000
-  )
-
-  // Log the breadcrumb for the exit event BEFORE closing the signin.
+  // The breadcrumb. This is the whole job of the endpoint now.
   //
-  // Order matters now: closing a signin fires signins_location_batch_hash,
-  // which hashes that signin's whole GPS trail as one piece of evidence. A ping
-  // written after the update falls outside the batch -- and this is the single
-  // most evidential ping in the trail, the one that records them crossing the
-  // boundary. See supabase/migrations/20260904010000_evidence_hashes.sql.
+  // It is written while the signin is still open on purpose: closing a signin
+  // fires signins_location_batch_hash, which hashes that shift's whole GPS
+  // trail as one piece of evidence, and a ping written afterwards falls outside
+  // the batch. This is the most evidential ping in the trail -- the one that
+  // records them crossing the boundary.
   //
-  // This insert has also never once succeeded. It omitted job_id, which is NOT
-  // NULL on location_logs, so every call failed on a not-null violation and the
-  // bare `catch {}` threw the error away. There is no geofence exit breadcrumb
-  // anywhere in the table. signin_id was missing too, which would have left
-  // every exit ping outside the batch even once job_id was fixed.
-  //
-  // Still best-effort: a missing breadcrumb must not stop someone being signed
-  // out. But the failure is logged now rather than swallowed.
-  const { error: breadcrumbErr } = await service
-    .from("location_logs")
-    .insert({
-      signin_id: signin.id,
-      user_id: installer.userId,
-      company_id: signin.company_id,
-      job_id: signin.job_id,
-      lat,
-      lng,
-      accuracy_metres: 0,
-      // Definitional: this endpoint only fires because they crossed out of the
-      // geofence. distance_from_site_metres is left null -- we know they are
-      // outside, not by how far, and the job coordinates are not loaded here.
-      within_range: false,
-      source: "geofence-exit",
-      logged_at: signedOutAt.toISOString(),
-    })
+  // This insert also never once succeeded before 2026-09-04: it omitted job_id,
+  // which is NOT NULL, and a bare `catch {}` threw the error away.
+  const { error: breadcrumbErr } = await service.from("location_logs").insert({
+    signin_id: signin.id,
+    user_id: installer.userId,
+    company_id: signin.company_id,
+    job_id: signin.job_id,
+    lat,
+    lng,
+    accuracy_metres:
+      typeof accuracy === "number" && Number.isFinite(accuracy) ? Math.round(accuracy) : null,
+    // Definitional: this endpoint only fires because they crossed out of the
+    // geofence. distance_from_site_metres is left null -- we know they are
+    // outside, not by how far, and the job coordinates are not loaded here.
+    within_range: false,
+    source: "geofence-exit",
+    logged_at: loggedAt.toISOString(),
+  })
 
   if (breadcrumbErr) {
     console.error("[geofence-exit] breadcrumb insert failed", breadcrumbErr)
-  }
-
-  // Close the signin
-  const { error: updateErr } = await service
-    .from("signins")
-    .update({
-      signed_out_at: signedOutAt.toISOString(),
-      sign_out_lat: lat,
-      sign_out_lng: lng,
-      hours_worked: parseFloat(hoursWorked.toFixed(2)),
-      auto_closed: true,
-      auto_closed_reason: "geofence_exit",
-      flagged: false,
-    })
-    .eq("id", signin.id)
-
-  if (updateErr) {
-    return NextResponse.json({ error: updateErr.message }, { status: 500 })
+    return NextResponse.json({ error: breadcrumbErr.message }, { status: 500 })
   }
 
   return NextResponse.json({
     success: true,
     signinId: signin.id,
-    signedOutAt: signedOutAt.toISOString(),
-    hoursWorked: parseFloat(hoursWorked.toFixed(2)),
-    action: "auto_signed_out_geofence_exit",
+    loggedAt: loggedAt.toISOString(),
+    // Explicitly not a sign-out. The cron decides, once there is a run of fixes
+    // that clears the dwell and accuracy bar.
+    action: "exit_recorded_pending_dwell",
   })
 }
