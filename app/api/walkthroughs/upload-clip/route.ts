@@ -5,6 +5,7 @@ import { verifyFieldToken } from "@/lib/auth"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { WALKTHROUGH_SYSTEM_PROMPT, buildUserMessage } from "@/lib/ai/walkthrough-prompt"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { parseRecordedAt } from "@/lib/uploads/mime"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -274,10 +275,24 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json()
-    const { jobId, streamUid, durationSeconds, lat, lng } = body
+    const { jobId, streamUid, durationSeconds, lat, lng, recordedAt } = body
 
     if (!jobId || !streamUid) {
       return NextResponse.json({ error: "Missing jobId or streamUid" }, { status: 400 })
+    }
+
+    // When the clip was RECORDED, which for a queued offline upload is not now.
+    // The row used to be stamped with new Date() -- the upload time -- and
+    // recorded_at is write-once evidence, so that lie was permanent. The mobile
+    // queue has carried the real time all along and simply never sent it.
+    //
+    // Required, not defaulted: an app old enough not to send it gets a clear
+    // error and keeps the clip queued on the device until it is updated, which
+    // is better than filing a morning walkthrough as an evening one forever.
+    const recorded = parseRecordedAt(recordedAt, new Date())
+    if (!recorded.ok) {
+      console.warn("[upload-clip] rejected: recordedAt", { userId: installer.userId, recordedAt })
+      return NextResponse.json({ error: recorded.error }, { status: 400 })
     }
 
     const service = await createServiceClient()
@@ -321,7 +336,7 @@ export async function POST(request: Request) {
         company_id: me.company_id,
         job_id: jobId,
         installer_id: installer.userId,
-        recorded_at: new Date().toISOString(),
+        recorded_at: recorded.at.toISOString(),
         gps_lat: lat || null,
         gps_lng: lng || null,
         duration_seconds: durationSeconds || null,

@@ -5,6 +5,7 @@ import { verifyFieldToken } from "@/lib/auth"
 import { uploadReceipt } from "@/lib/expense-upload"
 import { assertJobBelongsToCaller } from "@/lib/tenant"
 import { recordFileHash } from "@/lib/evidence"
+import { normaliseReceiptMime } from "@/lib/uploads/mime"
 
 /**
  * POST /api/expenses
@@ -65,6 +66,17 @@ export async function POST(request: Request) {
       if (!owned.ok) return owned.response
     }
 
+    // What kind of file this is, refused rather than guessed.
+    //
+    // This used to be `file.type || "image/jpeg"` at both use sites below. A
+    // client that sent no MIME type had its PDF receipt filed as a JPEG, and
+    // because receipt_mime was write-once the mislabel was permanent. Better to
+    // fail the upload and tell the person why.
+    const mime = normaliseReceiptMime(file.type)
+    if (!mime.ok) {
+      return NextResponse.json({ error: mime.error }, { status: 400 })
+    }
+
     const fileBuffer = Buffer.from(await file.arrayBuffer())
 
     // Idempotency: the same receipt image, for the same amount, on the same
@@ -98,7 +110,7 @@ export async function POST(request: Request) {
       companyId: installer.companyId,
       userId: installer.userId,
       fileBuffer,
-      mimeType: file.type || "image/jpeg",
+      mimeType: mime.mime,
       fileName: file.name,
     })
 
@@ -123,7 +135,7 @@ export async function POST(request: Request) {
       category,
       note: note || null,
       receipt_url: uploaded.publicUrl,
-      receipt_mime: file.type || "image/jpeg",
+      receipt_mime: mime.mime,
       idempotency_key: idempotencyKey,
     }
 
