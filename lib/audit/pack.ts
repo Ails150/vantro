@@ -68,6 +68,14 @@ function collectSubjects(data: AuditData) {
   add(data.defects)
   add(data.variations)
   add(data.walkthroughs)
+  // Safety briefings and, more importantly, every signature on them. The
+  // signature is a named person attesting they were briefed, which is the most
+  // evidential row the product holds; leaving it out of the manifest meant the
+  // pack printed it without covering it.
+  add(data.toolboxTalks)
+  for (const t of data.toolboxTalks || []) {
+    for (const sg of t?.signatures || []) if (sg?.id) entityIds.add(sg.id)
+  }
 
   for (const s of data.signins || []) if (s?.id) signinIds.add(s.id)
 

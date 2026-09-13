@@ -340,7 +340,7 @@ export async function fetchAuditData(
     .from("toolbox_talks")
     .select("id, title, notes, document_url, delivered_at, locked_at, " +
             "delivered_by_user:users!toolbox_talks_delivered_by_fkey(id, name), " +
-            "signatures:toolbox_talk_signatures(user_id, signed_at, lat, lng, users(id, name))")
+            "signatures:toolbox_talk_signatures(id, user_id, signed_at, lat, lng, users(id, name))")
     .eq("company_id", companyId)
     .eq("job_id", jobId)
     .is("archived_at", null)
@@ -366,6 +366,10 @@ export async function fetchAuditData(
     .filter((t: AnyRow) => (!from && !to) || inPeriod(t.delivered_at))
     .map((t: AnyRow) => {
       const signatures = (t.signatures || []).map((sg: AnyRow) => ({
+        // The signature's own id, so the pack can find its evidence hash.
+        // Without it the row is printed in the report but contributes nothing
+        // to the merkle root, which is a weaker claim than it looks.
+        id: sg.id,
         user_id: sg.user_id,
         name: sg.users?.name || "Unknown",
         signed_at: sg.signed_at,
