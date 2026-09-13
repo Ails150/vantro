@@ -13,6 +13,7 @@ import JobProgressTab from "@/components/admin/JobProgressTab"
 import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import ComplianceTab from "@/components/admin/ComplianceTab"
 import ToolboxTalksTab from "@/components/admin/ToolboxTalksTab"
+import RamsTab from "@/components/admin/RamsTab"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
@@ -2357,6 +2358,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
           />
         )}
         {activeTab === "toolbox" && <ToolboxTalksTab jobs={jobs.map((j: any) => ({ id: j.id, name: j.name }))} />}
+        {activeTab === "rams" && <RamsTab jobs={jobs.map((j: any) => ({ id: j.id, name: j.name }))} />}
         {activeTab === "settings" && <SettingsTab isSuperadmin={viewerIsSuperadmin} />}
 
         {activeTab === "support" && <SupportTab />}

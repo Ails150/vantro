@@ -24,7 +24,7 @@ import {
   BadgeCheck, Banknote, Bell, BookOpen, Briefcase, Building2, Calendar,
   CreditCard,
   CalendarClock, ChartColumn, FileSearch, Footprints, Gauge, HardHat, LayoutDashboard,
-  LifeBuoy, ListChecks, Map, MapPinned, Settings, TrendingUp, TriangleAlert,
+  LifeBuoy, ListChecks, Map, MapPinned, Settings, ShieldCheck, TrendingUp, TriangleAlert,
   Users, Wrench,
 } from "lucide-react"
 
@@ -80,6 +80,7 @@ const manageTabs: AdminTab[] = [
   { id: "payroll", label: "Payroll", icon: Banknote },
   { id: "defects", label: "Defects", icon: TriangleAlert },
   { id: "toolbox", label: "Toolbox talks", icon: HardHat },
+  { id: "rams", label: "RAMS", icon: ShieldCheck },
   { id: "progress", label: "Progress", icon: TrendingUp },
   { id: "walkthroughs", label: "Walk & talks", icon: Footprints },
   { id: "audit", label: "Audit", icon: FileSearch },

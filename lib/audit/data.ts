@@ -99,6 +99,18 @@ export interface AuditData {
    * talk row alone.
    */
   toolboxTalks: AnyRow[]
+  /**
+   * The RAMS in force for this job, its version history, and who has signed the
+   * current version. Signatures are against a version, so "signed" here always
+   * means "signed the one in force" -- a revision correctly resets everyone.
+   */
+  rams: {
+    current: AnyRow | null
+    versions: AnyRow[]
+    signatures: AnyRow[]
+    outstanding: AnyRow[]
+    crewSize: number
+  }
   /** Phase 1.4. Empty unless options.includeAdminLog is set. The human half of
    *  the chain of custody: who approved, resolved, edited or attempted to
    *  delete, and when. */
@@ -395,6 +407,76 @@ export async function fetchAuditData(
     })
 
   // -------------------------------------------------------------------------
+  // RAMS: the method statement in force, its history, and the signature gap.
+  // -------------------------------------------------------------------------
+  // Not period-filtered. A RAMS uploaded before the reporting window still
+  // governs the work inside it, and dropping it because it predates `from`
+  // would report a job with no method statement -- the opposite of the truth.
+  // The version history is included so the pack shows a revision happening
+  // mid-job, which is exactly when signatures go stale.
+  const { data: ramsVersions } = await service
+    .from("rams_documents")
+    .select("id, version, title, notes, document_url, document_path, document_sha256, " +
+            "created_at, superseded_at, archived_at, " +
+            "uploaded_by_user:users!rams_documents_uploaded_by_fkey(id, name)")
+    .eq("company_id", companyId)
+    .eq("job_id", jobId)
+    .is("archived_at", null)
+    .order("version", { ascending: true })
+
+  const ramsCurrent = (ramsVersions || []).find((v: AnyRow) => !v.superseded_at) || null
+
+  let ramsSignatures: AnyRow[] = []
+  if (ramsCurrent) {
+    const { data: sigs } = await service
+      .from("rams_signatures")
+      .select("id, user_id, signed_at, read_seconds, lat, lng, users(id, name)")
+      .eq("rams_id", ramsCurrent.id)
+      .order("signed_at", { ascending: true })
+    ramsSignatures = (sigs || []).map((sg: AnyRow) => ({
+      id: sg.id,
+      user_id: sg.user_id,
+      name: sg.users?.name || "Unknown",
+      signed_at: sg.signed_at,
+      read_seconds: sg.read_seconds,
+      located: sg.lat != null && sg.lng != null,
+    }))
+  }
+  const ramsSignedIds = new Set(ramsSignatures.map((sg: AnyRow) => sg.user_id))
+
+  const rams = {
+    current: ramsCurrent
+      ? {
+          id: ramsCurrent.id,
+          version: ramsCurrent.version,
+          title: ramsCurrent.title,
+          notes: ramsCurrent.notes,
+          document_url: ramsCurrent.document_url,
+          document_path: ramsCurrent.document_path,
+          document_sha256: ramsCurrent.document_sha256,
+          created_at: ramsCurrent.created_at,
+          uploaded_by: ramsCurrent.uploaded_by_user?.name || null,
+        }
+      : null,
+    versions: (ramsVersions || []).map((v: AnyRow) => ({
+      id: v.id,
+      version: v.version,
+      title: v.title,
+      created_at: v.created_at,
+      superseded_at: v.superseded_at,
+      uploaded_by: v.uploaded_by_user?.name || null,
+    })),
+    signatures: ramsSignatures,
+    outstanding: ramsCurrent
+      ? crew
+          .filter((u: AnyRow) => !ramsSignedIds.has(u.id))
+          .map((u: AnyRow) => ({ user_id: u.id, name: u.name }))
+          .sort((a: AnyRow, b: AnyRow) => a.name.localeCompare(b.name))
+      : [],
+    crewSize: crew.length,
+  }
+
+  // -------------------------------------------------------------------------
   // Phase 1.4: the admin audit log for this job and period.
   // -------------------------------------------------------------------------
   // Everything above records what happened on site. This records what happened
@@ -407,7 +489,7 @@ export async function fetchAuditData(
     // Scoped by the entities this job actually owns, so a busy company's log
     // does not leak other jobs' activity into this pack.
     const subjectIds = new Set<string>([jobId])
-    for (const r of [...signins, ...qa, ...diary, ...defects, ...variations, ...toolboxTalks]) {
+    for (const r of [...signins, ...qa, ...diary, ...defects, ...variations, ...toolboxTalks, ...rams.versions]) {
       if (r?.id) subjectIds.add(r.id)
     }
 
@@ -430,5 +512,5 @@ export async function fetchAuditData(
     adminLog = (logRows || []).filter((r: AnyRow) => !NOISE.test(r.action || ""))
   }
 
-  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, toolboxTalks, adminLog }
+  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, toolboxTalks, rams, adminLog }
 }

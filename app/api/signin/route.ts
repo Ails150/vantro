@@ -9,6 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { isInstallerWorking } from "@/lib/scheduling/resolver"
 import { resolveGeofenceRadius } from "@/lib/geofence-server"
 import { assertJobBelongsToCaller } from "@/lib/tenant"
+import { getRamsGate } from "@/lib/rams"
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000
@@ -59,6 +60,33 @@ export async function POST(request: Request) {
     job.lat = lat
     job.lng = lng
     siteAnchored = true
+  }
+
+  // RAMS gate. Before the geofence check on purpose: whether they are standing
+  // in the right place does not matter if they are not cleared to start work,
+  // and two refusals in a row for one attempt is a bad door.
+  //
+  // Checked against the version in force, so a revision puts the whole crew
+  // back to unsigned and tells them that rather than repeating the first-time
+  // wording.
+  const ramsGate = await getRamsGate(service, jobId, installer.userId)
+  if (ramsGate.blocked) {
+    return NextResponse.json(
+      {
+        error: ramsGate.message,
+        ramsRequired: true,
+        rams: ramsGate.rams
+          ? {
+              id: ramsGate.rams.id,
+              title: ramsGate.rams.title,
+              version: ramsGate.rams.version,
+              documentUrl: ramsGate.rams.document_url,
+            }
+          : null,
+        previouslySignedVersion: ramsGate.signedVersion,
+      },
+      { status: 403 },
+    )
   }
 
   let distanceMetres = 0

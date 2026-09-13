@@ -286,7 +286,7 @@ Write the executive summary now.`
 // ---------------- HTML render ----------------
 
 function renderReport(data: any, narrative: string, narrativeIsAI: boolean, integrity: PackIntegrity | null): string {
-  const { job, company, period, signins, qa, diary, defects, variations = [], toolboxTalks = [] } = data
+  const { job, company, period, signins, qa, diary, defects, variations = [], toolboxTalks = [], rams = { current: null, versions: [], signatures: [], outstanding: [], crewSize: 0 } } = data
   // Phase 1.2: the reference printed on this report is the one it is registered
   // under, so a reader who quotes it at /verify gets an answer. It used to be
   // built here from the job name and a slice of Date.now() -- never stored,
@@ -574,6 +574,41 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   const toolboxExpected = toolboxSigned + toolboxUnsigned
   const toolboxCompliance = toolboxExpected > 0 ? Math.round((toolboxSigned / toolboxExpected) * 100) : 100
 
+  // RAMS. The document hash is printed because it is the difference between
+  // "they signed the RAMS" as a claim about a URL and as a claim about a file:
+  // the bytes behind a link can be swapped, a sha256 cannot.
+  const ramsSignedCount = (rams.signatures || []).length
+  const ramsUnsignedCount = (rams.outstanding || []).length
+  const ramsExpected = ramsSignedCount + ramsUnsignedCount
+  const ramsCompliance = ramsExpected > 0 ? Math.round((ramsSignedCount / ramsExpected) * 100) : null
+
+  const ramsSection = !rams.current
+    ? `<p class="muted bad">No risk assessment or method statement has been uploaded for this job.</p>`
+    : `
+    <div class="card">
+      <h3>${escapeHtml(rams.current.title)} &mdash; version ${escapeHtml(String(rams.current.version))}</h3>
+      <div class="muted">Uploaded ${escapeHtml(fmtDateTime(rams.current.created_at))}${rams.current.uploaded_by ? " by " + escapeHtml(rams.current.uploaded_by) : ""}</div>
+      <div class="muted">Document SHA-256: <code>${escapeHtml(String(rams.current.document_sha256 || "").slice(0, 32))}&hellip;</code></div>
+      ${rams.current.notes ? `<p>${escapeHtml(rams.current.notes)}</p>` : ""}
+      <div class="muted"><strong>${ramsSignedCount} of ${ramsExpected}</strong> of the assigned crew have signed this version</div>
+      <ul>
+        ${(rams.signatures || []).map((sg: any) =>
+          `<li>${escapeHtml(sg.name)} &mdash; ${escapeHtml(fmtDateTime(sg.signed_at))}${sg.located ? " &middot; location recorded" : ""}</li>`
+        ).join("")}
+        ${(rams.outstanding || []).map((o: any) =>
+          `<li class="bad">${escapeHtml(o.name)} &mdash; not signed</li>`
+        ).join("")}
+      </ul>
+    </div>
+    ${(rams.versions || []).length > 1 ? `
+    <h3>Revision history</h3>
+    <p class="muted">A revision resets the signatures: a signature on an earlier version does not clear the current one, and sign-in is blocked until the new version is signed.</p>
+    <ul>
+      ${(rams.versions || []).map((v: any) =>
+        `<li>Version ${escapeHtml(String(v.version))} &mdash; ${escapeHtml(fmtDateTime(v.created_at))}${v.superseded_at ? ` (superseded ${escapeHtml(fmtDateTime(v.superseded_at))})` : " <strong>(in force)</strong>"}</li>`
+      ).join("")}
+    </ul>` : ""}`
+
   const toolboxCards = toolboxTalks.length === 0
     ? `<p class="muted">No toolbox talks were recorded on this job in this period.</p>`
     : toolboxTalks.map((t: any) => {
@@ -797,6 +832,23 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   </table>`}
   <div class="footer">
     <span>Vantro · getvantro.com</span>
+    <span>${refId}</span>
+  </div>
+</section>
+
+<!-- PAGE 3a0: RAMS -->
+<section class="page">
+  <h2>Risk assessment and method statement</h2>
+  <p class="muted">The method statement in force for this job, and every member of the assigned crew who has signed the version currently in force. Sign-in is blocked for anyone who has not.</p>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-num ${rams.current ? "ok" : "bad"}">${rams.current ? "v" + escapeHtml(String(rams.current.version)) : "&mdash;"}</div><div class="kpi-label">Version in force</div></div>
+    <div class="kpi"><div class="kpi-num">${ramsSignedCount}</div><div class="kpi-label">Signed</div></div>
+    <div class="kpi"><div class="kpi-num ${ramsUnsignedCount === 0 ? "ok" : "bad"}">${ramsUnsignedCount}</div><div class="kpi-label">Not signed</div></div>
+    <div class="kpi"><div class="kpi-num ${ramsCompliance === null ? "" : ramsCompliance >= 100 ? "ok" : ramsCompliance >= 80 ? "warn" : "bad"}">${ramsCompliance === null ? "&mdash;" : ramsCompliance + "%"}</div><div class="kpi-label">RAMS compliance</div></div>
+  </div>
+  ${ramsSection}
+  <div class="footer">
+    <span>Vantro &middot; getvantro.com</span>
     <span>${refId}</span>
   </div>
 </section>

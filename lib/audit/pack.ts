@@ -76,6 +76,12 @@ function collectSubjects(data: AuditData) {
   for (const t of data.toolboxTalks || []) {
     for (const sg of t?.signatures || []) if (sg?.id) entityIds.add(sg.id)
   }
+  // Every RAMS version, not just the one in force: a superseded method
+  // statement is what governed the work done before the revision, and a pack
+  // that covered only the current one would leave that period unevidenced.
+  add(data.rams?.versions)
+  for (const sg of data.rams?.signatures || []) if (sg?.id) entityIds.add(sg.id)
+  if (data.rams?.current?.document_path) paths.add(data.rams.current.document_path)
 
   for (const s of data.signins || []) if (s?.id) signinIds.add(s.id)
 

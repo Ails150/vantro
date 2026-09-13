@@ -176,6 +176,28 @@ export async function POST(request: Request) {
     talks: toolboxTalks,
   }
 
+  // RAMS — the method statement in force and who has signed it.
+  //
+  // `noRams` is reported as its own state rather than folded into 0% compliance:
+  // a job with no method statement uploaded and a job where nobody signed one
+  // are different findings, and an assessor treats them differently.
+  const ramsData = data.rams || { current: null, versions: [], signatures: [], outstanding: [], crewSize: 0 }
+  const ramsSigned = ramsData.signatures.length
+  const ramsOutstanding = ramsData.outstanding.length
+  const ramsExpected = ramsSigned + ramsOutstanding
+  const rams = {
+    present: !!ramsData.current,
+    current: ramsData.current,
+    versionCount: ramsData.versions.length,
+    versions: ramsData.versions,
+    signatures: ramsData.signatures,
+    outstanding: ramsData.outstanding,
+    crewSize: ramsData.crewSize,
+    signedCount: ramsSigned,
+    unsignedCount: ramsOutstanding,
+    compliance: ramsExpected > 0 ? Math.round((ramsSigned / ramsExpected) * 100) : null,
+  }
+
   // Issues — diary entries flagged + open defects
   const blockers = diary.filter(d => d.ai_alert_type === "blocker")
   const issues = diary.filter(d => d.ai_alert_type === "issue")
@@ -194,6 +216,7 @@ export async function POST(request: Request) {
     counts: [ qaRows.length, diary.length, defects.length, signins.length ],
     flags: [ blockers.length, issues.length, openDefects.length, progressiveSignoffs.length ],
     toolbox: [ toolbox.talkCount, toolbox.signatureCount, toolbox.unsignedCount ],
+    rams: [ rams.versionCount, rams.signedCount, rams.unsignedCount ],
     finalSignoff: finalSignoff ? finalSignoff.at : null,
     last: [ _maxTs(qaRows, "created_at"), _maxTs(diary, "created_at"), _maxTs(defects, "created_at"), _maxTs(signins, "signed_in_at") ],
   })).digest("hex")
@@ -232,6 +255,9 @@ export async function POST(request: Request) {
         deliverables: deliverables.map(d => ({ name: d.name, status: d.status, progress: `${d.approvedItems}/${d.totalItems} approved` })),
         signoffs: progressiveSignoffs.length,
         toolboxTalks: { given: toolbox.talkCount, signatures: toolbox.signatureCount, unsigned: toolbox.unsignedCount },
+        rams: rams.present
+          ? { version: rams.current?.version, signed: rams.signedCount, unsigned: rams.unsignedCount, revisions: rams.versionCount }
+          : "none uploaded for this job",
         finalSignoff: finalSignoff ? `Job marked complete by ${finalSignoff.by}` : null,
         blockers: blockers.map(b => ({ summary: b.ai_summary, text: b.entry_text?.slice(0, 200) })),
         issues: issues.map(i => ({ summary: i.ai_summary, text: i.entry_text?.slice(0, 200) })),
@@ -465,6 +491,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     signoffs: progressiveSignoffs,
     onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, geofenceRadiusMetres, fullLog: signins },
     toolbox,
+    rams,
     issues: { blockers, issues, openDefects, allDefects: defects },
     fullEvidence: { qa: qaRows, diary, defects, walkthroughs, signins },
     // Phase 1.4: the human half of the chain of custody.
