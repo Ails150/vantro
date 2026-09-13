@@ -104,6 +104,12 @@ export interface AuditData {
    * current version. Signatures are against a version, so "signed" here always
    * means "signed the one in force" -- a revision correctly resets everyone.
    */
+  /**
+   * Near misses, injuries and hazards on this job. Not period-filtered on
+   * `occurred_at` alone: an incident reported inside the window about something
+   * that happened just before it still belongs to this pack.
+   */
+  incidents: AnyRow[]
   rams: {
     current: AnyRow | null
     versions: AnyRow[]
@@ -167,7 +173,7 @@ export async function fetchAuditData(
     .eq("id", companyId).single()
 
   let signinsQ = service.from("signins")
-    .select("id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_from_site_metres, sign_out_distance_metres, within_range, sign_out_within_range, hours_worked, flagged, flag_reason, departed_early, early_departure_minutes, auto_closed, auto_closed_reason, users!user_id(id, name, trades)")
+    .select("id, signed_in_at, signed_out_at, lat, lng, sign_out_lat, sign_out_lng, distance_from_site_metres, sign_out_distance_metres, within_range, sign_out_within_range, hours_worked, flagged, flag_reason, departed_early, early_departure_minutes, auto_closed, auto_closed_reason, rams_check, users!user_id(id, name, trades)")
     .eq("job_id", jobId).order("signed_in_at", { ascending: true })
   if (from) signinsQ = signinsQ.gte("signed_in_at", from)
   if (to) signinsQ = signinsQ.lte("signed_in_at", to + "T23:59:59Z")
@@ -407,6 +413,55 @@ export async function fetchAuditData(
     })
 
   // -------------------------------------------------------------------------
+  // Incidents.
+  // -------------------------------------------------------------------------
+  // Filtered on reported_at rather than occurred_at, because an incident
+  // reported during the period is part of what happened during the period even
+  // if the event itself was a day earlier. Both timestamps are carried so a
+  // reader can see the lag, which is itself worth seeing: a week between the
+  // two is a reporting-culture finding.
+  let incidentsQ = service
+    .from("incidents")
+    .select("id, kind, description, photo_urls, photo_paths, occurred_at, reported_at, " +
+            "lat, lng, status, acknowledged_at, closed_at, closure_notes, " +
+            "reporter:users!incidents_reported_by_fkey(id, name), " +
+            "ack:users!incidents_acknowledged_by_fkey(name), " +
+            "closer:users!incidents_closed_by_fkey(name)")
+    .eq("company_id", companyId)
+    .eq("job_id", jobId)
+    .order("reported_at", { ascending: true })
+  if (from) incidentsQ = incidentsQ.gte("reported_at", from)
+  if (to) incidentsQ = incidentsQ.lte("reported_at", to + "T23:59:59Z")
+  const { data: incidentRows, error: incidentErr } = await incidentsQ
+  if (incidentErr) console.error("[audit] incidents error:", incidentErr.message)
+
+  const incidents: AnyRow[] = []
+  for (const i of incidentRows || []) {
+    const urls: string[] = []
+    for (const u of i.photo_urls || []) {
+      const signed = await signOne(service, u, ttl)
+      if (signed) urls.push(signed)
+    }
+    incidents.push({
+      id: i.id,
+      kind: i.kind,
+      description: i.description,
+      photo_urls: urls,
+      photo_paths: i.photo_paths || [],
+      occurred_at: i.occurred_at,
+      reported_at: i.reported_at,
+      reported_by: i.reporter?.name || "Unknown",
+      located: i.lat != null && i.lng != null,
+      status: i.status,
+      acknowledged_at: i.acknowledged_at,
+      acknowledged_by: i.ack?.name || null,
+      closed_at: i.closed_at,
+      closed_by: i.closer?.name || null,
+      closure_notes: i.closure_notes,
+    })
+  }
+
+  // -------------------------------------------------------------------------
   // RAMS: the method statement in force, its history, and the signature gap.
   // -------------------------------------------------------------------------
   // Not period-filtered. A RAMS uploaded before the reporting window still
@@ -489,7 +544,7 @@ export async function fetchAuditData(
     // Scoped by the entities this job actually owns, so a busy company's log
     // does not leak other jobs' activity into this pack.
     const subjectIds = new Set<string>([jobId])
-    for (const r of [...signins, ...qa, ...diary, ...defects, ...variations, ...toolboxTalks, ...rams.versions]) {
+    for (const r of [...signins, ...qa, ...diary, ...defects, ...variations, ...toolboxTalks, ...rams.versions, ...incidents]) {
       if (r?.id) subjectIds.add(r.id)
     }
 
@@ -512,5 +567,5 @@ export async function fetchAuditData(
     adminLog = (logRows || []).filter((r: AnyRow) => !NOISE.test(r.action || ""))
   }
 
-  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, toolboxTalks, rams, adminLog }
+  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, toolboxTalks, rams, incidents, adminLog }
 }

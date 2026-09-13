@@ -14,6 +14,7 @@ import AnalyticsTab from "@/components/admin/AnalyticsTab"
 import ComplianceTab from "@/components/admin/ComplianceTab"
 import ToolboxTalksTab from "@/components/admin/ToolboxTalksTab"
 import RamsTab from "@/components/admin/RamsTab"
+import IncidentsTab from "@/components/admin/IncidentsTab"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
@@ -241,6 +242,24 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   // trades_foundation_patched
   const [multiTradeEnabled, setMultiTradeEnabled] = useState(false)
   const [companyTrades, setCompanyTrades] = useState<Array<{ trade_key: string; label: string; enabled: boolean }>>([])
+  const [openIncidents, setOpenIncidents] = useState<any[]>([])
+
+  // Open incidents, for the Today pin. Loaded here rather than inside the tab
+  // because the whole point is that they are visible without opening the tab:
+  // an unclosed hazard should not be something you have to go and look for.
+  useEffect(() => {
+    let cancelled = false
+    const load = () => {
+      fetch("/api/admin/incidents?status=open")
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => { if (d && !cancelled) setOpenIncidents(d.incidents || []) })
+        .catch(() => {})
+    }
+    load()
+    const t = setInterval(load, 120000)
+    return () => { cancelled = true; clearInterval(t) }
+  }, [])
+
   // Team tab filters
   const [teamSearch, setTeamSearch] = useState("")
   const [teamRoleFilter, setTeamRoleFilter] = useState<string>("all")
@@ -449,7 +468,28 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       ? Math.floor((now.getTime() - new Date(oldestPendingQA.created_at).getTime()) / (1000 * 60 * 60))
       : 0
 
+    const injuries = openIncidents.filter((i: any) => i.kind === "injury")
     const actionItems = [
+      // First in the list, always. An open injury outranks every other thing
+      // an admin could be looking at, and a hazard nobody has closed is a live
+      // problem rather than a queue item.
+      injuries.length > 0 && {
+        key: "injuries",
+        label: injuries.length === 1 ? "Injury reported" : `${injuries.length} injuries reported`,
+        sub: "Not closed",
+        tab: "incidents",
+        severity: "high",
+      },
+      openIncidents.length - injuries.length > 0 && {
+        key: "incidents",
+        label:
+          openIncidents.length - injuries.length === 1
+            ? "Open incident"
+            : `${openIncidents.length - injuries.length} open incidents`,
+        sub: "Near miss or hazard, not closed",
+        tab: "incidents",
+        severity: "high",
+      },
       pendingQA.length > 0 && {
         key: "qa",
         label: pendingQA.length === 1 ? "QA approval waiting" : `${pendingQA.length} QA approvals waiting`,
@@ -679,7 +719,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       unresolvedAlertCount,
       oldAlertCount,
     }
-  }, [nowMs, jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults, teamMembers])
+  }, [nowMs, jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults, teamMembers, openIncidents])
 
   const supabase = createClient()
 
@@ -2359,6 +2399,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         )}
         {activeTab === "toolbox" && <ToolboxTalksTab jobs={jobs.map((j: any) => ({ id: j.id, name: j.name }))} />}
         {activeTab === "rams" && <RamsTab jobs={jobs.map((j: any) => ({ id: j.id, name: j.name }))} />}
+        {activeTab === "incidents" && <IncidentsTab />}
         {activeTab === "settings" && <SettingsTab isSuperadmin={viewerIsSuperadmin} />}
 
         {activeTab === "support" && <SupportTab />}

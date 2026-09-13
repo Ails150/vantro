@@ -185,8 +185,23 @@ export async function POST(request: Request) {
   const ramsSigned = ramsData.signatures.length
   const ramsOutstanding = ramsData.outstanding.length
   const ramsExpected = ramsSigned + ramsOutstanding
+  // Shifts that started while the gate was failing open. Counted separately
+  // from unsigned crew, because they are a different failure: nobody skipped a
+  // signature, the check itself did not run. Silence here is not the same as
+  // zero -- a null rams_check is a shift from before the column existed, and is
+  // reported as unknown rather than folded into "fine".
+  const ramsSkipped = signins.filter((sn: AnyRow) => sn.rams_check === "skipped_error")
+  const ramsUnrecorded = signins.filter((sn: AnyRow) => sn.rams_check == null).length
+
   const rams = {
     present: !!ramsData.current,
+    gateSkippedCount: ramsSkipped.length,
+    gateUnrecordedCount: ramsUnrecorded,
+    gateSkipped: ramsSkipped.map((sn: AnyRow) => ({
+      id: sn.id,
+      name: sn.users?.name || "Unknown",
+      signedInAt: sn.signed_in_at,
+    })),
     current: ramsData.current,
     versionCount: ramsData.versions.length,
     versions: ramsData.versions,
@@ -196,6 +211,22 @@ export async function POST(request: Request) {
     signedCount: ramsSigned,
     unsignedCount: ramsOutstanding,
     compliance: ramsExpected > 0 ? Math.round((ramsSigned / ramsExpected) * 100) : null,
+  }
+
+  // Incidents. `openCount` is the finding: a near miss reported and closed is
+  // a safety system working, and one still open at the end of the reporting
+  // period is not.
+  const incidentRows = data.incidents || []
+  const incidents = {
+    total: incidentRows.length,
+    byKind: {
+      near_miss: incidentRows.filter((i: AnyRow) => i.kind === "near_miss").length,
+      injury: incidentRows.filter((i: AnyRow) => i.kind === "injury").length,
+      hazard: incidentRows.filter((i: AnyRow) => i.kind === "hazard").length,
+    },
+    openCount: incidentRows.filter((i: AnyRow) => i.status !== "closed").length,
+    closedCount: incidentRows.filter((i: AnyRow) => i.status === "closed").length,
+    items: incidentRows,
   }
 
   // Issues — diary entries flagged + open defects
@@ -216,7 +247,8 @@ export async function POST(request: Request) {
     counts: [ qaRows.length, diary.length, defects.length, signins.length ],
     flags: [ blockers.length, issues.length, openDefects.length, progressiveSignoffs.length ],
     toolbox: [ toolbox.talkCount, toolbox.signatureCount, toolbox.unsignedCount ],
-    rams: [ rams.versionCount, rams.signedCount, rams.unsignedCount ],
+    rams: [ rams.versionCount, rams.signedCount, rams.unsignedCount, rams.gateSkippedCount ],
+    incidents: [ incidents.total, incidents.openCount, incidents.byKind.injury ],
     finalSignoff: finalSignoff ? finalSignoff.at : null,
     last: [ _maxTs(qaRows, "created_at"), _maxTs(diary, "created_at"), _maxTs(defects, "created_at"), _maxTs(signins, "signed_in_at") ],
   })).digest("hex")
@@ -254,9 +286,10 @@ export async function POST(request: Request) {
         onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance },
         deliverables: deliverables.map(d => ({ name: d.name, status: d.status, progress: `${d.approvedItems}/${d.totalItems} approved` })),
         signoffs: progressiveSignoffs.length,
+        incidents: { total: incidents.total, open: incidents.openCount, injuries: incidents.byKind.injury, nearMisses: incidents.byKind.near_miss },
         toolboxTalks: { given: toolbox.talkCount, signatures: toolbox.signatureCount, unsigned: toolbox.unsignedCount },
         rams: rams.present
-          ? { version: rams.current?.version, signed: rams.signedCount, unsigned: rams.unsignedCount, revisions: rams.versionCount }
+          ? { version: rams.current?.version, signed: rams.signedCount, unsigned: rams.unsignedCount, revisions: rams.versionCount, shiftsStartedWithoutCheck: rams.gateSkippedCount }
           : "none uploaded for this job",
         finalSignoff: finalSignoff ? `Job marked complete by ${finalSignoff.by}` : null,
         blockers: blockers.map(b => ({ summary: b.ai_summary, text: b.entry_text?.slice(0, 200) })),
@@ -492,6 +525,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, geofenceRadiusMetres, fullLog: signins },
     toolbox,
     rams,
+    incidents,
     issues: { blockers, issues, openDefects, allDefects: defects },
     fullEvidence: { qa: qaRows, diary, defects, walkthroughs, signins },
     // Phase 1.4: the human half of the chain of custody.

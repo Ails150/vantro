@@ -28,9 +28,6 @@
 // silently dropped, and reported back by the API so the gap is visible in the
 // UI too:
 //
-//   near miss                    no incidents table; diary_entries.ai_alert_type
-//                                has no safety category (blocker | issue |
-//                                variation | update | normal | none)
 //   client dispute note          no dispute concept; nearest existing homes are
 //                                `variations` or a flagged diary entry
 //
@@ -51,7 +48,6 @@ export const DEMO_ADMIN_EMAIL = "demo+northbridge@getvantro.com"
 export const DEMO_ADMIN_PASSWORD = process.env.DEMO_ADMIN_PASSWORD || "Northbridge!Demo2026"
 
 export const UNSUPPORTED = [
-  "1 near miss - no incidents table; diary_entries has no safety alert category",
   "1 client dispute note with linked evidence - no dispute concept; nearest homes are variations or a flagged diary entry",
 ] as const
 
@@ -408,6 +404,7 @@ async function purge(service: Service, log: (s: string) => void): Promise<void> 
 
   // Ordered child-first. Every one of these is filtered on company_id.
   const byCompany = [
+    "incidents",
     "rams_signatures",
     "rams_documents",
     "toolbox_talk_signatures",
@@ -1104,6 +1101,99 @@ export async function seedDemo(
   counts.rams_versions = ramsVersions
   counts.rams_signatures = ramsSignatures
   counts.rams_signatures_outstanding = ramsOutstanding
+
+  // --- incidents -----------------------------------------------------------
+  // One near miss still open, and one hazard reported and closed. Two states
+  // on purpose: a pack where everything is closed shows a tidy company but not
+  // a working feature, and the open one is what pins to the admin's Today.
+  const incidentPhotos = await makePhotos(
+    { service, companyId, userId: adminId, warnings },
+    [
+      { label: "Rowley Park", sub: "Unsecured stillage, north bay", hue: 30 },
+      { label: "Riverside Mews", sub: "Trailing lead across the walkway", hue: 30 },
+    ],
+  )
+
+  let incidentCount = 0
+  const incidentPlan = [
+    {
+      job: jobs[2],
+      reporter: workers[6].id,
+      kind: "near_miss",
+      daysAgo: 3,
+      description:
+        "A stillage of sealed units was left unstrapped on the north bay overnight. Coming in this " +
+        "morning the top unit had slid about 200mm and was resting against the edge protection. " +
+        "Nobody was underneath it. Strapped it and moved it back off the edge before starting.",
+      photo: 0,
+      close: null as null | { daysAfter: number; notes: string },
+    },
+    {
+      job: jobs[1],
+      reporter: workers[3].id,
+      kind: "hazard",
+      daysAgo: 12,
+      description:
+        "Extension lead for the saw running straight across the walkway from the cabin to the " +
+        "ground floor openings. Two of us nearly went over it carrying a unit.",
+      photo: 1,
+      close: {
+        daysAfter: 1,
+        notes:
+          "Rerouted the supply along the hoarding with cable protectors over the crossing point, and " +
+          "moved the cut station next to the cabin so the run is three metres instead of fifteen. " +
+          "Raised it at the following morning's start with both crews.",
+      },
+    },
+  ]
+
+  for (const plan of incidentPlan) {
+    const occurredAt = atLocal(addDays(today, -plan.daysAgo), 7, 40)
+    const reportedAt = new Date(occurredAt.getTime() + 35 * 60000)
+    const photo = incidentPhotos[plan.photo]
+
+    const { data: incident, error: incErr } = await service
+      .from("incidents")
+      .insert({
+        company_id: companyId,
+        job_id: plan.job.id,
+        reported_by: plan.reporter,
+        kind: plan.kind,
+        description: plan.description,
+        photo_urls: photo ? [photo.url] : [],
+        photo_paths: photo?.key ? [photo.key] : [],
+        occurred_at: iso(occurredAt),
+        reported_at: iso(reportedAt),
+        lat: plan.job.lat + (r() - 0.5) * 0.0006,
+        lng: plan.job.lng + (r() - 0.5) * 0.0006,
+        accuracy_metres: Math.floor(r() * 12) + 5,
+      })
+      .select("id")
+      .single()
+    if (incErr || !incident) {
+      warnings.push(`Incident (${plan.kind}) failed: ${incErr?.message}`)
+      continue
+    }
+    incidentCount++
+
+    if (plan.close) {
+      const closedAt = new Date(reportedAt.getTime() + plan.close.daysAfter * 86400000)
+      const { error: closeErr } = await service
+        .from("incidents")
+        .update({
+          status: "closed",
+          acknowledged_by: adminId,
+          acknowledged_at: iso(new Date(reportedAt.getTime() + 90 * 60000)),
+          closed_by: adminId,
+          closed_at: iso(closedAt),
+          closure_notes: plan.close.notes,
+        })
+        .eq("id", incident.id)
+      if (closeErr) warnings.push(`Incident close failed: ${closeErr.message}`)
+    }
+  }
+  counts.incidents = incidentCount
+  counts.incidents_open = incidentPlan.filter(p => !p.close).length
 
   // --- Compliance Audit Pack ----------------------------------------------
   // Generated through the real path so the manifest, merkle root and signature

@@ -34,14 +34,23 @@ export type RamsGate = {
    *   signed            they have signed the version in force
    *   unsigned          a RAMS is in force and they have not signed it
    *   superseded        they signed an earlier version; this one is new
+   *   skipped_error     the gate could not be evaluated and let them through
    */
-  reason: "none_required" | "signed" | "unsigned" | "superseded"
+  reason: "none_required" | "signed" | "unsigned" | "superseded" | "skipped_error"
   /** The version in force, when there is one. */
   rams: RamsDocument | null
   /** Set when they signed an earlier version, so the message can say so. */
   signedVersion: number | null
   /** Wording for the worker. Written here so every caller says the same thing. */
   message: string | null
+  /**
+   * What to stamp on signins.rams_check. Only the three terminal states are
+   * recordable: an `unsigned` or `superseded` gate never produces a sign-in
+   * row, because it refuses.
+   */
+  checkOutcome: "signed" | "none_required" | "skipped_error"
+  /** The database error, when the gate failed open. The caller alerts on it. */
+  lookupError: string | null
 }
 
 const FIELDS =
@@ -62,8 +71,14 @@ export async function getRamsGate(
   jobId: string,
   userId: string,
 ): Promise<RamsGate> {
-  const open = (reason: RamsGate["reason"]): RamsGate => ({
-    blocked: false, reason, rams: null, signedVersion: null, message: null,
+  const open = (reason: "none_required" | "skipped_error", lookupError: string | null = null): RamsGate => ({
+    blocked: false,
+    reason,
+    rams: null,
+    signedVersion: null,
+    message: null,
+    checkOutcome: reason,
+    lookupError,
   })
 
   const { data: current, error } = await service
@@ -76,7 +91,7 @@ export async function getRamsGate(
 
   if (error) {
     console.error("[rams] gate lookup failed - allowing sign-in", { jobId, userId, error: error.message })
-    return open("none_required")
+    return open("skipped_error", error.message)
   }
   if (!current) return open("none_required")
 
@@ -89,10 +104,14 @@ export async function getRamsGate(
 
   if (sigErr) {
     console.error("[rams] signature lookup failed - allowing sign-in", { jobId, userId, error: sigErr.message })
-    return open("none_required")
+    return open("skipped_error", sigErr.message)
   }
   if (signature) {
-    return { blocked: false, reason: "signed", rams: current, signedVersion: current.version, message: null }
+    return {
+      blocked: false, reason: "signed", rams: current,
+      signedVersion: current.version, message: null,
+      checkOutcome: "signed", lookupError: null,
+    }
   }
 
   // Did they sign an older version? Changes the wording, not the outcome.
@@ -111,6 +130,9 @@ export async function getRamsGate(
     reason: priorVersion != null ? "superseded" : "unsigned",
     rams: current,
     signedVersion: priorVersion,
+    // Never reached by a sign-in row: this gate refuses, so nothing is stamped.
+    checkOutcome: "signed",
+    lookupError: null,
     message:
       priorVersion != null
         ? `The method statement for this job has been revised since you signed it ` +
@@ -118,5 +140,54 @@ export async function getRamsGate(
           `Read and sign the new version before you sign in.`
         : `You need to read and sign the RAMS for this job before you can sign in: ` +
           `"${current.title}" (version ${current.version}).`,
+  }
+}
+
+
+/**
+ * Raise an admin alert that the RAMS gate is failing open, at most once per
+ * company per hour.
+ *
+ * Rate limited because the failure mode is a broken lookup, which means EVERY
+ * sign-in attempt across the company hits it. An alert per attempt would bury
+ * the one thing the admin needs to see under a hundred copies of itself, on the
+ * morning when everybody signs in at once.
+ *
+ * The window is enforced by reading the last alert of this type rather than by
+ * a counter, so it survives a cold start and does not need any shared state.
+ * Best effort throughout: an alert that cannot be raised must never stop
+ * someone starting work, which is the whole reason the gate fails open.
+ */
+export async function alertRamsGateFailure(
+  service: Service,
+  companyId: string,
+  detail: string,
+): Promise<void> {
+  const ALERT_TYPE = "rams_gate_error"
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  try {
+    const { data: recent } = await service
+      .from("alerts")
+      .select("id")
+      .eq("company_id", companyId)
+      .eq("alert_type", ALERT_TYPE)
+      .gte("created_at", oneHourAgo)
+      .limit(1)
+    if (recent && recent.length > 0) return
+
+    await service.from("alerts").insert({
+      company_id: companyId,
+      alert_type: ALERT_TYPE,
+      message:
+        "RAMS checks are failing, so sign-in is not being gated. Workers can start " +
+        "on jobs whose method statement they have not signed until this is fixed. " +
+        "Details: " + detail.slice(0, 300),
+      status: "open",
+      urgency: 3,
+      is_read: false,
+    })
+    console.error("[rams] gate failure alert raised for company", companyId)
+  } catch (e: any) {
+    console.error("[rams] could not raise gate failure alert", e?.message)
   }
 }

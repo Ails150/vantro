@@ -286,7 +286,7 @@ Write the executive summary now.`
 // ---------------- HTML render ----------------
 
 function renderReport(data: any, narrative: string, narrativeIsAI: boolean, integrity: PackIntegrity | null): string {
-  const { job, company, period, signins, qa, diary, defects, variations = [], toolboxTalks = [], rams = { current: null, versions: [], signatures: [], outstanding: [], crewSize: 0 } } = data
+  const { job, company, period, signins, qa, diary, defects, variations = [], toolboxTalks = [], rams = { current: null, versions: [], signatures: [], outstanding: [], crewSize: 0 }, incidents = [] } = data
   // Phase 1.2: the reference printed on this report is the one it is registered
   // under, so a reader who quotes it at /verify gets an answer. It used to be
   // built here from the job name and a slice of Date.now() -- never stored,
@@ -577,10 +577,60 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   // RAMS. The document hash is printed because it is the difference between
   // "they signed the RAMS" as a claim about a URL and as a claim about a file:
   // the bytes behind a link can be swapped, a sha256 cannot.
+  // Incidents. An open one is printed in the bad colour: at the end of a
+  // reporting period, "reported and closed" and "reported and still open" are
+  // different findings and should not look alike.
+  const incidentsOpen = incidents.filter((i: any) => i.status !== "closed")
+  const KIND_LABEL: Record<string, string> = {
+    near_miss: "Near miss", injury: "Injury", hazard: "Hazard",
+  }
+  const incidentCards = incidents.length === 0
+    ? `<p class="muted">No incidents were reported on this job in this period.</p>`
+    : incidents.map((i: any) => {
+        const open = i.status !== "closed"
+        return `
+    <div class="card">
+      <h3 class="${open ? "bad" : ""}">${escapeHtml(KIND_LABEL[i.kind] || i.kind)} &mdash; ${open ? escapeHtml(i.status) : "closed"}</h3>
+      <div class="muted">
+        Happened ${escapeHtml(fmtDateTime(i.occurred_at))} &middot;
+        reported by ${escapeHtml(i.reported_by)} ${escapeHtml(fmtDateTime(i.reported_at))}${i.located ? " &middot; location recorded" : ""}
+      </div>
+      <p>${escapeHtml(i.description)}</p>
+      ${(i.photo_urls || []).map((u: string) => `<img src="${escapeHtml(u)}" alt="" style="max-width:220px;border-radius:6px;margin:4px 4px 0 0"/>`).join("")}
+      ${i.closure_notes
+        ? `<div class="muted"><strong>Closed</strong> by ${escapeHtml(i.closed_by || "unknown")} ${escapeHtml(fmtDateTime(i.closed_at))}</div><p>${escapeHtml(i.closure_notes)}</p>`
+        : `<div class="muted bad">Not closed.</div>`}
+    </div>`
+      }).join("")
+
   const ramsSignedCount = (rams.signatures || []).length
   const ramsUnsignedCount = (rams.outstanding || []).length
   const ramsExpected = ramsSignedCount + ramsUnsignedCount
   const ramsCompliance = ramsExpected > 0 ? Math.round((ramsSignedCount / ramsExpected) * 100) : null
+
+  // Shifts that began while the gate was failing open. Printed on the Safety
+  // page in the bad colour and never merged into the unsigned count: nobody
+  // skipped a signature here, the check itself did not run, and an assessor
+  // reads those two findings differently.
+  const gateSkipped = (signins || []).filter((sn: any) => sn.rams_check === "skipped_error")
+  const gateUnrecorded = (signins || []).filter((sn: any) => sn.rams_check == null).length
+
+  const gateSkippedBlock = gateSkipped.length === 0
+    ? ""
+    : `
+    <div class="card">
+      <h3 class="bad">${gateSkipped.length} shift${gateSkipped.length === 1 ? "" : "s"} started without a RAMS check</h3>
+      <p class="muted">The RAMS lookup was failing at the time, so sign-in was allowed through unverified rather than stopping work across the site. These shifts are not evidence that the method statement was signed.</p>
+      <ul>
+        ${gateSkipped.map((sn: any) =>
+          `<li class="bad">${escapeHtml(sn.users?.name || "Unknown")} &mdash; ${escapeHtml(fmtDateTime(sn.signed_in_at))}</li>`
+        ).join("")}
+      </ul>
+    </div>`
+
+  const gateUnrecordedBlock = gateUnrecorded === 0
+    ? ""
+    : `<p class="muted">${gateUnrecorded} shift${gateUnrecorded === 1 ? "" : "s"} in this period predate RAMS checking and carry no record either way.</p>`
 
   const ramsSection = !rams.current
     ? `<p class="muted bad">No risk assessment or method statement has been uploaded for this job.</p>`
@@ -836,6 +886,23 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   </div>
 </section>
 
+<!-- PAGE 3a00: Incidents -->
+<section class="page">
+  <h2>Incidents</h2>
+  <p class="muted">Near misses, injuries and hazards reported from site, with what was done about each. A near miss reported and closed is a safety system working; one still open at the end of the period is not.</p>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-num">${incidents.length}</div><div class="kpi-label">Reported</div></div>
+    <div class="kpi"><div class="kpi-num ${incidents.filter((i: any) => i.kind === "injury").length === 0 ? "ok" : "bad"}">${incidents.filter((i: any) => i.kind === "injury").length}</div><div class="kpi-label">Injuries</div></div>
+    <div class="kpi"><div class="kpi-num">${incidents.filter((i: any) => i.kind === "near_miss").length}</div><div class="kpi-label">Near misses</div></div>
+    <div class="kpi"><div class="kpi-num ${incidentsOpen.length === 0 ? "ok" : "bad"}">${incidentsOpen.length}</div><div class="kpi-label">Still open</div></div>
+  </div>
+  ${incidentCards}
+  <div class="footer">
+    <span>Vantro &middot; getvantro.com</span>
+    <span>${refId}</span>
+  </div>
+</section>
+
 <!-- PAGE 3a0: RAMS -->
 <section class="page">
   <h2>Risk assessment and method statement</h2>
@@ -845,7 +912,10 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     <div class="kpi"><div class="kpi-num">${ramsSignedCount}</div><div class="kpi-label">Signed</div></div>
     <div class="kpi"><div class="kpi-num ${ramsUnsignedCount === 0 ? "ok" : "bad"}">${ramsUnsignedCount}</div><div class="kpi-label">Not signed</div></div>
     <div class="kpi"><div class="kpi-num ${ramsCompliance === null ? "" : ramsCompliance >= 100 ? "ok" : ramsCompliance >= 80 ? "warn" : "bad"}">${ramsCompliance === null ? "&mdash;" : ramsCompliance + "%"}</div><div class="kpi-label">RAMS compliance</div></div>
+    <div class="kpi"><div class="kpi-num ${gateSkipped.length === 0 ? "ok" : "bad"}">${gateSkipped.length}</div><div class="kpi-label">Started unchecked</div></div>
   </div>
+  ${gateSkippedBlock}
+  ${gateUnrecordedBlock}
   ${ramsSection}
   <div class="footer">
     <span>Vantro &middot; getvantro.com</span>

@@ -82,6 +82,10 @@ function collectSubjects(data: AuditData) {
   add(data.rams?.versions)
   for (const sg of data.rams?.signatures || []) if (sg?.id) entityIds.add(sg.id)
   if (data.rams?.current?.document_path) paths.add(data.rams.current.document_path)
+  add(data.incidents)
+  for (const i of data.incidents || []) {
+    for (const k of i?.photo_paths || []) if (k) paths.add(k)
+  }
 
   for (const s of data.signins || []) if (s?.id) signinIds.add(s.id)
 

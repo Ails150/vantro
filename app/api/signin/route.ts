@@ -9,7 +9,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { isInstallerWorking } from "@/lib/scheduling/resolver"
 import { resolveGeofenceRadius } from "@/lib/geofence-server"
 import { assertJobBelongsToCaller } from "@/lib/tenant"
-import { getRamsGate } from "@/lib/rams"
+import { getRamsGate, alertRamsGateFailure } from "@/lib/rams"
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371000
@@ -70,6 +70,17 @@ export async function POST(request: Request) {
   // back to unsigned and tells them that rather than repeating the first-time
   // wording.
   const ramsGate = await getRamsGate(service, jobId, installer.userId)
+
+  // The gate fails open on a lookup error, which is the right call and an
+  // invisible one: afterwards a shift that started unverified looks exactly
+  // like a shift that started because the worker had signed. Two things make
+  // it visible -- the stamp on the signin row below, and an alert to the
+  // admin, rate limited to once an hour because a broken lookup means EVERY
+  // sign-in hits it and a hundred copies of the warning is not a warning.
+  if (ramsGate.reason === "skipped_error") {
+    await alertRamsGateFailure(service, installer.companyId, ramsGate.lookupError || "unknown")
+  }
+
   if (ramsGate.blocked) {
     return NextResponse.json(
       {
@@ -241,6 +252,10 @@ export async function POST(request: Request) {
       distance_from_site_metres: distanceMetres,
       within_range: withinRange,
       expected_sign_out_time: finalExpectedSignOut,
+      // What the RAMS gate decided, recorded on the shift itself. 'skipped_error'
+      // is the one that matters: it marks a shift that started without the gate
+      // being evaluated, and the audit pack shows it in the bad colour.
+      rams_check: ramsGate.checkOutcome,
     })
     .select("id, signed_in_at")
     .single()
