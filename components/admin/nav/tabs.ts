@@ -23,7 +23,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   BadgeCheck, Banknote, Bell, BookOpen, Briefcase, Building2, Calendar,
   CreditCard,
-  CalendarClock, ChartColumn, FileSearch, Footprints, Gauge, LayoutDashboard,
+  CalendarClock, ChartColumn, FileSearch, Footprints, Gauge, HardHat, LayoutDashboard,
   LifeBuoy, ListChecks, Map, MapPinned, Settings, TrendingUp, TriangleAlert,
   Users, Wrench,
 } from "lucide-react"
@@ -79,6 +79,7 @@ const manageTabs: AdminTab[] = [
   { id: "calendar", label: "Calendar", icon: Calendar }, // calendar_sidebar_marker
   { id: "payroll", label: "Payroll", icon: Banknote },
   { id: "defects", label: "Defects", icon: TriangleAlert },
+  { id: "toolbox", label: "Toolbox talks", icon: HardHat },
   { id: "progress", label: "Progress", icon: TrendingUp },
   { id: "walkthroughs", label: "Walk & talks", icon: Footprints },
   { id: "audit", label: "Audit", icon: FileSearch },

@@ -155,6 +155,27 @@ export async function POST(request: Request) {
   const inRange = signins.filter((s: AnyRow) => s.within_range).length
   const geofenceCompliance = signins.length > 0 ? Math.round((inRange / signins.length) * 100) : 100
 
+  // Toolbox talks — the compliance line.
+  //
+  // A pack that lists the talks but not the gap is the version of this feature
+  // that is worth nothing: the question is never "was a briefing given", it is
+  // "did everyone on site receive it". `unsignedCount` is what an assessor
+  // reads first, so it is computed here rather than left to the renderer.
+  const toolboxTalks = data.toolboxTalks || []
+  const toolboxUnsigned = toolboxTalks.reduce((n: number, t: AnyRow) => n + (t.outstanding?.length || 0), 0)
+  const toolboxSigned = toolboxTalks.reduce((n: number, t: AnyRow) => n + (t.signatures?.length || 0), 0)
+  const toolboxExpected = toolboxSigned + toolboxUnsigned
+  const toolbox = {
+    talkCount: toolboxTalks.length,
+    signatureCount: toolboxSigned,
+    unsignedCount: toolboxUnsigned,
+    // 100% when no talks were given: nothing was outstanding. The talkCount of
+    // zero next to it is what says a pack has no briefings in it, and that is a
+    // different statement from "briefings were ignored".
+    compliance: toolboxExpected > 0 ? Math.round((toolboxSigned / toolboxExpected) * 100) : 100,
+    talks: toolboxTalks,
+  }
+
   // Issues — diary entries flagged + open defects
   const blockers = diary.filter(d => d.ai_alert_type === "blocker")
   const issues = diary.filter(d => d.ai_alert_type === "issue")
@@ -172,6 +193,7 @@ export async function POST(request: Request) {
     dlv: deliverables.map(d => [d.id, d.totalItems, d.completedItems, d.approvedItems, d.status]),
     counts: [ qaRows.length, diary.length, defects.length, signins.length ],
     flags: [ blockers.length, issues.length, openDefects.length, progressiveSignoffs.length ],
+    toolbox: [ toolbox.talkCount, toolbox.signatureCount, toolbox.unsignedCount ],
     finalSignoff: finalSignoff ? finalSignoff.at : null,
     last: [ _maxTs(qaRows, "created_at"), _maxTs(diary, "created_at"), _maxTs(defects, "created_at"), _maxTs(signins, "signed_in_at") ],
   })).digest("hex")
@@ -209,6 +231,7 @@ export async function POST(request: Request) {
         onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance },
         deliverables: deliverables.map(d => ({ name: d.name, status: d.status, progress: `${d.approvedItems}/${d.totalItems} approved` })),
         signoffs: progressiveSignoffs.length,
+        toolboxTalks: { given: toolbox.talkCount, signatures: toolbox.signatureCount, unsigned: toolbox.unsignedCount },
         finalSignoff: finalSignoff ? `Job marked complete by ${finalSignoff.by}` : null,
         blockers: blockers.map(b => ({ summary: b.ai_summary, text: b.entry_text?.slice(0, 200) })),
         issues: issues.map(i => ({ summary: i.ai_summary, text: i.entry_text?.slice(0, 200) })),
@@ -441,6 +464,7 @@ Return only the sentence, no JSON, no quotes, no preamble.`
     deliverables,
     signoffs: progressiveSignoffs,
     onSite: { installerCount, totalHours: Math.round(totalHours * 10) / 10, geofenceCompliance, geofenceRadiusMetres, fullLog: signins },
+    toolbox,
     issues: { blockers, issues, openDefects, allDefects: defects },
     fullEvidence: { qa: qaRows, diary, defects, walkthroughs, signins },
     // Phase 1.4: the human half of the chain of custody.

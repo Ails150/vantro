@@ -92,6 +92,13 @@ export interface AuditData {
   variations: AnyRow[]
   /** Empty unless options.includeWalkthroughs is set. */
   walkthroughs: AnyRow[]
+  /**
+   * Toolbox talks given on this job in the period, each with the crew it was
+   * for and who actually signed. The outstanding list is the compliance fact:
+   * a talk everyone signed and a talk nobody signed look identical from the
+   * talk row alone.
+   */
+  toolboxTalks: AnyRow[]
   /** Phase 1.4. Empty unless options.includeAdminLog is set. The human half of
    *  the chain of custody: who approved, resolved, edited or attempted to
    *  delete, and when. */
@@ -317,6 +324,73 @@ export async function fetchAuditData(
   }
 
   // -------------------------------------------------------------------------
+  // Toolbox talks, with signatures and the gap.
+  // -------------------------------------------------------------------------
+  // Always fetched, not behind an option: a compliance pack that silently omits
+  // safety briefings because a caller forgot a flag is the failure mode this
+  // whole layer exists to prevent.
+  //
+  // `outstanding` is computed against the crew assigned to the job, which is
+  // what makes an unsigned talk visible at all. The signature image itself is
+  // deliberately NOT carried here: the pack needs to state who attested and
+  // when, and shipping several hundred kilobytes of stroke data through every
+  // audit surface to render a squiggle is not worth it. The rows remain in
+  // toolbox_talk_signatures for anyone who needs to see the mark.
+  const { data: talkRows, error: talkErr } = await service
+    .from("toolbox_talks")
+    .select("id, title, notes, document_url, delivered_at, locked_at, " +
+            "delivered_by_user:users!toolbox_talks_delivered_by_fkey(id, name), " +
+            "signatures:toolbox_talk_signatures(user_id, signed_at, lat, lng, users(id, name))")
+    .eq("company_id", companyId)
+    .eq("job_id", jobId)
+    .is("archived_at", null)
+    .order("delivered_at", { ascending: true })
+  if (talkErr) console.error("[audit] toolbox talks error:", talkErr.message)
+
+  const { data: crewRows } = await service
+    .from("job_assignments")
+    .select("user_id, users(id, name, is_active)")
+    .eq("job_id", jobId)
+  const crew = (crewRows || [])
+    .map((a: AnyRow) => a.users)
+    .filter((u: AnyRow) => u && u.is_active !== false)
+
+  const inPeriod = (ts: string | null) => {
+    if (!ts) return false
+    if (from && ts < from) return false
+    if (to && ts > to + "T23:59:59.999Z") return false
+    return true
+  }
+
+  const toolboxTalks: AnyRow[] = (talkRows || [])
+    .filter((t: AnyRow) => (!from && !to) || inPeriod(t.delivered_at))
+    .map((t: AnyRow) => {
+      const signatures = (t.signatures || []).map((sg: AnyRow) => ({
+        user_id: sg.user_id,
+        name: sg.users?.name || "Unknown",
+        signed_at: sg.signed_at,
+        located: sg.lat != null && sg.lng != null,
+      }))
+      const signedIds = new Set(signatures.map((sg: AnyRow) => sg.user_id))
+      return {
+        id: t.id,
+        title: t.title,
+        notes: t.notes,
+        document_url: t.document_url,
+        delivered_at: t.delivered_at,
+        delivered_by: t.delivered_by_user?.name || null,
+        locked: !!t.locked_at,
+        crew_size: crew.length,
+        signatures: signatures.sort((a: AnyRow, b: AnyRow) =>
+          String(a.signed_at).localeCompare(String(b.signed_at))),
+        outstanding: crew
+          .filter((u: AnyRow) => !signedIds.has(u.id))
+          .map((u: AnyRow) => ({ user_id: u.id, name: u.name }))
+          .sort((a: AnyRow, b: AnyRow) => a.name.localeCompare(b.name)),
+      }
+    })
+
+  // -------------------------------------------------------------------------
   // Phase 1.4: the admin audit log for this job and period.
   // -------------------------------------------------------------------------
   // Everything above records what happened on site. This records what happened
@@ -329,7 +403,7 @@ export async function fetchAuditData(
     // Scoped by the entities this job actually owns, so a busy company's log
     // does not leak other jobs' activity into this pack.
     const subjectIds = new Set<string>([jobId])
-    for (const r of [...signins, ...qa, ...diary, ...defects, ...variations]) {
+    for (const r of [...signins, ...qa, ...diary, ...defects, ...variations, ...toolboxTalks]) {
       if (r?.id) subjectIds.add(r.id)
     }
 
@@ -352,5 +426,5 @@ export async function fetchAuditData(
     adminLog = (logRows || []).filter((r: AnyRow) => !NOISE.test(r.action || ""))
   }
 
-  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, adminLog }
+  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, toolboxTalks, adminLog }
 }

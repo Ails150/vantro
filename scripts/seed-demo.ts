@@ -28,7 +28,6 @@
 // silently dropped, and reported back by the API so the gap is visible in the
 // UI too:
 //
-//   toolbox talks + signatures   no toolbox_talks table, no UI, no route
 //   RAMS signed by all           no rams table
 //   near miss                    no incidents table; diary_entries.ai_alert_type
 //                                has no safety category (blocker | issue |
@@ -53,7 +52,6 @@ export const DEMO_ADMIN_EMAIL = "demo+northbridge@getvantro.com"
 export const DEMO_ADMIN_PASSWORD = process.env.DEMO_ADMIN_PASSWORD || "Northbridge!Demo2026"
 
 export const UNSUPPORTED = [
-  "2 toolbox talks with signatures - no toolbox_talks table or UI in this schema",
   "1 RAMS signed by all - no rams table in this schema",
   "1 near miss - no incidents table; diary_entries has no safety alert category",
   "1 client dispute note with linked evidence - no dispute concept; nearest homes are variations or a flagged diary entry",
@@ -197,6 +195,28 @@ function placeholderSvg(label: string, sub: string, hue: number): Buffer {
   )
 }
 
+/** A plausible drawn signature, so the admin view and the pack show a mark
+ *  rather than an empty box. Obviously synthetic on close inspection, which is
+ *  correct for demo data that sits next to real attestations. */
+function demoSignature(seed: number): string {
+  const rr = rng(`signature-${seed}`)
+  let d = "M20 130"
+  let x = 20
+  for (let i = 0; i < 9; i++) {
+    const cx1 = x + 10 + rr() * 14
+    const cy1 = 130 - (30 + rr() * 60)
+    const cx2 = x + 24 + rr() * 14
+    const cy2 = 130 - (10 + rr() * 70)
+    x += 34 + rr() * 12
+    d += ` C${cx1.toFixed(0)} ${cy1.toFixed(0)}, ${cx2.toFixed(0)} ${cy2.toFixed(0)}, ${x.toFixed(0)} ${(105 + rr() * 25).toFixed(0)}`
+  }
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="200" viewBox="0 0 360 200">` +
+    `<path d="${d}" fill="none" stroke="#111" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>` +
+    `</svg>`
+  return "data:image/svg+xml;base64," + Buffer.from(svg, "utf8").toString("base64")
+}
+
 const R2_BUCKET = process.env.CLOUDFLARE_R2_BUCKET || "vantro-photos"
 
 function r2Client(): S3Client | null {
@@ -267,6 +287,63 @@ async function makePhotos(
   return out
 }
 
+/**
+ * Get the demo admin's auth user, whatever state the last run left behind.
+ *
+ * Deleting a company's rows does not always take its auth users with it -- the
+ * delete can fail, or a previous run can have been interrupted between creating
+ * the auth user and creating the member row, which leaves an orphan that no
+ * company_id scan will ever find. Either way the next run used to die on
+ * "already registered".
+ *
+ * So: create if we can, and if the address is taken, adopt it and reset the
+ * password to the documented one. Adoption is safe here precisely because the
+ * address is a constant owned by this script.
+ */
+async function ensureAuthUser(
+  service: Service,
+  email: string,
+  password: string,
+  metadata: Record<string, any>,
+  log: (s: string) => void,
+): Promise<string> {
+  const { data, error } = await service.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: metadata,
+  })
+  if (!error && data?.user) return data.user.id
+
+  const taken = /already been registered|already exists/i.test(error?.message || "")
+  if (!taken) throw new Error(`demo admin auth user failed: ${error?.message}`)
+
+  log(`auth user ${email} already exists, adopting it`)
+  // There is no getUserByEmail on the admin API, so page until we find it.
+  // The demo address is a constant, so this runs once and finds it early.
+  let found: any = null
+  for (let page = 1; page <= 20 && !found; page++) {
+    const { data: list, error: listErr } = await service.auth.admin.listUsers({ page, perPage: 200 })
+    if (listErr) throw new Error(`could not list auth users: ${listErr.message}`)
+    found = (list?.users || []).find((u: any) => (u.email || "").toLowerCase() === email.toLowerCase())
+    if (!list?.users?.length || list.users.length < 200) break
+  }
+  if (!found) {
+    throw new Error(
+      `${email} is registered but could not be found in the first 4000 auth users; ` +
+        "delete it by hand in Supabase and re-run.",
+    )
+  }
+
+  const { error: updErr } = await service.auth.admin.updateUserById(found.id, {
+    password,
+    email_confirm: true,
+    user_metadata: metadata,
+  })
+  if (updErr) throw new Error(`could not reset the demo admin password: ${updErr.message}`)
+  return found.id
+}
+
 // ---------------------------------------------------------------------------
 // Purge
 // ---------------------------------------------------------------------------
@@ -295,6 +372,8 @@ async function purge(service: Service, log: (s: string) => void): Promise<void> 
 
   // Ordered child-first. Every one of these is filtered on company_id.
   const byCompany = [
+    "toolbox_talk_signatures",
+    "toolbox_talks",
     "notification_log",
     "location_logs",
     "evidence_hashes",
@@ -327,9 +406,12 @@ async function purge(service: Service, log: (s: string) => void): Promise<void> 
     .select("id, auth_user_id, email")
     .eq("company_id", companyId)
   for (const m of members || []) {
-    if (m.auth_user_id) {
-      await service.auth.admin.deleteUser(m.auth_user_id).catch(() => {})
-    }
+    if (!m.auth_user_id) continue
+    const { error } = await service.auth.admin.deleteUser(m.auth_user_id)
+    // Logged, not swallowed. A surviving auth user is exactly what made the
+    // second run of this script fail with "already registered", and a bare
+    // catch is why it took a re-run to notice.
+    if (error) log(`  auth user ${m.email}: ${error.message}`)
   }
   await service.from("users").delete().eq("company_id", companyId)
   await service.from("companies").delete().eq("id", companyId)
@@ -389,13 +471,13 @@ export async function seedDemo(
 
   // --- admin --------------------------------------------------------------
   const adminName = "Hannah Reeve"
-  const { data: authData, error: authErr } = await service.auth.admin.createUser({
-    email: DEMO_ADMIN_EMAIL,
-    password: DEMO_ADMIN_PASSWORD,
-    email_confirm: true,
-    user_metadata: { full_name: adminName, company_name: DEMO_COMPANY_NAME, demo: true },
-  })
-  if (authErr) throw new Error(`demo admin auth user failed: ${authErr.message}`)
+  const authUserId = await ensureAuthUser(
+    service,
+    DEMO_ADMIN_EMAIL,
+    DEMO_ADMIN_PASSWORD,
+    { full_name: adminName, company_name: DEMO_COMPANY_NAME, demo: true },
+    log,
+  )
 
   const { data: admin, error: adminErr } = await service
     .from("users")
@@ -406,7 +488,7 @@ export async function seedDemo(
       initials: "HR",
       role: "admin",
       is_active: true,
-      auth_user_id: authData.user.id,
+      auth_user_id: authUserId,
       working_days: [...weekdays],
     })
     .select("id")
@@ -783,6 +865,83 @@ export async function seedDemo(
     if (!error) qaCount++
   }
   counts.qa_submissions = qaCount
+
+  // --- toolbox talks -------------------------------------------------------
+  // Two talks, deliberately in different states: one the whole crew signed, and
+  // one with a name outstanding. A demo where everything is green does not show
+  // what the feature is for.
+  const TALKS = [
+    {
+      job: jobs[0],
+      title: "Working at height - edge protection and harness checks",
+      notes:
+        "Covered: inspection of the scaffold handover certificate before first use, the three points of contact rule on ladders, " +
+        "harness and lanyard pre-use checks, and the exclusion zone below the west elevation while units are being lifted. " +
+        "Anyone finding a missing or damaged guard rail stops work and reports it before going any further.",
+      daysAgo: 19,
+      signAll: true,
+    },
+    {
+      job: jobs[2],
+      title: "Manual handling - glazed units and the vacuum lifter",
+      notes:
+        "Covered: two-person minimum on anything over 25kg, correct use of the vacuum lifter including the seal test before every " +
+        "lift, keeping the load close and turning with the feet rather than the back, and clearing the route before picking up. " +
+        "Report any near miss with the lifter the same day.",
+      daysAgo: 6,
+      signAll: false,
+    },
+  ]
+
+  let talkCount = 0
+  let signatureCount = 0
+  let outstandingCount = 0
+  for (const t of TALKS) {
+    const deliveredAt = atLocal(addDays(today, -t.daysAgo), 7, 45)
+    const { data: talk, error: talkErr } = await service
+      .from("toolbox_talks")
+      .insert({
+        company_id: companyId,
+        job_id: t.job.id,
+        title: t.title,
+        notes: t.notes,
+        delivered_by: adminId,
+        delivered_at: iso(deliveredAt),
+        created_by: adminId,
+      })
+      .select("id")
+      .single()
+    if (talkErr || !talk) {
+      warnings.push(`Toolbox talk "${t.title}" failed: ${talkErr?.message}`)
+      continue
+    }
+    talkCount++
+
+    // Signatures land a few minutes after the briefing, in crew order, which is
+    // what a real sign-round looks like.
+    const attendees = crew[t.job.id]
+    const signers = t.signAll ? attendees : attendees.slice(0, Math.max(1, attendees.length - 1))
+    for (const [i, userId] of signers.entries()) {
+      const signedAt = new Date(deliveredAt.getTime() + (4 + i * 2) * 60000)
+      const { error: sigErr } = await service.from("toolbox_talk_signatures").insert({
+        company_id: companyId,
+        talk_id: talk.id,
+        user_id: userId,
+        signature_svg: demoSignature(i),
+        signed_at: iso(signedAt),
+        lat: t.job.lat + (r() - 0.5) * 0.0006,
+        lng: t.job.lng + (r() - 0.5) * 0.0006,
+        accuracy_metres: Math.floor(r() * 15) + 5,
+        device_info: "Demo seed",
+      })
+      if (sigErr) warnings.push(`Signature failed: ${sigErr.message}`)
+      else signatureCount++
+    }
+    outstandingCount += attendees.length - signers.length
+  }
+  counts.toolbox_talks = talkCount
+  counts.toolbox_signatures = signatureCount
+  counts.toolbox_signatures_outstanding = outstandingCount
 
   // --- Compliance Audit Pack ----------------------------------------------
   // Generated through the real path so the manifest, merkle root and signature

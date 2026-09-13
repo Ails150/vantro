@@ -286,7 +286,7 @@ Write the executive summary now.`
 // ---------------- HTML render ----------------
 
 function renderReport(data: any, narrative: string, narrativeIsAI: boolean, integrity: PackIntegrity | null): string {
-  const { job, company, period, signins, qa, diary, defects, variations = [] } = data
+  const { job, company, period, signins, qa, diary, defects, variations = [], toolboxTalks = [] } = data
   // Phase 1.2: the reference printed on this report is the one it is registered
   // under, so a reader who quotes it at /verify gets an answer. It used to be
   // built here from the job name and a slice of Date.now() -- never stored,
@@ -565,6 +565,36 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
 
   const narrativeHtml = narrative.split(/\n\n+/).map((p) => `<p>${escapeHtml(p)}</p>`).join("")
 
+  // Toolbox talks. The table is ordered so the gap is the thing you see: an
+  // unsigned name is printed in the bad colour, and a talk everyone signed
+  // still shows its crew size so "3 of 3" is a statement rather than an
+  // absence of red.
+  const toolboxSigned = toolboxTalks.reduce((n: number, t: any) => n + (t.signatures?.length || 0), 0)
+  const toolboxUnsigned = toolboxTalks.reduce((n: number, t: any) => n + (t.outstanding?.length || 0), 0)
+  const toolboxExpected = toolboxSigned + toolboxUnsigned
+  const toolboxCompliance = toolboxExpected > 0 ? Math.round((toolboxSigned / toolboxExpected) * 100) : 100
+
+  const toolboxCards = toolboxTalks.length === 0
+    ? `<p class="muted">No toolbox talks were recorded on this job in this period.</p>`
+    : toolboxTalks.map((t: any) => {
+        const signed = (t.signatures || []).map((sg: any) =>
+          `<li>${escapeHtml(sg.name)} &mdash; ${escapeHtml(fmtDateTime(sg.signed_at))}${sg.located ? " &middot; location recorded" : ""}</li>`
+        ).join("")
+        const outstanding = (t.outstanding || []).map((o: any) =>
+          `<li class="bad">${escapeHtml(o.name)} &mdash; not signed</li>`
+        ).join("")
+        const total = (t.signatures?.length || 0) + (t.outstanding?.length || 0)
+        return `
+    <div class="card">
+      <h3>${escapeHtml(t.title)}</h3>
+      <div class="muted">Delivered ${escapeHtml(fmtDateTime(t.delivered_at))}${t.delivered_by ? " by " + escapeHtml(t.delivered_by) : ""}</div>
+      ${t.notes ? `<p>${escapeHtml(t.notes)}</p>` : ""}
+      ${t.document_url ? `<div class="muted">Briefing document attached</div>` : ""}
+      <div class="muted"><strong>${(t.signatures?.length || 0)} of ${total}</strong> signed</div>
+      <ul>${signed}${outstanding}</ul>
+    </div>`
+      }).join("")
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -767,6 +797,23 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   </table>`}
   <div class="footer">
     <span>Vantro · getvantro.com</span>
+    <span>${refId}</span>
+  </div>
+</section>
+
+<!-- PAGE 3a: Safety briefings -->
+<section class="page">
+  <h2>Safety briefings</h2>
+  <p class="muted">Toolbox talks delivered on this job, and every person who signed for one. A name listed as not signed was assigned to the job and has no signature on record.</p>
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-num">${toolboxTalks.length}</div><div class="kpi-label">Talks delivered</div></div>
+    <div class="kpi"><div class="kpi-num">${toolboxSigned}</div><div class="kpi-label">Signatures</div></div>
+    <div class="kpi"><div class="kpi-num ${toolboxUnsigned === 0 ? "ok" : "bad"}">${toolboxUnsigned}</div><div class="kpi-label">Not signed</div></div>
+    <div class="kpi"><div class="kpi-num ${toolboxCompliance >= 100 ? "ok" : toolboxCompliance >= 80 ? "warn" : "bad"}">${toolboxTalks.length === 0 ? "&mdash;" : toolboxCompliance + "%"}</div><div class="kpi-label">Briefing compliance</div></div>
+  </div>
+  ${toolboxCards}
+  <div class="footer">
+    <span>Vantro &middot; getvantro.com</span>
     <span>${refId}</span>
   </div>
 </section>
