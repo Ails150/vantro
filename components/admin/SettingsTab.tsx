@@ -3,13 +3,16 @@ import { useState, useEffect } from "react"
 import { PageTransition, PageHeader, Section } from "@/components/ui/Page"
 import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 
-export default function SettingsTab() {
+export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: boolean }) {
   const [gracePeriod, setGracePeriod] = useState(60)
   const [geofenceRadius, setGeofenceRadius] = useState(150)
   const [defaultStart, setDefaultStart] = useState("")
   const [defaultSignOut, setDefaultSignOut] = useState("")
   const [backgroundGps, setBackgroundGps] = useState(true)
   const [sickAutoApprove, setSickAutoApprove] = useState(false)
+  const [quietStart, setQuietStart] = useState("19:00")
+  const [quietEnd, setQuietEnd] = useState("06:00")
+  const [weekendPush, setWeekendPush] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -28,6 +31,9 @@ export default function SettingsTab() {
         if (c.sick_auto_approve != null) setSickAutoApprove(c.sick_auto_approve)
         if (c.default_start_time) setDefaultStart(String(c.default_start_time).slice(0, 5))
         if (c.default_sign_out_time) setDefaultSignOut(String(c.default_sign_out_time).slice(0, 5))
+        if (c.notification_quiet_start) setQuietStart(String(c.notification_quiet_start).slice(0, 5))
+        if (c.notification_quiet_end) setQuietEnd(String(c.notification_quiet_end).slice(0, 5))
+        if (c.notification_weekend_push != null) setWeekendPush(c.notification_weekend_push)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -47,6 +53,9 @@ export default function SettingsTab() {
         sick_auto_approve: sickAutoApprove,
         default_start_time: defaultStart || null,
         default_sign_out_time: defaultSignOut || null,
+        notification_quiet_start: quietStart,
+        notification_quiet_end: quietEnd,
+        notification_weekend_push: weekendPush,
       }),
     })
     setSaving(false)
@@ -216,6 +225,207 @@ export default function SettingsTab() {
           </div>
         </div>
       </Section>
+
+      <Section title="Notification quiet hours">
+        <div className="space-y-5">
+          <p className="text-xs text-ink-subtle">
+            Shift reminders and sign-out notices are held during these hours.
+            The window may run past midnight. Auto sign-out still happens on
+            time; only the push to the worker waits.
+          </p>
+
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-ink mb-1">Quiet from</label>
+              <input type="time" value={quietStart} onChange={e => setQuietStart(e.target.value)} className={inp} />
+            </div>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-ink mb-1">Quiet until</label>
+              <input type="time" value={quietEnd} onChange={e => setQuietEnd(e.target.value)} className={inp} />
+            </div>
+          </div>
+
+          <div className="flex items-start justify-between gap-4 pt-2 border-t border-line">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-ink">
+                Push on Saturdays and Sundays
+              </label>
+              <p className="text-xs text-ink-subtle mt-1">
+                Off by default. A worker who is rostered for a weekend day still
+                gets their notifications either way — this only covers weekend
+                days nobody is scheduled on.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWeekendPush(!weekendPush)}
+              className={
+                "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors " +
+                (weekendPush ? "bg-accent" : "bg-surface-hover")
+              }
+              aria-pressed={weekendPush}
+              aria-label="Toggle weekend push notifications"
+            >
+              <span
+                className={
+                  "inline-block h-4 w-4 transform rounded-full bg-canvas shadow transition-transform " +
+                  (weekendPush ? "translate-x-6" : "translate-x-1")
+                }
+              />
+            </button>
+          </div>
+
+          <p className="text-xs text-ink-subtle">
+            Saved with the button above.
+          </p>
+        </div>
+      </Section>
+
+      {isSuperadmin && <DemoDataSection />}
     </PageTransition>
+  )
+}
+
+/**
+ * Superadmin only. Builds the Northbridge Glazing demo tenant.
+ *
+ * Deliberately wordy about what it does before it does it: this creates and
+ * destroys an entire company, and the button is two clicks from the settings a
+ * normal admin uses every week. The confirm step names the company so nobody
+ * can mistake it for a reset of their own data.
+ */
+function DemoDataSection() {
+  const [running, setRunning] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [result, setResult] = useState<any>(null)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  async function run() {
+    setRunning(true)
+    setFailed(null)
+    setResult(null)
+    try {
+      const res = await fetch("/api/admin/seed-demo", { method: "POST" })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) setFailed(body.error || `Seed failed (${res.status})`)
+      else setResult(body)
+    } catch (e: any) {
+      setFailed(e?.message || "Seed failed")
+    }
+    setRunning(false)
+    setConfirming(false)
+  }
+
+  return (
+    <Section title="Demo data">
+      <div className="space-y-4">
+        <p className="text-xs text-ink-subtle">
+          Builds <strong className="text-ink">Northbridge Glazing Ltd</strong>: eight workers,
+          three sites in Cambridge, Ely and Newmarket, six weeks of sign-ins,
+          diary entries, a defect raised and closed, and a signed Compliance
+          Audit Pack. Running it again rebuilds that company from scratch. It
+          touches no other company&rsquo;s data.
+        </p>
+
+        {!confirming && (
+          <button
+            onClick={() => setConfirming(true)}
+            disabled={running}
+            className="bg-surface-hover hover:bg-line text-ink font-bold rounded-md px-6 py-2.5 text-sm transition-colors disabled:opacity-50"
+          >
+            {running ? "Loading demo..." : "Load demo"}
+          </button>
+        )}
+
+        {confirming && (
+          <div className="rounded-md border border-line-strong bg-surface p-4 space-y-3">
+            <p className="text-sm text-ink">
+              This deletes and rebuilds every row belonging to Northbridge
+              Glazing Ltd, including its logins. Nothing outside that company is
+              touched. Continue?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={run}
+                disabled={running}
+                className="bg-accent hover:bg-accent-ink text-white font-bold rounded-md px-5 py-2 text-sm transition-colors disabled:opacity-50"
+              >
+                {running ? "Building..." : "Yes, rebuild the demo"}
+              </button>
+              <button
+                onClick={() => setConfirming(false)}
+                disabled={running}
+                className="text-ink-subtle hover:text-ink px-3 py-2 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {failed && <p className="text-sm text-danger">{failed}</p>}
+
+        {result && (
+          <div className="rounded-md border border-line-strong bg-surface p-4 space-y-3 text-sm">
+            <p className="font-medium text-ink">{result.companyName} is ready.</p>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-ink-subtle mb-1">Admin login</p>
+              <p className="text-ink font-mono text-xs">{result.admin?.email}</p>
+              <p className="text-ink font-mono text-xs">{result.admin?.password}</p>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-ink-subtle mb-1">Worker PINs</p>
+              <ul className="text-xs text-ink-subtle space-y-0.5">
+                {(result.workers || []).map((w: any) => (
+                  <li key={w.email} className="font-mono">
+                    {w.pin} &nbsp;{w.name} &nbsp;<span className="opacity-60">{w.email}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-ink-subtle mb-1">Built</p>
+              <ul className="text-xs text-ink-subtle">
+                {Object.entries(result.counts || {}).map(([k, v]) => (
+                  <li key={k}>{k.replace(/_/g, " ")}: {String(v)}</li>
+                ))}
+              </ul>
+            </div>
+
+            {result.auditPack?.reference && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-ink-subtle mb-1">Audit pack</p>
+                <p className="text-xs text-ink-subtle font-mono">{result.auditPack.reference}</p>
+                <p className="text-xs text-ink-subtle">
+                  {result.auditPack.signed ? "Signed" : "UNSIGNED"} &middot;{" "}
+                  {result.auditPack.evidenceCount} pieces of evidence
+                </p>
+              </div>
+            )}
+
+            {(result.warnings || []).length > 0 && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-warning mb-1">Warnings</p>
+                <ul className="text-xs text-ink-subtle list-disc pl-4 space-y-0.5">
+                  {result.warnings.map((w: string) => <li key={w}>{w}</li>)}
+                </ul>
+              </div>
+            )}
+
+            {(result.unsupported || []).length > 0 && (
+              <div>
+                <p className="text-xs uppercase tracking-wide text-ink-subtle mb-1">Not seeded</p>
+                <ul className="text-xs text-ink-subtle list-disc pl-4 space-y-0.5">
+                  {result.unsupported.map((u: string) => <li key={u}>{u}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </Section>
   )
 }

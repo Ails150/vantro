@@ -2355,7 +2355,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             onOpenPortal={handleOpenBillingPortal}
           />
         )}
-        {activeTab === "settings" && <SettingsTab />}
+        {activeTab === "settings" && <SettingsTab isSuperadmin={viewerIsSuperadmin} />}
 
         {activeTab === "support" && <SupportTab />}
 
