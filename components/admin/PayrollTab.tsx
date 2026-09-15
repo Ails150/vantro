@@ -1,6 +1,7 @@
 ﻿"use client"
 import { useState, useEffect } from "react"
 import { PayrollExpenseRow } from "@/components/admin/PayrollExpenseRow"
+import PayrollBonuses from "@/components/admin/PayrollBonuses"
 import { isFieldRole } from '@/lib/roles'
 
 import { formatIn, formatTime } from "@/lib/format-time"
@@ -303,8 +304,16 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
                 if (!r) return null
                 const weekStart = new Date(r.from).toISOString().slice(0, 10)
                 return (
-                  <div className="px-6 pb-5">
+                  <div className="px-6 pb-5 space-y-4">
                     <PayrollExpenseRow userId={m.id} userName={m.name} weekStart={weekStart} />
+                    {/* Bonuses sit with the week they belong to, because a
+                        bonus is decided while looking at somebody's week. */}
+                    <PayrollBonuses
+                      userId={m.id}
+                      userName={m.name}
+                      from={r.from}
+                      to={r.to}
+                    />
                   </div>
                 )
               })()}

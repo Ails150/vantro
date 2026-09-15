@@ -613,3 +613,67 @@ export function payForWeek(
     total: Math.round(((ot.total ?? 0) + bankHoliday) * 100) / 100,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Bonuses
+// ---------------------------------------------------------------------------
+//
+// The only money here that is not derived from hours. A bonus is a number a
+// person decided on, so it is validated rather than computed.
+
+/**
+ * Validate a bonus amount typed by a person.
+ *
+ * NEGATIVE IS ALLOWED. A deduction is a bonus with a minus sign -- a correction
+ * for last month's overpayment, a damaged tool agreed with the worker. Refusing
+ * them would push those corrections into a spreadsheet, which is where this
+ * product is trying to stop things living.
+ *
+ * Zero is refused: it is not a bonus, it is a row somebody abandoned halfway
+ * through, and it would sit in a payroll run meaning nothing.
+ */
+export function parseBonusAmount(
+  raw: unknown,
+): { ok: true; amount: number } | { ok: false; why: string } {
+  if (raw === null || raw === undefined || raw === "") {
+    return { ok: false, why: "Enter an amount" }
+  }
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return { ok: false, why: "Amount must be a number" }
+  if (n === 0) return { ok: false, why: "A bonus of zero is not a bonus" }
+  if (Math.abs(n) > 100000) {
+    return { ok: false, why: "Amount looks wrong — check the decimal point" }
+  }
+  if (Math.round(n * 100) !== Math.round(n * 1000) / 10) {
+    return { ok: false, why: "Amount can have at most two decimal places" }
+  }
+  return { ok: true, amount: Math.round(n * 100) / 100 }
+}
+
+/**
+ * Add bonuses to a week's pay.
+ *
+ * Kept separate from payForWeek() rather than folded into it. Bonuses are not
+ * affected by any pay rule -- no multiplier, no rounding, no threshold -- and
+ * running them through the same function would invite somebody to apply one by
+ * accident. A bonus is the amount that was decided, exactly.
+ *
+ * Returns null total only when there is no rate AND no bonuses; a company can
+ * legitimately pay somebody a bonus and nothing else.
+ */
+export function addBonuses(
+  weekPay: { total: number | null },
+  bonusAmounts: number[],
+): { bonuses: number; total: number | null } {
+  let pence = 0
+  for (const b of bonusAmounts) {
+    const n = Number(b)
+    if (Number.isFinite(n)) pence += Math.round(n * 100)
+  }
+  const bonuses = pence / 100
+
+  if (weekPay.total === null) {
+    return { bonuses, total: bonuses === 0 ? null : bonuses }
+  }
+  return { bonuses, total: Math.round((weekPay.total + bonuses) * 100) / 100 }
+}
