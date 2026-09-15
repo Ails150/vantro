@@ -489,6 +489,10 @@ export async function seedDemo(
       default_sign_in_time: "08:00:00",
       default_sign_out_time: "16:30:00",
       grace_period_minutes: 15,
+      // A company default, so the demo shows a pay figure for everyone
+      // immediately. Two of the eight get their own rate below, which is what
+      // makes the "own rate" and "default rate" labels both visible.
+      default_hourly_rate: 18.5,
       geofence_radius_metres: 150,
       background_gps_enabled: true,
       installer_limit: 25,
@@ -557,6 +561,10 @@ export async function seedDemo(
         weekly_schedule: weeklySchedule,
         sign_in_time: "08:00:00",
         sign_out_time: "16:30:00",
+        // Only the first two carry a personal rate: the leading hand above the
+        // default and the apprentice below it. Everyone else sits on the
+        // company default, which is the state a real tenant is in on day one.
+        hourly_rate: w.name === WORKERS[0].name ? 24.0 : w.name === WORKERS[1].name ? 13.25 : null,
         gps_tracking_acknowledged: true,
         gps_tracking_acknowledged_at: iso(new Date()),
       })

@@ -17,6 +17,7 @@ import RamsTab from "@/components/admin/RamsTab"
 import IncidentsTab from "@/components/admin/IncidentsTab"
 import RetentionTab from "@/components/admin/RetentionTab"
 import JobRetentionCard from "@/components/admin/JobRetentionCard"
+import TeamRateField from "@/components/admin/TeamRateField"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
@@ -2114,6 +2115,20 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             </div>
                           )}
 
+                          {/* Pay rate. Shown for anyone who can be on site and
+                              therefore on a payroll export; admins are paid
+                              outside this system. */}
+                          {isInstFm && (
+                            <div className="flex items-center justify-between gap-2 mb-3">
+                              <span className="text-[10px] uppercase tracking-wide text-ink-subtle">Rate</span>
+                              <TeamRateField
+                                userId={m.id}
+                                hourlyRate={m.hourly_rate != null ? Number(m.hourly_rate) : null}
+                                companyDefaultRate={company?.default_hourly_rate != null ? Number(company.default_hourly_rate) : null}
+                              />
+                            </div>
+                          )}
+
                           {isInstFm && (
                             <div className="flex items-center gap-2 pt-3 mt-auto border-t border-line">
                               <button
@@ -2471,7 +2486,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             <div className="flex justify-end mb-4">
               <button onClick={() => setShowPayrollExport(true)} className="px-4 py-2 bg-teal-500 hover:bg-teal-600 text-white rounded-xl text-sm font-semibold">Export to CSV</button>
             </div>
-            <PayrollTab teamMembers={teamMembers} />
+            <PayrollTab teamMembers={teamMembers} defaultHourlyRate={company?.default_hourly_rate != null ? Number(company.default_hourly_rate) : null} />
             <PayrollExportModal open={showPayrollExport} onClose={() => setShowPayrollExport(false)} />
           </div>
         )}

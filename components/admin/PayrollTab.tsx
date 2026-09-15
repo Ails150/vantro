@@ -4,7 +4,8 @@ import { PayrollExpenseRow } from "@/components/admin/PayrollExpenseRow"
 import { isFieldRole } from '@/lib/roles'
 
 import { formatIn, formatTime } from "@/lib/format-time"
-interface Props { teamMembers: any[] }
+import { formatPay, payFor, resolveRate } from "@/lib/pay"
+interface Props { teamMembers: any[]; defaultHourlyRate?: number | null }
 
 function getWeekRange(offset = 0) {
   const now = new Date()
@@ -24,7 +25,7 @@ function getMonthRange() {
   return { from: from.toISOString(), to: to.toISOString() }
 }
 
-export default function PayrollTab({ teamMembers }: Props) {
+export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Props) {
   const installers = teamMembers.filter((m: any) => isFieldRole(m.role))
   const [mode, setMode] = useState("this_week")
   const [customFrom, setCustomFrom] = useState("")
@@ -137,7 +138,7 @@ export default function PayrollTab({ teamMembers }: Props) {
 
       <div className={card}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <span className="font-semibold">Hours by installer</span>
+          <span className="font-semibold">Hours and pay by installer</span>
         </div>
         {installers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No installers yet</div>
         : installers.map((m: any) => {
@@ -157,6 +158,33 @@ export default function PayrollTab({ teamMembers }: Props) {
                 <div className="text-right mr-3">
                   <div className="text-2xl font-bold text-teal-500">{total.toFixed(1)}h</div>
                   <div className={"text-xs " + sub}>{ms.length} session{ms.length !== 1 ? "s" : ""}</div>
+                </div>
+                {/* Pay beside the hours, never instead of them. The hours are
+                    the evidenced fact; the pay is an arithmetic consequence of
+                    a rate somebody typed, and if the rate is missing this says
+                    so rather than printing a confident zero. */}
+                <div className="text-right mr-3 min-w-[92px]">
+                  {(() => {
+                    const resolved = resolveRate(
+                      m.hourly_rate != null ? Number(m.hourly_rate) : null,
+                      defaultHourlyRate,
+                    )
+                    const pay = payFor(total, resolved.rate)
+                    return (
+                      <>
+                        <div className={"text-lg font-bold " + (pay === null ? "text-gray-400" : "text-gray-900")}>
+                          {formatPay(pay)}
+                        </div>
+                        <div className={"text-xs " + sub}>
+                          {resolved.source === "unset"
+                            ? "no rate set"
+                            : resolved.source === "company_default"
+                              ? "default rate"
+                              : "own rate"}
+                        </div>
+                      </>
+                    )
+                  })()}
                 </div>
                 <span className={"text-xs " + sub}>{isExpanded ? "▲" : "▼"}</span>
               </div>

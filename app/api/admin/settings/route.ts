@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { parseRate } from "@/lib/pay"
 
 const FIELDS = [
   "id",
@@ -16,6 +17,7 @@ const FIELDS = [
   "default_schedule",
   "grace_period_minutes",
   "geofence_radius_metres",
+  "default_hourly_rate",
     "leave_year_start_month",
     "leave_year_start_day",
   "background_gps_enabled",
@@ -88,6 +90,15 @@ export async function POST(request: Request) {
     updates.grace_period_minutes = body.grace_period_minutes
   if (body.geofence_radius_metres !== undefined)
     updates.geofence_radius_metres = body.geofence_radius_metres
+
+  // The rate every worker with no rate of their own is paid. Validated through
+  // parseRate so a rate typed in pence is refused with a sentence rather than
+  // by a check constraint -- 1850 for 18.50 would multiply a week by a hundred.
+  if (body.default_hourly_rate !== undefined) {
+    const parsed = parseRate(body.default_hourly_rate)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.why }, { status: 400 })
+    updates.default_hourly_rate = parsed.rate
+  }
   if (body.background_gps_enabled !== undefined)
     updates.background_gps_enabled = body.background_gps_enabled
   if (body.sick_auto_approve !== undefined)

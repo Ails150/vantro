@@ -13,6 +13,7 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
   const [quietStart, setQuietStart] = useState("19:00")
   const [quietEnd, setQuietEnd] = useState("06:00")
   const [weekendPush, setWeekendPush] = useState(false)
+  const [defaultRate, setDefaultRate] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -24,6 +25,7 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
       .then((data) => {
         const c = data.company || {}
         if (c.grace_period_minutes != null) setGracePeriod(c.grace_period_minutes)
+        if (c.default_hourly_rate != null) setDefaultRate(String(c.default_hourly_rate))
         if (c.geofence_radius_metres != null)
           setGeofenceRadius(c.geofence_radius_metres)
         if (c.background_gps_enabled != null)
@@ -56,6 +58,7 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
         notification_quiet_start: quietStart,
         notification_quiet_end: quietEnd,
         notification_weekend_push: weekendPush,
+        default_hourly_rate: defaultRate === "" ? null : Number(defaultRate),
       }),
     })
     setSaving(false)
@@ -278,6 +281,32 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
           <p className="text-xs text-ink-subtle">
             Saved with the button above.
           </p>
+        </div>
+      </Section>
+
+      <Section title="Pay">
+        <div className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1">
+              Default hourly rate (£)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="1000"
+              step="0.01"
+              value={defaultRate}
+              onChange={(e) => setDefaultRate(e.target.value)}
+              placeholder="18.50"
+              className={inp}
+            />
+            <p className="text-xs text-ink-subtle mt-1">
+              Used for anyone whose own rate is blank, so you get a pay figure
+              without filling in the whole team first. Set a rate on a person in
+              the Team tab to override it. Someone set to £0 stays at £0 — that
+              is treated as deliberate, not as missing.
+            </p>
+          </div>
         </div>
       </Section>
 
