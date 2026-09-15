@@ -121,6 +121,34 @@ export async function PUT(request: Request) {
     )
   }
 
+  const otDaily = optionalDecimal(body.overtimeDailyThresholdHours, 0.01, 24)
+  if (otDaily === "bad") {
+    return NextResponse.json(
+      { error: "Daily overtime threshold must be between 0 and 24 hours, or blank" },
+      { status: 400 },
+    )
+  }
+
+  const otWeekly = optionalDecimal(body.overtimeWeeklyThresholdHours, 0.01, 168)
+  if (otWeekly === "bad") {
+    return NextResponse.json(
+      { error: "Weekly overtime threshold must be between 0 and 168 hours, or blank" },
+      { status: 400 },
+    )
+  }
+
+  // Refused below 1 rather than clamped: below 1 means overtime paid worse than
+  // basic, which is a typo every time -- usually 0.5 where 1.5 was meant. The
+  // engine ignores such a value defensively, but the person typing it should be
+  // told rather than quietly overruled.
+  const otMultiplier = optionalDecimal(body.overtimeMultiplier, 1, 3)
+  if (otMultiplier === "bad") {
+    return NextResponse.json(
+      { error: "Overtime multiplier must be between 1 and 3 (1.5 is time and a half), or blank" },
+      { status: 400 },
+    )
+  }
+
   const direction = body.roundingDirection ?? "nearest"
   if (!["nearest", "up", "down"].includes(direction)) {
     return NextResponse.json({ error: "Rounding direction must be nearest, up or down" }, { status: 400 })
@@ -134,6 +162,9 @@ export async function PUT(request: Request) {
     unpaid_break_minutes: breakMinutes,
     break_after_hours: breakAfter,
     lateness_grace_minutes: latenessGrace,
+    overtime_daily_threshold_hours: otDaily,
+    overtime_weekly_threshold_hours: otWeekly,
+    overtime_multiplier: otMultiplier,
   }
 
   // Upsert on the primary key. The company id IS the key, so this is create or
@@ -153,7 +184,9 @@ export async function PUT(request: Request) {
     `[pay-rules] company=${companyId} round=${row.round_to_minutes ?? "off"}` +
       `/${row.rounding_direction} minimum=${row.minimum_paid_minutes ?? "off"} ` +
       `break=${row.unpaid_break_minutes ?? "off"}@${row.break_after_hours ?? "always"} ` +
-      `lateness=${row.lateness_grace_minutes ?? "off"}`,
+      `lateness=${row.lateness_grace_minutes ?? "off"} ` +
+      `ot=${row.overtime_daily_threshold_hours ?? "-"}d/${row.overtime_weekly_threshold_hours ?? "-"}w` +
+      `x${row.overtime_multiplier ?? 1}`,
   )
 
   return NextResponse.json({ ok: true, configured: true, rules: toPayRules(data ?? row) })
@@ -173,4 +206,13 @@ function optionalInt(raw: any, min: number, max: number): number | null | "bad" 
   if (!Number.isInteger(n)) return "bad"
   if (n < min || n > max) return "bad"
   return n
+}
+
+/** Like optionalInt, but for a value with decimals. Same three outcomes. */
+function optionalDecimal(raw: any, min: number, max: number): number | null | "bad" {
+  if (raw === null || raw === undefined || raw === "") return null
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return "bad"
+  if (n < min || n > max) return "bad"
+  return Math.round(n * 100) / 100
 }

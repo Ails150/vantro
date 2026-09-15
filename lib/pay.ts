@@ -169,6 +169,12 @@ export type PayRules = {
    * charge them twice for one offence.
    */
   latenessGraceMinutes: number | null
+  /** Hours in one day above which overtime is paid. */
+  overtimeDailyThresholdHours: number | null
+  /** Hours in one week above which overtime is paid, after daily is removed. */
+  overtimeWeeklyThresholdHours: number | null
+  /** Applied to the worker's own rate. 1.5 is time and a half. */
+  overtimeMultiplier: number | null
 }
 
 /**
@@ -184,6 +190,9 @@ export const NO_PAY_RULES: PayRules = {
   unpaidBreakMinutes: null,
   breakAfterHours: null,
   latenessGraceMinutes: null,
+  overtimeDailyThresholdHours: null,
+  overtimeWeeklyThresholdHours: null,
+  overtimeMultiplier: null,
 }
 
 /** Coerce a pay_rules row (or its absence) into rules the engine can use. */
@@ -200,6 +209,9 @@ export function toPayRules(row: any | null | undefined): PayRules {
     unpaidBreakMinutes: intOrNull(row.unpaid_break_minutes),
     breakAfterHours: numberOrNull(row.break_after_hours),
     latenessGraceMinutes: intOrNull(row.lateness_grace_minutes),
+    overtimeDailyThresholdHours: numberOrNull(row.overtime_daily_threshold_hours),
+    overtimeWeeklyThresholdHours: numberOrNull(row.overtime_weekly_threshold_hours),
+    overtimeMultiplier: numberOrNull(row.overtime_multiplier),
   }
 }
 
@@ -375,4 +387,136 @@ export function scheduledStartFor(
   companyDefaultStart: string | null | undefined,
 ): string | null {
   return jobStartTime || workerSignInTime || companyDefaultStart || null
+}
+
+// ---------------------------------------------------------------------------
+// Overtime
+// ---------------------------------------------------------------------------
+//
+// Deliberately NOT part of payableHours(). Every other rule is a fact about one
+// shift; "over forty hours in a week" cannot be decided while looking at a
+// single Tuesday. So overtime takes a whole week and payableHours() stays
+// per-shift and stays simple.
+
+/** One day's already-payable hours. The date is a local YYYY-MM-DD. */
+export type DayHours = { date: string; hours: number }
+
+export type OvertimeSplit = {
+  /** Hours paid at the basic rate. */
+  basicHours: number
+  /** Hours paid at the multiplier. */
+  overtimeHours: number
+  /** basicHours + overtimeHours, for callers that want the total back. */
+  totalHours: number
+  /** Which threshold produced the overtime, for explaining it on screen. */
+  fromDaily: number
+  fromWeekly: number
+}
+
+/**
+ * Split a worker's week into basic and overtime hours.
+ *
+ * Daily overtime comes out FIRST, and the weekly threshold is then applied only
+ * to what remains. This is the trap the whole function exists to avoid: a ten
+ * hour Monday under an eight hour daily rule has already yielded two overtime
+ * hours, and a weekly rule that then looks at the raw fifty hour total pays
+ * those same two hours a second time.
+ *
+ * Hours in, hours out -- no money. The caller multiplies by the rate, so this
+ * stays testable against plain numbers and cannot disagree with payFor().
+ */
+export function splitOvertime(days: DayHours[], rules: PayRules): OvertimeSplit {
+  // Group by date first. Two shifts on the same Tuesday are one Tuesday as far
+  // as a daily threshold is concerned -- a worker who does 5 hours on one site
+  // and 5 on another has done a ten hour day, and paying each shift as if it
+  // stood alone would hide every bit of daily overtime a multi-site company
+  // ever works.
+  const byDate = new Map<string, number>()
+  for (const d of days) {
+    const hours = Number(d?.hours)
+    if (!Number.isFinite(hours) || hours <= 0) continue
+    const key = String(d.date || "").slice(0, 10)
+    byDate.set(key, (byDate.get(key) || 0) + hours)
+  }
+
+  const totalHours = round2(Array.from(byDate.values()).reduce((a, b) => a + b, 0))
+
+  const dailyThreshold = rules.overtimeDailyThresholdHours
+  let fromDaily = 0
+  if (dailyThreshold && dailyThreshold > 0) {
+    for (const hours of byDate.values()) {
+      if (hours > dailyThreshold) fromDaily += hours - dailyThreshold
+    }
+  }
+  fromDaily = round2(fromDaily)
+
+  // What is left after daily overtime has been removed. This is the figure the
+  // weekly threshold is measured against.
+  const afterDaily = round2(totalHours - fromDaily)
+
+  const weeklyThreshold = rules.overtimeWeeklyThresholdHours
+  let fromWeekly = 0
+  if (weeklyThreshold && weeklyThreshold > 0 && afterDaily > weeklyThreshold) {
+    fromWeekly = round2(afterDaily - weeklyThreshold)
+  }
+
+  const overtimeHours = round2(fromDaily + fromWeekly)
+  return {
+    basicHours: round2(totalHours - overtimeHours),
+    overtimeHours,
+    totalHours,
+    fromDaily,
+    fromWeekly,
+  }
+}
+
+/**
+ * Pay for a split week.
+ *
+ * The multiplier applies to the worker's OWN rate, so changing a rate never
+ * leaves a stale overtime rate behind it.
+ *
+ * A null multiplier means overtime is paid at basic. That is what a company
+ * which set a threshold but no multiplier has literally asked for, and it is
+ * safer than assuming time and a half on their behalf and quietly inflating
+ * their wage bill.
+ *
+ * Each component is rounded to the penny on its own and the total is their sum,
+ * so the three figures on screen always add up. Rounding the total separately
+ * gives a number that does not equal the rows above it.
+ */
+export function payForSplit(
+  split: OvertimeSplit,
+  rate: number | null,
+  rules: PayRules,
+): { basic: number | null; overtime: number | null; total: number | null } {
+  if (rate === null || !Number.isFinite(rate)) {
+    return { basic: null, overtime: null, total: null }
+  }
+
+  const multiplier =
+    rules.overtimeMultiplier && rules.overtimeMultiplier >= 1 ? rules.overtimeMultiplier : 1
+
+  const basic = payFor(split.basicHours, rate) ?? 0
+  // The overtime RATE is rounded to the penny before it is applied, because that
+  // is the number a payslip prints and the one a worker checks against. 18.33 at
+  // time and a half is 27.50, not 27.495.
+  //
+  // Rounded in PENCE, not pounds. Math.round(27.495 * 100) is 2749, because
+  // 27.495 * 100 is 2749.4999999999995 in binary floating point -- so the
+  // obvious version silently pays a penny an hour short. Multiplying the
+  // already-integer pence rate keeps the half exact.
+  const overtimeRatePence = Math.round(Math.round(rate * 100) * multiplier)
+  const overtimeRate = overtimeRatePence / 100
+  const overtime = payFor(split.overtimeHours, overtimeRate) ?? 0
+
+  return {
+    basic,
+    overtime,
+    total: Math.round((basic + overtime) * 100) / 100,
+  }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
 }

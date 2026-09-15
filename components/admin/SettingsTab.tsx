@@ -563,6 +563,9 @@ function PayRulesSection() {
   const [breakMinutes, setBreakMinutes] = useState("")
   const [breakAfter, setBreakAfter] = useState("")
   const [latenessGrace, setLatenessGrace] = useState("")
+  const [otDaily, setOtDaily] = useState("")
+  const [otWeekly, setOtWeekly] = useState("")
+  const [otMultiplier, setOtMultiplier] = useState("")
   const [loading, setLoading] = useState(true)
   const [gated, setGated] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -584,6 +587,9 @@ function PayRulesSection() {
         setBreakMinutes(d.rules?.unpaidBreakMinutes != null ? String(d.rules.unpaidBreakMinutes) : "")
         setBreakAfter(d.rules?.breakAfterHours != null ? String(d.rules.breakAfterHours) : "")
         setLatenessGrace(d.rules?.latenessGraceMinutes != null ? String(d.rules.latenessGraceMinutes) : "")
+        setOtDaily(d.rules?.overtimeDailyThresholdHours != null ? String(d.rules.overtimeDailyThresholdHours) : "")
+        setOtWeekly(d.rules?.overtimeWeeklyThresholdHours != null ? String(d.rules.overtimeWeeklyThresholdHours) : "")
+        setOtMultiplier(d.rules?.overtimeMultiplier != null ? String(d.rules.overtimeMultiplier) : "")
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -604,6 +610,9 @@ function PayRulesSection() {
           unpaidBreakMinutes: breakMinutes === "" ? null : Number(breakMinutes),
           breakAfterHours: breakAfter === "" ? null : Number(breakAfter),
           latenessGraceMinutes: latenessGrace === "" ? null : Number(latenessGrace),
+          overtimeDailyThresholdHours: otDaily === "" ? null : Number(otDaily),
+          overtimeWeeklyThresholdHours: otWeekly === "" ? null : Number(otWeekly),
+          overtimeMultiplier: otMultiplier === "" ? null : Number(otMultiplier),
         }),
       })
       const body = await res.json().catch(() => ({}))
@@ -724,6 +733,33 @@ function PayRulesSection() {
           <p className="text-xs text-ink-subtle mt-1">
             A shorter shift is paid as this. Somebody who never signed in is
             still paid nothing.
+          </p>
+        </div>
+
+        <div className="pt-2 border-t border-line">
+          <p className="text-sm font-medium text-ink mb-2">Overtime</p>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-ink mb-1">Over (hours/day)</label>
+              <input type="number" min="0" max="24" step="0.25" value={otDaily}
+                onChange={e => setOtDaily(e.target.value)} placeholder="None" className={inp}/>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink mb-1">Over (hours/week)</label>
+              <input type="number" min="0" max="168" step="0.25" value={otWeekly}
+                onChange={e => setOtWeekly(e.target.value)} placeholder="None" className={inp}/>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-ink mb-1">Multiplier</label>
+              <input type="number" min="1" max="3" step="0.1" value={otMultiplier}
+                onChange={e => setOtMultiplier(e.target.value)} placeholder="1.5" className={inp}/>
+            </div>
+          </div>
+          <p className="text-xs text-ink-subtle mt-1">
+            Daily overtime is taken out first, then the weekly threshold applies
+            to what is left, so no hour is ever paid twice. The multiplier
+            applies to each person&rsquo;s own rate. Leave it blank to pay
+            overtime hours at basic rate.
           </p>
         </div>
 
