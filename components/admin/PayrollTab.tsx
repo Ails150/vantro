@@ -4,7 +4,7 @@ import { PayrollExpenseRow } from "@/components/admin/PayrollExpenseRow"
 import { isFieldRole } from '@/lib/roles'
 
 import { formatIn, formatTime } from "@/lib/format-time"
-import { formatPay, payFor, resolveRate } from "@/lib/pay"
+import { NO_PAY_RULES, formatPay, payFor, payableHours, resolveRate, type PayRules } from "@/lib/pay"
 interface Props { teamMembers: any[]; defaultHourlyRate?: number | null }
 
 function getWeekRange(offset = 0) {
@@ -27,6 +27,18 @@ function getMonthRange() {
 
 export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Props) {
   const installers = teamMembers.filter((m: any) => isFieldRole(m.role))
+  // Pay rules, loaded once. A 402 is normal and silent: the tab renders for
+  // plans that do not have them, and the no-op ruleset is the right answer for
+  // those companies anyway.
+  const [payRules, setPayRules] = useState<PayRules>(NO_PAY_RULES)
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/pay-rules")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d?.rules && !cancelled) setPayRules(d.rules) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
   const [mode, setMode] = useState("this_week")
   const [customFrom, setCustomFrom] = useState("")
   const [customTo, setCustomTo] = useState("")
@@ -169,7 +181,12 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
                       m.hourly_rate != null ? Number(m.hourly_rate) : null,
                       defaultHourlyRate,
                     )
-                    const pay = payFor(total, resolved.rate)
+                    // The rules are applied to the HOURS, then the rate is
+                    // applied to the result. Paying the raw hours and rounding
+                    // the money afterwards would give a different figure and
+                    // make the rounding rule invisible.
+                    const paid = payableHours(total, payRules)
+                    const pay = payFor(paid, resolved.rate)
                     return (
                       <>
                         <div className={"text-lg font-bold " + (pay === null ? "text-gray-400" : "text-gray-900")}>
@@ -182,6 +199,13 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
                               ? "default rate"
                               : "own rate"}
                         </div>
+                        {/* Only shown when the rules actually moved the number,
+                            so an unchanged figure carries no noise. */}
+                        {Math.abs(paid - total) > 0.0001 && (
+                          <div className="text-[10px] text-gray-400">
+                            paid as {paid.toFixed(2)}h
+                          </div>
+                        )}
                       </>
                     )
                   })()}

@@ -137,3 +137,100 @@ export function parseRate(raw: unknown): { ok: true; rate: number | null } | { o
   }
   return { ok: true, rate: Math.round(n * 100) / 100 }
 }
+
+// ---------------------------------------------------------------------------
+// Pay rules
+// ---------------------------------------------------------------------------
+//
+// Rules sit between "how long was this person on site" and "what do we pay for
+// that". They are per company, all optional, and all off unless switched on --
+// see 20260915150000_pay_rules.sql for why a default that quietly changed a
+// payroll total would be indefensible.
+//
+// payableHours() is the single funnel. Every rule that changes the NUMBER OF
+// HOURS goes through it, in a fixed order, so two rules can never be applied in
+// a different sequence by two callers and produce two answers.
+
+export type RoundingDirection = "nearest" | "up" | "down"
+
+export type PayRules = {
+  roundToMinutes: number | null
+  roundingDirection: RoundingDirection
+  minimumPaidMinutes: number | null
+}
+
+/**
+ * What a company with no pay_rules row gets: today's behaviour, exactly.
+ *
+ * Kept as a named constant rather than scattered `?? null`s, so "no rules" is
+ * one object that can be tested against and reasoned about.
+ */
+export const NO_PAY_RULES: PayRules = {
+  roundToMinutes: null,
+  roundingDirection: "nearest",
+  minimumPaidMinutes: null,
+}
+
+/** Coerce a pay_rules row (or its absence) into rules the engine can use. */
+export function toPayRules(row: any | null | undefined): PayRules {
+  if (!row) return NO_PAY_RULES
+  const direction = row.rounding_direction
+  return {
+    roundToMinutes: intOrNull(row.round_to_minutes),
+    roundingDirection:
+      direction === "up" || direction === "down" || direction === "nearest"
+        ? direction
+        : "nearest",
+    minimumPaidMinutes: intOrNull(row.minimum_paid_minutes),
+  }
+}
+
+function intOrNull(value: any): number | null {
+  if (value === null || value === undefined || value === "") return null
+  const n = Number(value)
+  return Number.isFinite(n) ? Math.trunc(n) : null
+}
+
+/**
+ * Turn time actually on site into time that gets paid.
+ *
+ * Order is fixed and matters:
+ *   1. round the worked time
+ *   2. apply the minimum
+ *
+ * Rounding first, then the minimum, because the minimum is a floor on what is
+ * PAID. Doing it the other way lets a 'down' rounding drop a shift back below
+ * the minimum it was just raised to, which would make the minimum a suggestion
+ * rather than a floor.
+ *
+ * Works in whole minutes throughout. Hours are a float with a repeating decimal
+ * for most real shifts (7h31m is 7.51666...), and rounding rules expressed in
+ * minutes have to be evaluated in minutes or the boundaries land in the wrong
+ * place.
+ */
+export function payableHours(workedHours: number, rules: PayRules): number {
+  const worked = Number(workedHours)
+  if (!Number.isFinite(worked) || worked <= 0) return 0
+
+  let minutes = Math.round(worked * 60)
+
+  if (rules.roundToMinutes && rules.roundToMinutes > 0) {
+    minutes = roundMinutes(minutes, rules.roundToMinutes, rules.roundingDirection)
+  }
+
+  if (rules.minimumPaidMinutes && rules.minimumPaidMinutes > minutes) {
+    minutes = rules.minimumPaidMinutes
+  }
+
+  return minutes / 60
+}
+
+function roundMinutes(minutes: number, unit: number, direction: RoundingDirection): number {
+  if (direction === "up") return Math.ceil(minutes / unit) * unit
+  if (direction === "down") return Math.floor(minutes / unit) * unit
+  // 'nearest' rounds halves UP rather than to even. Banker's rounding is the
+  // statistically neutral choice and the wrong one here: a worker who is
+  // exactly on the boundary should not lose the half, and "we round half down
+  // sometimes" is not a sentence anybody wants to say to their crew.
+  return Math.round(minutes / unit) * unit
+}

@@ -310,6 +310,8 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
         </div>
       </Section>
 
+      <PayRulesSection />
+
       <WeeklyReportSection />
 
       {isSuperadmin && <DemoDataSection />}
@@ -536,6 +538,159 @@ function DemoDataSection() {
             )}
           </div>
         )}
+      </div>
+    </Section>
+  )
+}
+
+/**
+ * Pay rules: rounding and the minimum paid shift.
+ *
+ * Its own section with its own Save, separate from the settings above, because
+ * every field here changes what somebody is paid. Putting "round every shift
+ * down to the hour" behind the same button as the geofence radius is how a
+ * payroll total moves without anyone meaning it to.
+ *
+ * A company that has never saved anything here is told so explicitly. "No rules
+ * set" and "rules set to nothing" look identical on a form and are different
+ * facts, and only one of them means somebody has thought about it.
+ */
+function PayRulesSection() {
+  const [configured, setConfigured] = useState(false)
+  const [roundTo, setRoundTo] = useState("")
+  const [direction, setDirection] = useState("nearest")
+  const [minimum, setMinimum] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [gated, setGated] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/admin/pay-rules")
+      .then(async r => {
+        if (r.status === 402) { setGated(true); return null }
+        return r.ok ? r.json() : null
+      })
+      .then(d => {
+        if (!d) return
+        setConfigured(Boolean(d.configured))
+        setRoundTo(d.rules?.roundToMinutes != null ? String(d.rules.roundToMinutes) : "")
+        setDirection(d.rules?.roundingDirection || "nearest")
+        setMinimum(d.rules?.minimumPaidMinutes != null ? String(d.rules.minimumPaidMinutes) : "")
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    setSaved(false)
+    setError(null)
+    try {
+      const res = await fetch("/api/admin/pay-rules", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roundToMinutes: roundTo === "" ? null : Number(roundTo),
+          roundingDirection: direction,
+          minimumPaidMinutes: minimum === "" ? null : Number(minimum),
+        }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(body.error || `Save failed (${res.status})`); return }
+      setConfigured(true)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (e: any) {
+      setError(e?.message || "Save failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (gated || loading) return null
+
+  const inp =
+    "w-full rounded-md border border-line-strong bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-subtle transition-colors duration-fast ease-out focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent-ink/20"
+
+  return (
+    <Section title="Pay rules">
+      <div className="space-y-5">
+        <p className="text-xs text-ink-subtle">
+          Applied to every shift before it is paid.{" "}
+          {configured
+            ? "Leave a field blank to switch that rule off."
+            : "Nothing is set, so shifts are paid exactly as recorded."}
+        </p>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1">Round shifts to</label>
+            <select value={roundTo} onChange={e => setRoundTo(e.target.value)} className={inp}>
+              <option value="">No rounding</option>
+              <option value="5">5 minutes</option>
+              <option value="6">6 minutes</option>
+              <option value="10">10 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="60">1 hour</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1">Rounding direction</label>
+            <select
+              value={direction}
+              onChange={e => setDirection(e.target.value)}
+              disabled={roundTo === ""}
+              className={inp + (roundTo === "" ? " opacity-50" : "")}
+            >
+              <option value="nearest">To the nearest</option>
+              <option value="up">Always up (favours the worker)</option>
+              <option value="down">Always down (favours the company)</option>
+            </select>
+          </div>
+        </div>
+
+        {direction === "down" && roundTo !== "" && (
+          <p className="text-xs text-warning">
+            Rounding down takes paid time off every shift that is not already
+            exact. Make sure this matches what your crew have been told.
+          </p>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-ink mb-1">
+            Minimum paid shift (minutes)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="1440"
+            step="1"
+            value={minimum}
+            onChange={e => setMinimum(e.target.value)}
+            placeholder="No minimum"
+            className={inp}
+          />
+          <p className="text-xs text-ink-subtle mt-1">
+            A shorter shift is paid as this. Somebody who never signed in is
+            still paid nothing.
+          </p>
+        </div>
+
+        {error && <p className="text-sm text-danger">{error}</p>}
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={save}
+            disabled={saving}
+            className="bg-accent hover:bg-accent-ink text-white font-bold rounded-md px-5 py-2 text-sm transition-colors disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save pay rules"}
+          </button>
+          {saved && <span className="text-xs text-accent-ink">Saved</span>}
+        </div>
       </div>
     </Section>
   )

@@ -1,0 +1,142 @@
+// app/api/admin/pay-rules/route.ts
+//
+// GET  this company's pay rules, or the no-op set if it has never saved any.
+// PUT  save them.
+//
+// Separate from /api/admin/settings on purpose. Settings is a flat allowlist of
+// columns on companies, and pay rules are their own table with their own
+// validation and their own consequence: every field here changes what somebody
+// is paid. Mixing them would put "round every shift down to the hour" behind
+// the same Save button as the geofence radius.
+
+import { NextResponse } from "next/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getCallerContext } from "@/lib/company-context"
+import { can, toPlan } from "@/lib/plan"
+import { toPayRules } from "@/lib/pay"
+
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
+
+// Foreman is excluded from both reading and writing. Pay rules are an owner's
+// settings; a supervisor approving hours has no business changing what those
+// hours are worth.
+const PAY_ROLES = ["admin", "superadmin", "support"]
+
+async function caller() {
+  const ctx = await getCallerContext()
+  if (!ctx) return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) }
+  if (!PAY_ROLES.includes(ctx.role)) {
+    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) }
+  }
+  if (!ctx.companyId) {
+    return { error: NextResponse.json({ error: "No company selected" }, { status: 400 }) }
+  }
+
+  const service = await createServiceClient()
+  const { data: company } = (await service
+    .from("companies").select("id, plan").eq("id", ctx.companyId).single()) as { data: any }
+
+  // Pay rules ride with the payroll export entitlement: they exist to make that
+  // export correct, and they are meaningless without it.
+  if (!can(toPlan(company?.plan), "payrollExport")) {
+    return {
+      error: NextResponse.json(
+        { error: "Pay rules are on the Payroll plan", requiredPlan: "payroll" },
+        { status: 402 },
+      ),
+    }
+  }
+
+  return { ctx, service, companyId: ctx.companyId }
+}
+
+export async function GET() {
+  const c = await caller()
+  if ("error" in c) return c.error
+  const { service, companyId } = c
+
+  const { data } = (await service
+    .from("pay_rules").select("*").eq("company_id", companyId).maybeSingle()) as { data: any }
+
+  return NextResponse.json({
+    // `configured` is the row existing, not the values being non-null. A company
+    // that deliberately saved "no rounding" has configured its pay rules; one
+    // that has never opened the screen has not, and the UI says so differently.
+    configured: Boolean(data),
+    rules: toPayRules(data),
+  })
+}
+
+export async function PUT(request: Request) {
+  const c = await caller()
+  if ("error" in c) return c.error
+  const { service, companyId } = c
+
+  const body = await request.json().catch(() => null)
+  if (!body) return NextResponse.json({ error: "Invalid body" }, { status: 400 })
+
+  const roundTo = optionalInt(body.roundToMinutes, 1, 60)
+  if (roundTo === "bad") {
+    return NextResponse.json(
+      { error: "Rounding must be between 1 and 60 minutes, or blank for no rounding" },
+      { status: 400 },
+    )
+  }
+
+  const minimum = optionalInt(body.minimumPaidMinutes, 0, 1440)
+  if (minimum === "bad") {
+    return NextResponse.json(
+      { error: "Minimum paid shift must be between 0 and 1440 minutes, or blank" },
+      { status: 400 },
+    )
+  }
+
+  const direction = body.roundingDirection ?? "nearest"
+  if (!["nearest", "up", "down"].includes(direction)) {
+    return NextResponse.json({ error: "Rounding direction must be nearest, up or down" }, { status: 400 })
+  }
+
+  const row = {
+    company_id: companyId,
+    round_to_minutes: roundTo,
+    rounding_direction: direction,
+    minimum_paid_minutes: minimum,
+  }
+
+  // Upsert on the primary key. The company id IS the key, so this is create or
+  // replace with no chance of a second row.
+  const { data, error } = (await service
+    .from("pay_rules")
+    .upsert(row, { onConflict: "company_id" })
+    .select("*")
+    .single()) as { data: any; error: any }
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Logged because pay rules are the kind of setting somebody changes and then
+  // does not remember changing, and a payroll total that moved needs an
+  // explanation that does not depend on anyone's memory.
+  console.log(
+    `[pay-rules] company=${companyId} round=${row.round_to_minutes ?? "off"}` +
+      `/${row.rounding_direction} minimum=${row.minimum_paid_minutes ?? "off"}`,
+  )
+
+  return NextResponse.json({ ok: true, configured: true, rules: toPayRules(data ?? row) })
+}
+
+/**
+ * An optional whole number within bounds.
+ *
+ * Three outcomes, not two: the value, null for "cleared", and "bad" for
+ * refused. Returning null for a bad value would silently switch a rule OFF when
+ * somebody fat-fingered it, which is the quiet kind of wrong this file is
+ * trying to avoid.
+ */
+function optionalInt(raw: any, min: number, max: number): number | null | "bad" {
+  if (raw === null || raw === undefined || raw === "") return null
+  const n = Number(raw)
+  if (!Number.isInteger(n)) return "bad"
+  if (n < min || n > max) return "bad"
+  return n
+}
