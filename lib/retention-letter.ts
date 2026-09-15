@@ -24,8 +24,9 @@
 // expire. A reference plus a verify URL stays true for as long as the record
 // does, and the client can pull the pack if they want it.
 
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib"
-import { printable, truncate, wrapText } from "./pdf-text"
+import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib"
+import { textSafety, wrapText } from "./pdf-text"
+import { embedPdfFonts } from "./pdf-fonts"
 import { formatMoney } from "./retention"
 
 const INK = rgb(0.043, 0.059, 0.078)
@@ -60,8 +61,12 @@ export type RetentionLetterInput = {
 export async function renderRetentionLetterPdf(input: RetentionLetterInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const page = doc.addPage([PAGE_W, PAGE_H])
-  const regular = await doc.embedFont(StandardFonts.Helvetica)
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  // A claim letter goes to a client under the company's own name. Getting that
+  // company's name wrong on it is exactly the kind of small insult that gets
+  // remembered, so this is the document the Unicode fonts matter most for.
+  const fonts = await embedPdfFonts(doc)
+  const { regular, bold } = fonts
+  const { text: printable, truncate } = textSafety(fonts.unicode)
 
   let y = PAGE_H - MARGIN
 
@@ -103,7 +108,7 @@ export async function renderRetentionLetterPdf(input: RetentionLetterInput): Pro
       : `We write in respect of retention held against the above contract, and request that the ` +
         `retention sum shown below is released in accordance with the terms of the contract.`
 
-  y = paragraph(page, opening, regular, 10.5, y)
+  y = paragraph(page, opening, regular, 10.5, y, printable)
   y -= 14
 
   // ─── Figures ─────────────────────────────────────────────────────────────
@@ -151,6 +156,7 @@ export async function renderRetentionLetterPdf(input: RetentionLetterInput): Pro
       regular,
       10.5,
       y,
+      printable,
     )
     y -= 6
 
@@ -162,7 +168,7 @@ export async function renderRetentionLetterPdf(input: RetentionLetterInput): Pro
 
     if (input.verifyUrl) {
       page.drawText("Verify at", { x: MARGIN, y, size: 10, font: regular, color: MUTED })
-      const urlLines = wrapText(input.verifyUrl, regular, 10, BODY_W - 190)
+      const urlLines = wrapText(input.verifyUrl, regular, 10, BODY_W - 190, printable)
       for (const line of urlLines) {
         page.drawText(line, { x: MARGIN + 190, y, size: 10, font: regular, color: INK })
         y -= 14
@@ -180,6 +186,7 @@ export async function renderRetentionLetterPdf(input: RetentionLetterInput): Pro
       regular,
       10.5,
       y,
+      printable,
     )
     y -= 12
   }
@@ -192,6 +199,7 @@ export async function renderRetentionLetterPdf(input: RetentionLetterInput): Pro
     regular,
     10.5,
     y,
+    printable,
   )
   y -= 30
 
@@ -222,9 +230,10 @@ function paragraph(
   font: PDFFont,
   size: number,
   startY: number,
+  safe: (value: string) => string,
 ): number {
   let y = startY
-  for (const line of wrapText(text, font, size, BODY_W)) {
+  for (const line of wrapText(text, font, size, BODY_W, safe)) {
     page.drawText(line, { x: MARGIN, y, size, font, color: INK })
     y -= size * 1.55
   }

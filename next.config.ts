@@ -12,6 +12,21 @@ const sentryRelease = `vantro@${commitSha ? commitSha.slice(0, 7) : "dev"}`
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  /**
+   * Ship the PDF fonts with the serverless functions.
+   *
+   * lib/pdf-fonts.ts reads these off disk at runtime. Nothing imports them, so
+   * the build's file tracing has no way to discover them on its own and the
+   * functions would deploy without them -- working locally and failing on
+   * Vercel, which is the worst shape a bug can have.
+   *
+   * They live in assets/ rather than public/ deliberately: they are only ever
+   * read by the server, and serving 1.2MB of fonts to browsers that will never
+   * request them is waste.
+   */
+  outputFileTracingIncludes: {
+    "/api/**": ["./assets/fonts/**"],
+  },
   env: {
     // Inlined at build time so the client bundle carries the same release
     // string the server and the uploaded source maps use.

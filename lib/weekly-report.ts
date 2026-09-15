@@ -12,11 +12,12 @@
 // and rules, the base-14 fonts need no files on disk, and nothing here should
 // require Chromium on a serverless function.
 
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib"
+import { PDFDocument, rgb, type PDFPage } from "pdf-lib"
 import { addDays, formatIn, isoWeekStart, londonMidnight } from "./format-time"
 // printable() and truncate() moved to lib/pdf-text.ts when the retention
 // claim letter became the second PDF that has to draw a company name.
-import { printable, truncate } from "./pdf-text"
+import { textSafety } from "./pdf-text"
+import { embedPdfFonts } from "./pdf-fonts"
 
 // Brand ink and accent, matched to the admin UI.
 const INK = rgb(0.043, 0.059, 0.078)
@@ -100,8 +101,11 @@ function h(n: number): string {
 export async function renderWeeklyReportPdf(input: WeeklyReportInput): Promise<Uint8Array> {
   const doc = await PDFDocument.create()
   const page = doc.addPage([PAGE_W, PAGE_H])
-  const regular = await doc.embedFont(StandardFonts.Helvetica)
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  // Noto Sans when it is available, Helvetica when it is not. `safe` handles
+  // the difference so no drawText call below has to know which it got.
+  const fonts = await embedPdfFonts(doc)
+  const { regular, bold } = fonts
+  const { text: printable, truncate } = textSafety(fonts.unicode)
 
   const weekEndLabel = formatIn(londonMidnight(addDays(input.weekStart, 6)), {
     day: "numeric", month: "long", year: "numeric",

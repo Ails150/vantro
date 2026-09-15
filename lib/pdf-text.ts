@@ -64,8 +64,20 @@ export function truncate(value: string, max: number): string {
  * columns. A letter is prose, and prose that runs off the right edge of an A4
  * page is not a letter you would send to a client.
  */
-export function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
-  const words = printable(text).split(/\s+/).filter(Boolean)
+export function wrapText(
+  text: string,
+  font: PDFFont,
+  size: number,
+  maxWidth: number,
+  /**
+   * How to make the text drawable. Defaults to transliterating, which is right
+   * for Helvetica and wrong for Noto Sans -- a caller with Unicode fonts passes
+   * textSafety(true).text here, or the wrapper would quietly undo the embedding
+   * it just paid for.
+   */
+  safe: (value: string) => string = printable,
+): string[] {
+  const words = safe(text).split(/\s+/).filter(Boolean)
   const lines: string[] = []
   let line = ""
 
@@ -95,4 +107,27 @@ export function wrapText(text: string, font: PDFFont, size: number, maxWidth: nu
   }
   if (line) lines.push(line)
   return lines
+}
+
+/**
+ * Text handling for a document, chosen by which fonts actually embedded.
+ *
+ * With Noto Sans in place, names pass through exactly as spelled. With the
+ * Helvetica fallback they must still be transliterated or pdf-lib throws on the
+ * first accented character and the whole document fails.
+ *
+ * Returned as a pair of functions rather than a boolean the caller branches on,
+ * so a call site cannot forget the check on one of its twenty drawText lines.
+ */
+export function textSafety(unicode: boolean) {
+  if (unicode) {
+    return {
+      text: (value: string) => String(value ?? ""),
+      truncate: (value: string, max: number) => {
+        const s = String(value ?? "")
+        return s.length > max ? s.slice(0, max - 3) + "..." : s
+      },
+    }
+  }
+  return { text: printable, truncate }
 }
