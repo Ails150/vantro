@@ -560,6 +560,8 @@ function PayRulesSection() {
   const [roundTo, setRoundTo] = useState("")
   const [direction, setDirection] = useState("nearest")
   const [minimum, setMinimum] = useState("")
+  const [breakMinutes, setBreakMinutes] = useState("")
+  const [breakAfter, setBreakAfter] = useState("")
   const [loading, setLoading] = useState(true)
   const [gated, setGated] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -578,6 +580,8 @@ function PayRulesSection() {
         setRoundTo(d.rules?.roundToMinutes != null ? String(d.rules.roundToMinutes) : "")
         setDirection(d.rules?.roundingDirection || "nearest")
         setMinimum(d.rules?.minimumPaidMinutes != null ? String(d.rules.minimumPaidMinutes) : "")
+        setBreakMinutes(d.rules?.unpaidBreakMinutes != null ? String(d.rules.unpaidBreakMinutes) : "")
+        setBreakAfter(d.rules?.breakAfterHours != null ? String(d.rules.breakAfterHours) : "")
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -595,6 +599,8 @@ function PayRulesSection() {
           roundToMinutes: roundTo === "" ? null : Number(roundTo),
           roundingDirection: direction,
           minimumPaidMinutes: minimum === "" ? null : Number(minimum),
+          unpaidBreakMinutes: breakMinutes === "" ? null : Number(breakMinutes),
+          breakAfterHours: breakAfter === "" ? null : Number(breakAfter),
         }),
       })
       const body = await res.json().catch(() => ({}))
@@ -658,6 +664,45 @@ function PayRulesSection() {
             exact. Make sure this matches what your crew have been told.
           </p>
         )}
+
+        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-line">
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1">
+              Unpaid break (minutes)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="480"
+              step="1"
+              value={breakMinutes}
+              onChange={e => setBreakMinutes(e.target.value)}
+              placeholder="No break deducted"
+              className={inp}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1">
+              Only on shifts over (hours)
+            </label>
+            <input
+              type="number"
+              min="0"
+              max="24"
+              step="0.25"
+              value={breakAfter}
+              onChange={e => setBreakAfter(e.target.value)}
+              placeholder="Every shift"
+              className={inp + (breakMinutes === "" ? " opacity-50" : "")}
+              disabled={breakMinutes === ""}
+            />
+          </div>
+        </div>
+        <p className="text-xs text-ink-subtle -mt-3">
+          A payroll deduction, not a record that a break was taken. A shift
+          exactly on the threshold does not qualify — &ldquo;over six
+          hours&rdquo; means over.
+        </p>
 
         <div>
           <label className="block text-sm font-medium text-ink mb-1">

@@ -157,6 +157,10 @@ export type PayRules = {
   roundToMinutes: number | null
   roundingDirection: RoundingDirection
   minimumPaidMinutes: number | null
+  /** Minutes taken off a qualifying shift as an unpaid break. */
+  unpaidBreakMinutes: number | null
+  /** Only deduct the break above this many hours. Null means every shift. */
+  breakAfterHours: number | null
 }
 
 /**
@@ -169,6 +173,8 @@ export const NO_PAY_RULES: PayRules = {
   roundToMinutes: null,
   roundingDirection: "nearest",
   minimumPaidMinutes: null,
+  unpaidBreakMinutes: null,
+  breakAfterHours: null,
 }
 
 /** Coerce a pay_rules row (or its absence) into rules the engine can use. */
@@ -182,7 +188,15 @@ export function toPayRules(row: any | null | undefined): PayRules {
         ? direction
         : "nearest",
     minimumPaidMinutes: intOrNull(row.minimum_paid_minutes),
+    unpaidBreakMinutes: intOrNull(row.unpaid_break_minutes),
+    breakAfterHours: numberOrNull(row.break_after_hours),
   }
+}
+
+function numberOrNull(value: any): number | null {
+  if (value === null || value === undefined || value === "") return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
 }
 
 function intOrNull(value: any): number | null {
@@ -195,13 +209,15 @@ function intOrNull(value: any): number | null {
  * Turn time actually on site into time that gets paid.
  *
  * Order is fixed and matters:
- *   1. round the worked time
- *   2. apply the minimum
+ *   1. deduct the unpaid break
+ *   2. round the worked time
+ *   3. apply the minimum
  *
- * Rounding first, then the minimum, because the minimum is a floor on what is
- * PAID. Doing it the other way lets a 'down' rounding drop a shift back below
- * the minimum it was just raised to, which would make the minimum a suggestion
- * rather than a floor.
+ * The break comes first because it is a fact about the shift, while rounding is
+ * a commercial adjustment on top of what was worked. The minimum comes last
+ * because it is a floor on what is PAID: any other order lets a 'down' rounding
+ * drop a shift back below the minimum it was just raised to, which would make
+ * the minimum a suggestion rather than a floor.
  *
  * Works in whole minutes throughout. Hours are a float with a repeating decimal
  * for most real shifts (7h31m is 7.51666...), and rounding rules expressed in
@@ -214,10 +230,36 @@ export function payableHours(workedHours: number, rules: PayRules): number {
 
   let minutes = Math.round(worked * 60)
 
+  // 1. The unpaid break, FIRST.
+  //
+  // Before rounding, because the break is a fact about the shift and rounding
+  // is a commercial adjustment applied to what was worked. Deducting after
+  // rounding would let a 15-minute rounding quietly give half of the break
+  // back, which makes the deduction look arbitrary to anyone checking it by
+  // hand.
+  //
+  // The threshold is tested against the time ACTUALLY on site, not against the
+  // running total, so the answer to "did this shift qualify for a break" cannot
+  // change depending on which other rules happen to be switched on.
+  if (rules.unpaidBreakMinutes && rules.unpaidBreakMinutes > 0) {
+    const qualifies =
+      rules.breakAfterHours === null || rules.breakAfterHours === undefined
+        ? true
+        : worked > rules.breakAfterHours
+    if (qualifies) {
+      // Never below zero. A shift shorter than its own break deduction is a
+      // data error somewhere else, and the honest answer here is nothing paid
+      // rather than a negative that would subtract from the rest of the week.
+      minutes = Math.max(0, minutes - rules.unpaidBreakMinutes)
+    }
+  }
+
+  // 2. Rounding.
   if (rules.roundToMinutes && rules.roundToMinutes > 0) {
     minutes = roundMinutes(minutes, rules.roundToMinutes, rules.roundingDirection)
   }
 
+  // 3. The minimum, LAST, because it is a floor on what is paid.
   if (rules.minimumPaidMinutes && rules.minimumPaidMinutes > minutes) {
     minutes = rules.minimumPaidMinutes
   }

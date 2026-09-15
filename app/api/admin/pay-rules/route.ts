@@ -92,6 +92,27 @@ export async function PUT(request: Request) {
     )
   }
 
+  const breakMinutes = optionalInt(body.unpaidBreakMinutes, 0, 480)
+  if (breakMinutes === "bad") {
+    return NextResponse.json(
+      { error: "Unpaid break must be between 0 and 480 minutes, or blank" },
+      { status: 400 },
+    )
+  }
+
+  // Hours, not minutes, and fractional: "over 5.5 hours" is a real policy.
+  let breakAfter: number | null = null
+  if (body.breakAfterHours !== null && body.breakAfterHours !== undefined && body.breakAfterHours !== "") {
+    const n = Number(body.breakAfterHours)
+    if (!Number.isFinite(n) || n < 0 || n > 24) {
+      return NextResponse.json(
+        { error: "Break threshold must be between 0 and 24 hours, or blank" },
+        { status: 400 },
+      )
+    }
+    breakAfter = Math.round(n * 100) / 100
+  }
+
   const direction = body.roundingDirection ?? "nearest"
   if (!["nearest", "up", "down"].includes(direction)) {
     return NextResponse.json({ error: "Rounding direction must be nearest, up or down" }, { status: 400 })
@@ -102,6 +123,8 @@ export async function PUT(request: Request) {
     round_to_minutes: roundTo,
     rounding_direction: direction,
     minimum_paid_minutes: minimum,
+    unpaid_break_minutes: breakMinutes,
+    break_after_hours: breakAfter,
   }
 
   // Upsert on the primary key. The company id IS the key, so this is create or
@@ -119,7 +142,8 @@ export async function PUT(request: Request) {
   // explanation that does not depend on anyone's memory.
   console.log(
     `[pay-rules] company=${companyId} round=${row.round_to_minutes ?? "off"}` +
-      `/${row.rounding_direction} minimum=${row.minimum_paid_minutes ?? "off"}`,
+      `/${row.rounding_direction} minimum=${row.minimum_paid_minutes ?? "off"} ` +
+      `break=${row.unpaid_break_minutes ?? "off"}@${row.break_after_hours ?? "always"}`,
   )
 
   return NextResponse.json({ ok: true, configured: true, rules: toPayRules(data ?? row) })

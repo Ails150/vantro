@@ -96,9 +96,17 @@ test.describe("order of operations: the minimum is a floor, not a suggestion", (
 
 test.describe("toPayRules coercion", () => {
   test("reads a row", () => {
+    // Exact equality on purpose: it catches a field being silently dropped from
+    // the mapping. Spread over NO_PAY_RULES so that adding a rule to the type
+    // makes this fail loudly once, here, rather than everywhere at random.
     expect(
       toPayRules({ round_to_minutes: 15, rounding_direction: "up", minimum_paid_minutes: 240 }),
-    ).toEqual({ roundToMinutes: 15, roundingDirection: "up", minimumPaidMinutes: 240 })
+    ).toEqual({
+      ...NO_PAY_RULES,
+      roundToMinutes: 15,
+      roundingDirection: "up",
+      minimumPaidMinutes: 240,
+    })
   })
 
   test("an unknown direction falls back to nearest rather than throwing", () => {
