@@ -4,7 +4,10 @@ import { PayrollExpenseRow } from "@/components/admin/PayrollExpenseRow"
 import { isFieldRole } from '@/lib/roles'
 
 import { formatIn, formatTime } from "@/lib/format-time"
-import { NO_PAY_RULES, formatPay, payFor, payableHours, resolveRate, type PayRules } from "@/lib/pay"
+import {
+  NO_PAY_RULES, formatPay, latenessFor, payFor, payableHours, resolveRate,
+  scheduledStartFor, type PayRules,
+} from "@/lib/pay"
 interface Props { teamMembers: any[]; defaultHourlyRate?: number | null }
 
 function getWeekRange(offset = 0) {
@@ -99,6 +102,30 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
     }, 0)
   }
 
+  /**
+   * Late arrivals in a set of shifts.
+   *
+   * Local wall-clock on both sides: the arrival is formatted in the company's
+   * zone before being compared to a scheduled start that is itself wall-clock.
+   * Comparing a UTC instant to "08:00" reports everybody as an hour late for
+   * half the year.
+   */
+  function getLateness(ss: any[]) {
+    let late = 0
+    let worstMinutes = 0
+    for (const s of ss) {
+      if (!s.signed_in_at) continue
+      const arrived = formatIn(s.signed_in_at, { hour: "2-digit", minute: "2-digit", hour12: false })
+      const start = scheduledStartFor(s.jobs?.start_time, s.users?.sign_in_time, null)
+      const l = latenessFor(arrived, start, payRules.latenessGraceMinutes)
+      if (l.isLate) {
+        late += 1
+        if (l.minutesLate > worstMinutes) worstMinutes = l.minutesLate
+      }
+    }
+    return { late, worstMinutes }
+  }
+
   function getByDay(ss: any[]) {
     const days: Record<string, number> = {}
     ss.forEach((s: any) => {
@@ -158,6 +185,7 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
           const total = getTotalHours(ms)
           const byDay = getByDay(ms)
           const byJob = getByJob(ms)
+          const lateness = getLateness(ms)
           const isExpanded = expandedId === m.id
           return (
             <div key={m.id} className="border-b border-gray-50 last:border-0">
@@ -166,6 +194,15 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
                 <div className="flex-1">
                   <div className="font-semibold">{m.name}</div>
                   <div className={"text-sm " + sub}>{m.email}</div>
+                  {/* Only rendered when lateness reporting is switched on AND
+                      somebody was actually late, so a punctual crew shows a
+                      clean list rather than a row of green ticks. */}
+                  {lateness.late > 0 && (
+                    <div className="text-xs text-amber-600 mt-0.5">
+                      {lateness.late} late {lateness.late === 1 ? "arrival" : "arrivals"}
+                      {lateness.worstMinutes > 0 && ` · worst ${lateness.worstMinutes} min`}
+                    </div>
+                  )}
                 </div>
                 <div className="text-right mr-3">
                   <div className="text-2xl font-bold text-teal-500">{total.toFixed(1)}h</div>

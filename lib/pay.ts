@@ -161,6 +161,14 @@ export type PayRules = {
   unpaidBreakMinutes: number | null
   /** Only deduct the break above this many hours. Null means every shift. */
   breakAfterHours: number | null
+  /**
+   * Minutes past the scheduled start before an arrival is called late.
+   *
+   * REPORTING ONLY. Nothing in payableHours() reads this, and nothing should:
+   * a late worker is already paid for fewer hours, and deducting again would
+   * charge them twice for one offence.
+   */
+  latenessGraceMinutes: number | null
 }
 
 /**
@@ -175,6 +183,7 @@ export const NO_PAY_RULES: PayRules = {
   minimumPaidMinutes: null,
   unpaidBreakMinutes: null,
   breakAfterHours: null,
+  latenessGraceMinutes: null,
 }
 
 /** Coerce a pay_rules row (or its absence) into rules the engine can use. */
@@ -190,6 +199,7 @@ export function toPayRules(row: any | null | undefined): PayRules {
     minimumPaidMinutes: intOrNull(row.minimum_paid_minutes),
     unpaidBreakMinutes: intOrNull(row.unpaid_break_minutes),
     breakAfterHours: numberOrNull(row.break_after_hours),
+    latenessGraceMinutes: intOrNull(row.lateness_grace_minutes),
   }
 }
 
@@ -275,4 +285,94 @@ function roundMinutes(minutes: number, unit: number, direction: RoundingDirectio
   // exactly on the boundary should not lose the half, and "we round half down
   // sometimes" is not a sentence anybody wants to say to their crew.
   return Math.round(minutes / unit) * unit
+}
+
+// ---------------------------------------------------------------------------
+// Lateness
+// ---------------------------------------------------------------------------
+//
+// Separate from payableHours() on purpose, and it must stay separate. Lateness
+// is a management fact, not a pay adjustment -- see the migration for why
+// deducting for it would charge somebody twice for the same forty minutes.
+
+export type Lateness = {
+  /** True only when reporting is switched on AND the arrival was past grace. */
+  isLate: boolean
+  /** Minutes past the scheduled start. 0 when on time or not reportable. */
+  minutesLate: number
+  /** False when there is no schedule to compare against. */
+  hasSchedule: boolean
+}
+
+const NOT_LATE: Lateness = { isLate: false, minutesLate: 0, hasSchedule: false }
+
+/**
+ * Was this arrival late, and by how much.
+ *
+ * `scheduledStart` is "HH:MM" or "HH:MM:SS" in the site's local day; the
+ * caller resolves which schedule applies (the job's start time, then the
+ * worker's own, then the company default) because that precedence is about
+ * records, not arithmetic, and does not belong in a pure function.
+ *
+ * `signedInLocal` is the arrival as "HH:MM" in the SAME local day. Both sides
+ * are local wall-clock on purpose: comparing a UTC instant against a wall-clock
+ * start time is how a shift on the wrong side of a clock change reports
+ * everybody as an hour late.
+ */
+export function latenessFor(
+  signedInLocal: string | null | undefined,
+  scheduledStart: string | null | undefined,
+  graceMinutes: number | null | undefined,
+): Lateness {
+  // Reporting off. Returns "not late" rather than "unknown": the caller asked a
+  // question the company has said it does not want answered.
+  if (graceMinutes === null || graceMinutes === undefined) return NOT_LATE
+
+  const arrived = minutesOfDay(signedInLocal)
+  const start = minutesOfDay(scheduledStart)
+  if (arrived === null || start === null) return NOT_LATE
+
+  const late = arrived - start
+
+  // Early is not negative lateness, it is simply not late. Reporting "-12
+  // minutes late" invites somebody to net it off against a late day, which is
+  // not how either attendance or pay works.
+  if (late <= 0) return { isLate: false, minutesLate: 0, hasSchedule: true }
+
+  const grace = Math.max(0, Math.trunc(Number(graceMinutes) || 0))
+  return {
+    // Grace is inclusive: exactly on the grace boundary is still on time. The
+    // boundary should favour the person, and "you were ten minutes late" when
+    // the allowance is ten minutes is an argument nobody needs.
+    isLate: late > grace,
+    minutesLate: late,
+    hasSchedule: true,
+  }
+}
+
+/** "HH:MM" or "HH:MM:SS" to minutes since midnight. Null if unreadable. */
+function minutesOfDay(value: string | null | undefined): number | null {
+  if (!value || typeof value !== "string") return null
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?$/.exec(value.trim())
+  if (!m) return null
+  const hours = Number(m[1])
+  const mins = Number(m[2])
+  if (hours < 0 || hours > 23 || mins < 0 || mins > 59) return null
+  return hours * 60 + mins
+}
+
+/**
+ * Which schedule a shift should be judged against.
+ *
+ * The site wins, then the worker, then the company. A job with a start time has
+ * been given one deliberately -- an early start for a crane lift, a late one
+ * for a noise restriction -- and it should not be overridden by somebody's
+ * usual hours.
+ */
+export function scheduledStartFor(
+  jobStartTime: string | null | undefined,
+  workerSignInTime: string | null | undefined,
+  companyDefaultStart: string | null | undefined,
+): string | null {
+  return jobStartTime || workerSignInTime || companyDefaultStart || null
 }

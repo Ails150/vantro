@@ -113,6 +113,14 @@ export async function PUT(request: Request) {
     breakAfter = Math.round(n * 100) / 100
   }
 
+  const latenessGrace = optionalInt(body.latenessGraceMinutes, 0, 120)
+  if (latenessGrace === "bad") {
+    return NextResponse.json(
+      { error: "Lateness grace must be between 0 and 120 minutes, or blank to not report lateness" },
+      { status: 400 },
+    )
+  }
+
   const direction = body.roundingDirection ?? "nearest"
   if (!["nearest", "up", "down"].includes(direction)) {
     return NextResponse.json({ error: "Rounding direction must be nearest, up or down" }, { status: 400 })
@@ -125,6 +133,7 @@ export async function PUT(request: Request) {
     minimum_paid_minutes: minimum,
     unpaid_break_minutes: breakMinutes,
     break_after_hours: breakAfter,
+    lateness_grace_minutes: latenessGrace,
   }
 
   // Upsert on the primary key. The company id IS the key, so this is create or
@@ -143,7 +152,8 @@ export async function PUT(request: Request) {
   console.log(
     `[pay-rules] company=${companyId} round=${row.round_to_minutes ?? "off"}` +
       `/${row.rounding_direction} minimum=${row.minimum_paid_minutes ?? "off"} ` +
-      `break=${row.unpaid_break_minutes ?? "off"}@${row.break_after_hours ?? "always"}`,
+      `break=${row.unpaid_break_minutes ?? "off"}@${row.break_after_hours ?? "always"} ` +
+      `lateness=${row.lateness_grace_minutes ?? "off"}`,
   )
 
   return NextResponse.json({ ok: true, configured: true, rules: toPayRules(data ?? row) })

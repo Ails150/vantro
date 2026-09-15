@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   if (!from || !to) return NextResponse.json({ error: 'Missing dates' }, { status: 400 })
   const { data: signins } = await service
     .from('signins')
-    .select('*, users(id, name, initials, email), jobs(name)')
+    .select('*, users(id, name, initials, email, sign_in_time), jobs(name, start_time)')
     .eq('company_id', userData.company_id)
     .gte('signed_in_at', from)
     .lte('signed_in_at', to)

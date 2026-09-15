@@ -562,6 +562,7 @@ function PayRulesSection() {
   const [minimum, setMinimum] = useState("")
   const [breakMinutes, setBreakMinutes] = useState("")
   const [breakAfter, setBreakAfter] = useState("")
+  const [latenessGrace, setLatenessGrace] = useState("")
   const [loading, setLoading] = useState(true)
   const [gated, setGated] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -582,6 +583,7 @@ function PayRulesSection() {
         setMinimum(d.rules?.minimumPaidMinutes != null ? String(d.rules.minimumPaidMinutes) : "")
         setBreakMinutes(d.rules?.unpaidBreakMinutes != null ? String(d.rules.unpaidBreakMinutes) : "")
         setBreakAfter(d.rules?.breakAfterHours != null ? String(d.rules.breakAfterHours) : "")
+        setLatenessGrace(d.rules?.latenessGraceMinutes != null ? String(d.rules.latenessGraceMinutes) : "")
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -601,6 +603,7 @@ function PayRulesSection() {
           minimumPaidMinutes: minimum === "" ? null : Number(minimum),
           unpaidBreakMinutes: breakMinutes === "" ? null : Number(breakMinutes),
           breakAfterHours: breakAfter === "" ? null : Number(breakAfter),
+          latenessGraceMinutes: latenessGrace === "" ? null : Number(latenessGrace),
         }),
       })
       const body = await res.json().catch(() => ({}))
@@ -721,6 +724,28 @@ function PayRulesSection() {
           <p className="text-xs text-ink-subtle mt-1">
             A shorter shift is paid as this. Somebody who never signed in is
             still paid nothing.
+          </p>
+        </div>
+
+        <div className="pt-2 border-t border-line">
+          <label className="block text-sm font-medium text-ink mb-1">
+            Report arrivals late after (minutes)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="120"
+            step="1"
+            value={latenessGrace}
+            onChange={e => setLatenessGrace(e.target.value)}
+            placeholder="Do not report lateness"
+            className={inp}
+          />
+          <p className="text-xs text-ink-subtle mt-1">
+            Reporting only. This never changes anyone&rsquo;s pay: someone who
+            arrives late has worked fewer hours and is already paid less, and
+            deducting again would charge them twice. Separate from the sign-out
+            grace period above.
           </p>
         </div>
 
