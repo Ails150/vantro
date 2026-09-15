@@ -14,6 +14,9 @@
 
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib"
 import { addDays, formatIn, isoWeekStart, londonMidnight } from "./format-time"
+// printable() and truncate() moved to lib/pdf-text.ts when the retention
+// claim letter became the second PDF that has to draw a company name.
+import { printable, truncate } from "./pdf-text"
 
 // Brand ink and accent, matched to the admin UI.
 const INK = rgb(0.043, 0.059, 0.078)
@@ -209,54 +212,6 @@ export async function renderWeeklyReportPdf(input: WeeklyReportInput): Promise<U
 function rule(page: PDFPage, y: number) {
   page.drawRectangle({ x: MARGIN, y, width: PAGE_W - MARGIN * 2, height: 0.8, color: LINE })
 }
-
-// Characters that do not decompose under NFD, so stripping combining marks
-// leaves them untouched. A short list on purpose: these are the ones that turn
-// up in the names this product actually carries.
-const HARD_CASES: Record<string, string> = {
-  "ł": "l", "Ł": "L", // l-stroke, Polish
-  "đ": "d", "Đ": "D",
-  "ø": "o", "Ø": "O",
-  "æ": "ae", "Æ": "AE",
-  "ß": "ss",
-  "—": "-", "–": "-", "‘": "'", "’": "'",
-  "“": '"', "”": '"', "…": "...",
-}
-
-/**
- * Make a string printable in Helvetica.
- *
- * The base-14 fonts stop at Latin-1 and pdf-lib throws on anything past it
- * rather than dropping it, so this has to happen somewhere. Replacing those
- * characters with a dot was the first version and it was wrong for this
- * product: the app is translated into Polish, Romanian and Lithuanian, so a
- * worker called Slusarz came out of a payroll summary as ".lusarz".
- * Transliterating gives the name spelled plainly instead of redacted.
- *
- * Embedding a Unicode font would keep the diacritics properly, and is the
- * right answer if this report ever has to be authoritative. It costs a font
- * file plus @pdf-lib/fontkit, which a one-page weekly summary does not justify
- * yet.
- */
-function printable(value: string): string {
-  const mapped = String(value || "").replace(
-    /[ŁłĐđØøÆæß–—‘’“”…]/g,
-    (c) => HARD_CASES[c] ?? c,
-  )
-  // NFD splits an accented letter into its base plus a combining mark;
-  // dropping the marks leaves the base letter, which covers almost all of
-  // Latin Extended-A.
-  const stripped = mapped.normalize("NFD").replace(/[̀-ͯ]/g, "")
-  // Anything still outside Latin-1 would throw, so it becomes a dot as a last
-  // resort rather than costing the company its whole report.
-  return stripped.replace(/[^\x20-\xFF]/g, "·")
-}
-
-function truncate(value: string, max: number): string {
-  const safe = printable(value)
-  return safe.length > max ? safe.slice(0, max - 3) + "..." : safe
-}
-
 
 /** The Monday of the week that has just finished, for a Friday send. */
 export function currentWeekStart(now: Date): string {

@@ -15,6 +15,8 @@ import ComplianceTab from "@/components/admin/ComplianceTab"
 import ToolboxTalksTab from "@/components/admin/ToolboxTalksTab"
 import RamsTab from "@/components/admin/RamsTab"
 import IncidentsTab from "@/components/admin/IncidentsTab"
+import RetentionTab from "@/components/admin/RetentionTab"
+import JobRetentionCard from "@/components/admin/JobRetentionCard"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
@@ -27,7 +29,7 @@ import SitesTab from "./SitesTab"
 import { adminNavGroups, tabBadge, DEFAULT_TAB, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
 import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
-import { toPlan } from "@/lib/plan"
+import { canSeeTab, toPlan } from "@/lib/plan"
 import { type SupportContacts } from "@/lib/support"
 import { useNow } from "@/components/ui/useNow"
 import BillingTab from "./tabs/BillingTab"
@@ -91,15 +93,29 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   // the hide list is data in lib/vertical.ts, so the render below stays a map
   // over an array and nothing here knows why a tab is missing.
   const vertical = toVertical(company?.vertical)
+  const companyPlan = toPlan(company?.plan)
   // Groups keep their shape; only the items inside are filtered. A group that
   // ends up empty for a vertical is dropped rather than rendered as a heading
   // with nothing under it.
   const visibleGroups = useMemo(
     () =>
       adminNavGroups
-        .map(g => ({ ...g, items: filterTabsByVertical(g.items, vertical) }))
+        .map(g => ({
+          ...g,
+          items: filterTabsByVertical(g.items, vertical)
+            // Plan gate, applied to Retention only.
+            //
+            // canSeeTab() has always known which feature unlocks which tab, but
+            // nothing called it -- the nav filtered by vertical alone. Turning
+            // it on for the whole list here would newly hide Payroll, Diary,
+            // Audit and four others from every company below Suite, which is a
+            // real product decision and not one that belongs in a commit about
+            // retention. Retention is gated because it is new: nobody can lose
+            // a tab they have never seen.
+            .filter(t => t.id !== "retention" || canSeeTab(companyPlan, t.id)),
+        }))
         .filter(g => g.items.length > 0),
-    [vertical],
+    [vertical, companyPlan],
   )
 
   // A hidden tab must never reach activeTab: its nav entry is gone, so there
@@ -243,6 +259,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [multiTradeEnabled, setMultiTradeEnabled] = useState(false)
   const [companyTrades, setCompanyTrades] = useState<Array<{ trade_key: string; label: string; enabled: boolean }>>([])
   const [openIncidents, setOpenIncidents] = useState<any[]>([])
+  const [retentionJobs, setRetentionJobs] = useState<any[]>([])
 
   // Open incidents, for the Today pin. Loaded here rather than inside the tab
   // because the whole point is that they are visible without opening the tab:
@@ -258,6 +275,21 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     load()
     const t = setInterval(load, 120000)
     return () => { cancelled = true; clearInterval(t) }
+  }, [])
+
+  // Retention claims that need chasing, for the Today pin.
+  //
+  // Loaded once rather than on an interval, unlike incidents: a claim date
+  // moves by one day per day, so re-polling it every two minutes would buy
+  // nothing. A 402 here is normal and silent -- the endpoint is Suite-only and
+  // this component renders for every plan.
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/retention")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d && !cancelled) setRetentionJobs(d.jobs || []) })
+      .catch(() => {})
+    return () => { cancelled = true }
   }, [])
 
   // Team tab filters
@@ -469,6 +501,34 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       : 0
 
     const injuries = openIncidents.filter((i: any) => i.kind === "injury")
+
+    // Retention, split by whether the date has arrived. The states come from
+    // the server, which computed them with lib/retention.ts -- this does not
+    // re-derive them from dates, because two implementations of "is this due"
+    // is exactly how the board ends up disagreeing with the Retention tab.
+    const retentionClaimable = retentionJobs.filter((j: any) => j.state === "claimable")
+    const retentionDueSoon = retentionJobs.filter((j: any) => j.state === "due_soon")
+
+    // The sub-line carries the worst case, not a total. "4 claims due" with
+    // nothing beside it reads as a queue; "oldest 214 days overdue" is the part
+    // that makes somebody open the tab.
+    const mostOverdueDays = retentionClaimable.reduce(
+      (worst: number, j: any) => Math.min(worst, j.daysUntilClaim ?? 0),
+      0,
+    )
+    const retentionOverdueSub =
+      mostOverdueDays < 0
+        ? `Oldest ${Math.abs(mostOverdueDays)} ${Math.abs(mostOverdueDays) === 1 ? "day" : "days"} overdue`
+        : "Due today"
+
+    const soonestDays = retentionDueSoon.reduce(
+      (soonest: number, j: any) => Math.min(soonest, j.daysUntilClaim ?? Infinity),
+      Infinity,
+    )
+    const retentionSoonSub = Number.isFinite(soonestDays)
+      ? `Next in ${soonestDays} ${soonestDays === 1 ? "day" : "days"}`
+      : ""
+
     const actionItems = [
       // First in the list, always. An open injury outranks every other thing
       // an admin could be looking at, and a hazard nobody has closed is a live
@@ -503,6 +563,34 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         sub: "",
         tab: "alerts",
         severity: "high",
+      },
+      // Money a client is holding that is now askable for. Below the safety
+      // items and the QA queue, which are about today; above the setup tasks,
+      // because a retention claim has a date on it and the others do not.
+      //
+      // Claimable is high and overdue says so in the sub-line. A claim that
+      // went past its date is not a reminder any more, it is money sitting
+      // with someone else, and the count of days is the part that makes anyone
+      // act on it.
+      retentionClaimable.length > 0 && {
+        key: "retention-claimable",
+        label:
+          retentionClaimable.length === 1
+            ? "Retention claim due"
+            : `${retentionClaimable.length} retention claims due`,
+        sub: retentionOverdueSub,
+        tab: "retention",
+        severity: "high",
+      },
+      retentionDueSoon.length > 0 && {
+        key: "retention-soon",
+        label:
+          retentionDueSoon.length === 1
+            ? "Retention claim due soon"
+            : `${retentionDueSoon.length} retention claims due soon`,
+        sub: retentionSoonSub,
+        tab: "retention",
+        severity: "medium",
       },
       understaffedJobs.length > 0 && {
         key: "staffing",
@@ -719,7 +807,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       unresolvedAlertCount,
       oldAlertCount,
     }
-  }, [nowMs, jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults, teamMembers, openIncidents])
+  }, [nowMs, jobs, signins, alerts, resolvedAlerts, pendingQA, localAssignments, staffingAlerts, staffingResults, teamMembers, openIncidents, retentionJobs])
 
   const supabase = createClient()
 
@@ -1692,6 +1780,15 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                             <Button variant="ghost" onClick={() => setEditingJobId(null)}>Cancel</Button>
                             <Button variant="ghost" tone="danger" onClick={() => archiveJob(j.id, j.name)}>Archive</Button>
                           </div>
+                          {/* Retention sits below the job's own fields and
+                              saves separately, because the two are filled in
+                              months apart: the job details on day one, the
+                              practical completion date when the certificate
+                              arrives. One Save for both would mean reopening
+                              and re-saving the whole job to record a date. */}
+                          {canSeeTab(companyPlan, "retention") && (
+                            <JobRetentionCard job={j} onSaved={() => router.refresh()} />
+                          )}
                         </div>
                       </div>
                     )}
@@ -2400,6 +2497,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "toolbox" && <ToolboxTalksTab jobs={jobs.map((j: any) => ({ id: j.id, name: j.name }))} />}
         {activeTab === "rams" && <RamsTab jobs={jobs.map((j: any) => ({ id: j.id, name: j.name }))} />}
         {activeTab === "incidents" && <IncidentsTab />}
+        {activeTab === "retention" && <RetentionTab />}
         {activeTab === "settings" && <SettingsTab isSuperadmin={viewerIsSuperadmin} />}
 
         {activeTab === "support" && <SupportTab />}

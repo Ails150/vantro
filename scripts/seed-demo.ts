@@ -629,6 +629,59 @@ export async function seedDemo(
   }
   counts.sites = jobs.length
 
+  // --- a finished job with retention still held ---------------------------
+  //
+  // A FOURTH job, completed last year, deliberately not added to `jobs` above:
+  // that array drives the crews, the sign-ins and the audit pack, all of which
+  // want the three live sites.
+  //
+  // Retention only exists on work that has finished, so demonstrating it needs
+  // a job that is over. This is the shape a real one has -- off the board,
+  // archived in everyone's mind, with 2,400 pounds of the company's money
+  // still sitting with the client.
+  //
+  // The dates are anchored so the claim falls due 21 days from whenever the
+  // seed runs. That is inside the 30-day reminder window, so the demo tenant
+  // always opens with a retention claim already pinned to TODAY rather than
+  // with a feature that looks inert until somebody works out what to type.
+  const retentionPc = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate() + 21)
+  const { data: retentionJob, error: retentionErr } = await service
+    .from("jobs")
+    .insert({
+      company_id: companyId,
+      client_id: client?.id ?? null,
+      name: "Trumpington Road - Phase 1 curtain walling",
+      address: "212 Trumpington Road, Cambridge CB2 8AH",
+      lat: 52.1783,
+      lng: 0.1181,
+      status: "completed",
+      completed_at: iso(new Date(retentionPc.getTime())),
+      start_date: dateOnly(new Date(retentionPc.getTime() - 120 * 86400000)),
+      end_date: dateOnly(retentionPc),
+      gps_source: "geocoded",
+      geofence_radius_metres: 150,
+      required_trades: ["glazier"],
+      contractor: "Cavendish Estates",
+      created_by: adminId,
+
+      // 5% of 48,000 = 2,400 held, released twelve months after practical
+      // completion. Five per cent over twelve months is the commonest pair of
+      // terms in UK subcontracting, so the demo shows the ordinary case rather
+      // than an interesting one.
+      contract_value: 48000,
+      retention_percent: 5,
+      practical_completion_date: dateOnly(retentionPc),
+      defects_period_months: 12,
+      retention_released_at: null,
+    })
+    .select("id")
+    .single()
+  if (retentionErr || !retentionJob) {
+    throw new Error(`retention job failed: ${retentionErr?.message}`)
+  }
+  counts.retention_jobs = 1
+  counts.retention_held_gbp = 2400
+
   // Crews: workers 0-2 Cambridge, 3-5 Ely, 6-7 Newmarket, with the surveyor
   // on all three so the demo has someone who moves between sites.
   const crew: Record<string, string[]> = {

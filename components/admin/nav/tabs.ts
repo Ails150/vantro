@@ -12,6 +12,7 @@
 //
 //   Today   what is happening right now, and what is waiting on you
 //   Manage  the records you maintain
+//   Money   what you owe and what you are owed
 //   Setup   configuration you touch once and then rarely again
 //
 // Tab ids are unchanged and load-bearing: they key the render branches in
@@ -24,7 +25,7 @@ import {
   BadgeCheck, Banknote, Bell, BookOpen, Briefcase, Building2, Calendar,
   CreditCard,
   CalendarClock, ChartColumn, FileSearch, Footprints, Gauge, HardHat, LayoutDashboard,
-  LifeBuoy, ListChecks, Map, MapPinned, Settings, ShieldCheck, Siren, TrendingUp, TriangleAlert,
+  LifeBuoy, ListChecks, Map, MapPinned, PiggyBank, Settings, ShieldCheck, Siren, TrendingUp, TriangleAlert,
   Users, Wrench,
 } from "lucide-react"
 
@@ -77,7 +78,6 @@ const manageTabs: AdminTab[] = [
   { id: "subcontractors", label: "Subcontractors", icon: Building2 },
   { id: "schedule", label: "Scheduler", icon: CalendarClock }, // schedule_link_added
   { id: "calendar", label: "Calendar", icon: Calendar }, // calendar_sidebar_marker
-  { id: "payroll", label: "Payroll", icon: Banknote },
   { id: "defects", label: "Defects", icon: TriangleAlert },
   { id: "toolbox", label: "Toolbox talks", icon: HardHat },
   { id: "rams", label: "RAMS", icon: ShieldCheck },
@@ -85,6 +85,21 @@ const manageTabs: AdminTab[] = [
   { id: "progress", label: "Progress", icon: TrendingUp },
   { id: "walkthroughs", label: "Walk & talks", icon: Footprints },
   { id: "audit", label: "Audit", icon: FileSearch },
+]
+
+// FOUR ZONES now, not three. Money is the new one.
+//
+// Payroll moved here out of Manage. It was the only tab in Manage that was
+// about cash rather than about site records, and it now sits beside Retention
+// because the two questions -- what do we owe our people, and what is a client
+// still holding of ours -- get asked by the same person in the same sitting.
+//
+// Tab ids are unchanged, so every ?tab= link, every stored last-tab and every
+// hiddenTabs entry still resolves. Only the grouping moved, which is exactly
+// what this file's header says is safe to change.
+const moneyTabs: AdminTab[] = [
+  { id: "payroll", label: "Payroll", icon: Banknote },
+  { id: "retention", label: "Retention", icon: PiggyBank },
 ]
 
 const setupTabsGroup: AdminTab[] = [
@@ -100,6 +115,7 @@ const setupTabsGroup: AdminTab[] = [
 export const adminNavGroups: AdminNavGroup[] = [
   { key: "today", label: "Today", items: todayTabs },
   { key: "manage", label: "Manage", items: manageTabs },
+  { key: "money", label: "Money", items: moneyTabs },
   { key: "setup", label: "Setup", defaultCollapsed: true, items: setupTabsGroup },
 ]
 

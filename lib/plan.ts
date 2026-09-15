@@ -62,6 +62,16 @@ export type Feature =
   | "walkthroughs"
   /** Subcontractor records and compliance. */
   | "subcontractors"
+  /**
+   * Retention tracking: what a client is holding back, and when to claim it.
+   *
+   * Named retentionTracking, not retention, on purpose. "Retention" already
+   * means the history window in this codebase (fullHistory, HISTORY_DAYS,
+   * historyDays) and those two things have nothing to do with each other. A
+   * feature flag that reads as either one would eventually gate the wrong
+   * thing.
+   */
+  | "retentionTracking"
 
 /** The lowest plan that includes each feature. */
 const MINIMUM: Record<Feature, Plan> = {
@@ -82,6 +92,7 @@ const MINIMUM: Record<Feature, Plan> = {
   diary: "suite",
   walkthroughs: "suite",
   subcontractors: "suite",
+  retentionTracking: "suite",
 }
 
 /**
@@ -142,6 +153,7 @@ export const TAB_FEATURE: Record<string, Feature> = {
   diary: "diary",
   walkthroughs: "walkthroughs",
   subcontractors: "subcontractors",
+  retention: "retentionTracking",
 }
 
 export function canSeeTab(plan: Plan | null | undefined, tabId: string): boolean {
