@@ -281,8 +281,90 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
         </div>
       </Section>
 
+      <WeeklyReportSection />
+
       {isSuperadmin && <DemoDataSection />}
     </PageTransition>
+  )
+}
+
+/**
+ * Send this week's report on demand.
+ *
+ * Every admin, every plan. The Friday email is the one piece of the product
+ * that arrives when nobody is looking at the screen, which made it the one
+ * piece nobody could check. This is the check.
+ *
+ * The Resend message id is shown rather than hidden in a log: when a customer
+ * says the report never arrived, the id is what turns that into a question with
+ * an answer -- delivered, bounced, or never sent at all.
+ */
+function WeeklyReportSection() {
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState<any>(null)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  async function send() {
+    setSending(true)
+    setFailed(null)
+    setSent(null)
+    try {
+      const res = await fetch("/api/admin/weekly-report", { method: "POST" })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) setFailed(body.error || `Send failed (${res.status})`)
+      else setSent(body)
+    } catch (e: any) {
+      setFailed(e?.message || "Send failed")
+    }
+    setSending(false)
+  }
+
+  return (
+    <Section title="Weekly report">
+      <div className="space-y-4">
+        <p className="text-xs text-ink-subtle">
+          A one-page PDF of this week so far &mdash; hours, shifts, who worked
+          &mdash; emailed to every active admin on this company. It sends
+          automatically at 5pm on Friday; this sends the same email now, and does
+          not replace Friday&rsquo;s.
+        </p>
+
+        <button
+          onClick={send}
+          disabled={sending}
+          className="bg-surface-hover hover:bg-line text-ink font-bold rounded-md px-6 py-2.5 text-sm transition-colors disabled:opacity-50"
+        >
+          {sending ? "Sending..." : "Send this week's report now"}
+        </button>
+
+        {failed && <p className="text-sm text-danger">{failed}</p>}
+
+        {sent && (
+          <div className="rounded-md border border-line-strong bg-surface p-4 space-y-2 text-sm">
+            <p className="font-medium text-ink">
+              Sent to {sent.recipients?.length || 0}{" "}
+              {sent.recipients?.length === 1 ? "admin" : "admins"}.
+            </p>
+            <p className="text-xs text-ink-subtle">
+              {sent.recipients?.join(", ")}
+            </p>
+            <p className="text-xs text-ink-subtle">
+              Week of {sent.weekStart} &middot; {Number(sent.totalHours || 0).toFixed(1)}h across{" "}
+              {sent.shiftCount || 0} shifts
+              {sent.shiftCount === 0 && " (nothing recorded yet this week)"}
+            </p>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-ink-subtle mb-1">
+                Resend message id
+              </p>
+              <p className="text-ink font-mono text-xs break-all">
+                {sent.messageId || "not returned by the provider"}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </Section>
   )
 }
 
