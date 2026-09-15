@@ -566,6 +566,7 @@ function PayRulesSection() {
   const [otDaily, setOtDaily] = useState("")
   const [otWeekly, setOtWeekly] = useState("")
   const [otMultiplier, setOtMultiplier] = useState("")
+  const [bhMultiplier, setBhMultiplier] = useState("")
   const [loading, setLoading] = useState(true)
   const [gated, setGated] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -590,6 +591,7 @@ function PayRulesSection() {
         setOtDaily(d.rules?.overtimeDailyThresholdHours != null ? String(d.rules.overtimeDailyThresholdHours) : "")
         setOtWeekly(d.rules?.overtimeWeeklyThresholdHours != null ? String(d.rules.overtimeWeeklyThresholdHours) : "")
         setOtMultiplier(d.rules?.overtimeMultiplier != null ? String(d.rules.overtimeMultiplier) : "")
+        setBhMultiplier(d.rules?.bankHolidayMultiplier != null ? String(d.rules.bankHolidayMultiplier) : "")
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -613,6 +615,7 @@ function PayRulesSection() {
           overtimeDailyThresholdHours: otDaily === "" ? null : Number(otDaily),
           overtimeWeeklyThresholdHours: otWeekly === "" ? null : Number(otWeekly),
           overtimeMultiplier: otMultiplier === "" ? null : Number(otMultiplier),
+          bankHolidayMultiplier: bhMultiplier === "" ? null : Number(bhMultiplier),
         }),
       })
       const body = await res.json().catch(() => ({}))
@@ -760,6 +763,28 @@ function PayRulesSection() {
             to what is left, so no hour is ever paid twice. The multiplier
             applies to each person&rsquo;s own rate. Leave it blank to pay
             overtime hours at basic rate.
+          </p>
+        </div>
+
+        <div className="pt-2 border-t border-line">
+          <label className="block text-sm font-medium text-ink mb-1">
+            Bank holiday multiplier
+          </label>
+          <input
+            type="number"
+            min="1"
+            max="3"
+            step="0.1"
+            value={bhMultiplier}
+            onChange={e => setBhMultiplier(e.target.value)}
+            placeholder="Paid as an ordinary day"
+            className={inp}
+          />
+          <p className="text-xs text-ink-subtle mt-1">
+            Applied to hours worked on a date in your public holiday calendar.
+            Those hours are taken out of the week before overtime is worked out,
+            so they never collect two multipliers — which also means they do not
+            count towards a weekly overtime threshold.
           </p>
         </div>
 

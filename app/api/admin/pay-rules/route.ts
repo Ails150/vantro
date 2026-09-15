@@ -149,6 +149,14 @@ export async function PUT(request: Request) {
     )
   }
 
+  const bhMultiplier = optionalDecimal(body.bankHolidayMultiplier, 1, 3)
+  if (bhMultiplier === "bad") {
+    return NextResponse.json(
+      { error: "Bank holiday multiplier must be between 1 and 3 (2 is double time), or blank" },
+      { status: 400 },
+    )
+  }
+
   const direction = body.roundingDirection ?? "nearest"
   if (!["nearest", "up", "down"].includes(direction)) {
     return NextResponse.json({ error: "Rounding direction must be nearest, up or down" }, { status: 400 })
@@ -165,6 +173,7 @@ export async function PUT(request: Request) {
     overtime_daily_threshold_hours: otDaily,
     overtime_weekly_threshold_hours: otWeekly,
     overtime_multiplier: otMultiplier,
+    bank_holiday_multiplier: bhMultiplier,
   }
 
   // Upsert on the primary key. The company id IS the key, so this is create or
@@ -186,7 +195,7 @@ export async function PUT(request: Request) {
       `break=${row.unpaid_break_minutes ?? "off"}@${row.break_after_hours ?? "always"} ` +
       `lateness=${row.lateness_grace_minutes ?? "off"} ` +
       `ot=${row.overtime_daily_threshold_hours ?? "-"}d/${row.overtime_weekly_threshold_hours ?? "-"}w` +
-      `x${row.overtime_multiplier ?? 1}`,
+      `x${row.overtime_multiplier ?? 1} bh=x${row.bank_holiday_multiplier ?? 1}`,
   )
 
   return NextResponse.json({ ok: true, configured: true, rules: toPayRules(data ?? row) })

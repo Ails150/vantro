@@ -175,6 +175,8 @@ export type PayRules = {
   overtimeWeeklyThresholdHours: number | null
   /** Applied to the worker's own rate. 1.5 is time and a half. */
   overtimeMultiplier: number | null
+  /** Applied to the worker's rate for hours on a public holiday. */
+  bankHolidayMultiplier: number | null
 }
 
 /**
@@ -193,6 +195,7 @@ export const NO_PAY_RULES: PayRules = {
   overtimeDailyThresholdHours: null,
   overtimeWeeklyThresholdHours: null,
   overtimeMultiplier: null,
+  bankHolidayMultiplier: null,
 }
 
 /** Coerce a pay_rules row (or its absence) into rules the engine can use. */
@@ -212,6 +215,7 @@ export function toPayRules(row: any | null | undefined): PayRules {
     overtimeDailyThresholdHours: numberOrNull(row.overtime_daily_threshold_hours),
     overtimeWeeklyThresholdHours: numberOrNull(row.overtime_weekly_threshold_hours),
     overtimeMultiplier: numberOrNull(row.overtime_multiplier),
+    bankHolidayMultiplier: numberOrNull(row.bank_holiday_multiplier),
   }
 }
 
@@ -519,4 +523,93 @@ export function payForSplit(
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100
+}
+
+// ---------------------------------------------------------------------------
+// Bank holidays
+// ---------------------------------------------------------------------------
+
+export type WeekSplit = {
+  /** Hours on a public holiday, paid at the bank holiday multiplier. */
+  bankHolidayHours: number
+  /** Everything else, already split into basic and overtime. */
+  overtime: OvertimeSplit
+}
+
+/**
+ * Split a week into bank holiday hours and ordinary hours, then split the
+ * ordinary hours into basic and overtime.
+ *
+ * Bank holiday hours come OUT FIRST and never reach splitOvertime(). See
+ * 20260915190000_pay_rules_bank_holidays.sql for the three possible readings
+ * and why this is the one implemented: the day is already enhanced, so it must
+ * not also receive an overtime multiplier, and it does not push the rest of the
+ * week over a weekly threshold.
+ *
+ * `holidayDates` is a set of local YYYY-MM-DD. The caller loads them from
+ * public_holidays for the company's country, because which dates are holidays
+ * is a record, not arithmetic.
+ */
+export function splitWeek(
+  days: DayHours[],
+  holidayDates: Set<string>,
+  rules: PayRules,
+): WeekSplit {
+  // With no multiplier set, a bank holiday is an ordinary working day and must
+  // flow through the overtime rules exactly as one. Separating the hours anyway
+  // would silently exclude them from a weekly threshold.
+  const enhanced = rules.bankHolidayMultiplier && rules.bankHolidayMultiplier >= 1
+
+  if (!enhanced) {
+    return { bankHolidayHours: 0, overtime: splitOvertime(days, rules) }
+  }
+
+  const holiday: DayHours[] = []
+  const ordinary: DayHours[] = []
+  for (const d of days) {
+    const key = String(d?.date || "").slice(0, 10)
+    if (holidayDates.has(key)) holiday.push(d)
+    else ordinary.push(d)
+  }
+
+  const bankHolidayHours = round2(
+    holiday.reduce((sum, d) => {
+      const h = Number(d?.hours)
+      return Number.isFinite(h) && h > 0 ? sum + h : sum
+    }, 0),
+  )
+
+  return { bankHolidayHours, overtime: splitOvertime(ordinary, rules) }
+}
+
+/**
+ * Pay for a full week, bank holidays included.
+ *
+ * Each component is rounded to the penny on its own and the total is their sum,
+ * so the figures on screen add up to the figure at the bottom.
+ */
+export function payForWeek(
+  split: WeekSplit,
+  rate: number | null,
+  rules: PayRules,
+): { basic: number | null; overtime: number | null; bankHoliday: number | null; total: number | null } {
+  if (rate === null || !Number.isFinite(rate)) {
+    return { basic: null, overtime: null, bankHoliday: null, total: null }
+  }
+
+  const ot = payForSplit(split.overtime, rate, rules)
+
+  const multiplier =
+    rules.bankHolidayMultiplier && rules.bankHolidayMultiplier >= 1 ? rules.bankHolidayMultiplier : 1
+  // Rounded in pence for the same reason the overtime rate is: rounding
+  // rate * multiplier in pounds loses a penny on every half.
+  const holidayRate = Math.round(Math.round(rate * 100) * multiplier) / 100
+  const bankHoliday = payFor(split.bankHolidayHours, holidayRate) ?? 0
+
+  return {
+    basic: ot.basic,
+    overtime: ot.overtime,
+    bankHoliday,
+    total: Math.round(((ot.total ?? 0) + bankHoliday) * 100) / 100,
+  }
 }
