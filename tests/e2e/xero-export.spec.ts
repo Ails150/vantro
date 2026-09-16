@@ -62,7 +62,7 @@ test.describe("xero export", () => {
     expect(body.exports[0].xero_timesheet_ref).toBe("VTR-TS-20260105")
   })
 
-  test("the timesheet is a Xero-shaped CSV with a column per day", async ({ page }) => {
+  test("the timesheet carries pay, not just hours", async ({ page }) => {
     test.setTimeout(120_000)
     await login(page)
 
@@ -70,13 +70,43 @@ test.describe("xero export", () => {
     expect(res.ok()).toBeTruthy()
     expect(res.headers()["content-type"]).toContain("text/csv")
 
-    const header = (await res.text()).split("\n")[0]
+    const text = await res.text()
+    const header = text.split(String.fromCharCode(10))[0]
+
     expect(header).toContain("Employee")
     expect(header).toContain("Earnings Rate")
+
+    // The export used to be hours only, under one "Ordinary Hours" rate, with
+    // overtime buried in the totals and no rate anywhere -- so a payroll run
+    // computed from it could not reach the figure the app showed. These three
+    // columns are what fixed that, and this test exists to keep them.
+    expect(header, "the rate and amount columns are gone again").toContain("Hours")
+    expect(header).toContain("Rate")
+    expect(header).toContain("Amount")
+
     // Dated day columns, so whoever opens it can see which week it is.
     expect(header).toContain("Mon 05 Jan")
     expect(header).toContain("Sun 11 Jan")
-    expect(header).toContain("Total")
+
+    // A TOTAL ROW, not a Total column: the file is one line per worker per pay
+    // type now, so the week's figure belongs at the bottom rather than beside
+    // every line.
+    const lines = text.trim().split(String.fromCharCode(10))
+    const total = lines[lines.length - 1]
+    expect(total, "no TOTAL row at the end of the file").toMatch(/^TOTAL,/)
+
+    // And it must be the sum of the Amount column above it.
+    const amountIndex = header.split(",").indexOf("Amount")
+    expect(amountIndex).toBeGreaterThan(-1)
+    const summed = lines
+      .slice(1, -1)
+      .map(l => Number(l.split(",")[amountIndex] || 0))
+      .reduce((a, b) => a + b, 0)
+    const stated = Number(total.split(",")[amountIndex] || 0)
+    expect(
+      Math.round(summed * 100) / 100,
+      "the TOTAL row does not equal the lines above it",
+    ).toBe(stated)
   })
 
   test("a malformed week is refused rather than guessed at", async ({ page }) => {
