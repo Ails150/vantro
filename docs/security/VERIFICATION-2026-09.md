@@ -186,20 +186,28 @@ back in one layer down, and the suite caught it before anybody hit it.
 - **F24, the admin email change notice.** There is no email-change feature. The
   test that exists fails the day somebody adds one without the notice.
 
-## A residual, stated rather than closed
+## The residual, since closed
 
-The field sign-in has a `checkOnly` branch that answers "does this address have
-an account". Everything else in that route works to avoid disclosing exactly
-that — one error message, one status code, a dummy bcrypt comparison so the
-timing matches.
+This section used to say the account oracle could not be closed on the server,
+because the app used it to choose between "enter your PIN" and "set one up" and
+a worker shown the wrong one is stuck. That was true, and it was also an excuse.
 
-It cannot be closed on the server: the app uses it to choose between "enter your
-PIN" and "set one up", and a worker at a site gate shown the wrong one is stuck.
-Closing it means always asking for the PIN and offering setup on failure, which
-is a mobile change.
+It is closed. The app stopped asking at version 1.5.0 — the email goes straight
+to "choose your PIN" and the set-PIN call is what finds out — and the server
+branch performs no lookup, returning a constant. `setup-pin` stopped
+distinguishing "unknown address" from "already has a PIN" in the same change,
+because moving an oracle to another route is not removing it.
 
-What is fixed is the sweep. Each address now costs the same budget as a sign-in
-attempt, so a list cannot be walked from rotating IPs.
+Two details worth keeping:
+
+- **The branch is a constant, not a deletion.** Builds already on people's
+  phones still send `{ email, pin: "0000", checkOnly: true }`. Delete the branch
+  and those fall through to the sign-in path as real attempts with PIN 0000 —
+  five taps and a worker is locked out by a screen asking for their email. It
+  can be deleted once no installed build is 1.4.0 or older.
+- **The cost, paid deliberately:** somebody who already has a PIN and taps "New
+  installer" now learns it after typing four digits rather than before. That is
+  the whole price of not publishing a customer's staff list.
 
 ## Where it stands
 
