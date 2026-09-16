@@ -115,6 +115,8 @@ const EXEMPT_PREFIXES = [
   "/api/cron",          // cron carries a secret, not a user session
   "/verify",            // the public evidence-pack verifier
   "/privacy",
+  "/legal",             // terms and the DPA: linked from signup, read by anyone
+  "/.well-known",       // security.txt, which a scanner fetches with no session
   "/support",
 ]
 
