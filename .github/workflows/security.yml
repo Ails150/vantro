@@ -1,0 +1,144 @@
+# Standing security gate.
+#
+# Three jobs, deliberately separate so a failure names itself rather than
+# reporting "security failed":
+#
+#   audit     dependency advisories, on both repositories
+#   unit      the pure-logic tests, including the pay and GDPR arithmetic
+#   security  the penetration-test approximation in tests/security
+#
+# The `security` job needs credentials and a reachable deployment, so it runs
+# only where those exist. It does NOT silently pass when they are missing --
+# see the guard in that job.
+
+name: security
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    # Monday 07:00 UTC. An advisory published on Wednesday should not wait for
+    # somebody to happen to push.
+    - cron: "0 7 * * 1"
+
+jobs:
+  audit:
+    name: dependency advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # --audit-level=high fails the job on high and critical only. Moderate
+      # advisories are reported and do not block: this repository carries some
+      # that are build-time only, and a gate that cries wolf gets switched off.
+      - name: npm audit (web)
+        run: npm audit --audit-level=high
+
+      # The mobile repo is a separate checkout. Its 8 remaining highs are all
+      # image-size reached through metro -- build tooling, not shipped in the
+      # APK -- and the only fix npm offers is a major Expo SDK upgrade. They are
+      # accepted deliberately in vantro-mobile's package.json commit, so this
+      # job reports them without failing until that upgrade lands.
+      - name: Check out mobile
+        uses: actions/checkout@v4
+        with:
+          repository: Ails150/vantro-mobile
+          path: mobile
+          token: ${{ secrets.MOBILE_REPO_TOKEN }}
+        continue-on-error: true
+
+      - name: npm audit (mobile, reporting only)
+        working-directory: mobile
+        run: |
+          if [ -f package.json ]; then
+            npm install --package-lock-only --ignore-scripts
+            npm audit --audit-level=critical || true
+            echo "::notice::mobile highs are build-time only; see the expo 57 upgrade item"
+          else
+            echo "::warning::mobile repo not checked out, audit skipped"
+          fi
+        continue-on-error: true
+
+  unit:
+    name: unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright test --project=unit
+
+      # tsc with the raised heap. Plain tsc OOMs on this repository, which is
+      # recorded in docs/DEPLOY_CHECKLIST.md and is not a CI quirk.
+      - name: Typecheck
+        run: npx tsc --noEmit
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+
+  security:
+    name: security suite
+    runs-on: ubuntu-latest
+    # Not on pull_request from a fork: the secrets would not be available and
+    # the job would report a pass having run nothing.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The secret-history scan walks every commit.
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # FAILS rather than skips when credentials are absent. A security job that
+      # quietly passes because a secret was not set is worse than no job: it
+      # reports green while testing nothing, which is the exact failure this
+      # suite has already hit twice in its own specs.
+      - name: Require credentials
+        run: |
+          missing=""
+          for v in NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!v}" ]; then missing="$missing $v"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::security suite cannot run without:$missing"
+            exit 1
+          fi
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      - name: Security suite
+        run: npx playwright test --project=security
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SECURITY_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+          # Field-token specs need a server whose JWT_SECRET is known. Point
+          # this at a preview deployment built with a test secret; without it
+          # those specs target localhost and will fail loudly rather than skip.
+          FIELD_BASE_URL: ${{ secrets.FIELD_BASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-traces
+          path: test-results/
+          retention-days: 7
