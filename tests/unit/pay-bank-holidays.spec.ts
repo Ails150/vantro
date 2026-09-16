@@ -17,14 +17,14 @@ test.describe("no multiplier means a bank holiday is an ordinary day", () => {
       BOXING_DAY,
       rules({ overtimeWeeklyThresholdHours: 40 }),
     )
-    expect(s.bankHolidayHours).toBe(0)
+    expect(s.enhancedHours).toBe(0)
     expect(s.overtime.totalHours).toBe(42)
     expect(s.overtime.overtimeHours).toBe(2)
   })
 
   test("a multiplier below 1 is treated as no multiplier", () => {
     const s = splitWeek(week(["2026-12-28", 8]), BOXING_DAY, rules({ bankHolidayMultiplier: 0.5 }))
-    expect(s.bankHolidayHours).toBe(0)
+    expect(s.enhancedHours).toBe(0)
     expect(s.overtime.totalHours).toBe(8)
   })
 })
@@ -36,7 +36,7 @@ test.describe("with a multiplier, holiday hours come out first", () => {
       BOXING_DAY,
       rules({ bankHolidayMultiplier: 2 }),
     )
-    expect(s.bankHolidayHours).toBe(8)
+    expect(s.enhancedHours).toBe(8)
     expect(s.overtime.totalHours).toBe(8)
   })
 
@@ -52,7 +52,7 @@ test.describe("with a multiplier, holiday hours come out first", () => {
       BOXING_DAY,
       rules({ bankHolidayMultiplier: 2, overtimeWeeklyThresholdHours: 40 }),
     )
-    expect(s.bankHolidayHours).toBe(8)
+    expect(s.enhancedHours).toBe(8)
     expect(s.overtime.totalHours).toBe(40)
     expect(s.overtime.overtimeHours).toBe(0)
   })
@@ -63,7 +63,7 @@ test.describe("with a multiplier, holiday hours come out first", () => {
       BOXING_DAY,
       rules({ bankHolidayMultiplier: 2, overtimeDailyThresholdHours: 8 }),
     )
-    expect(s.bankHolidayHours).toBe(8)
+    expect(s.enhancedHours).toBe(8)
     expect(s.overtime.overtimeHours).toBe(2)
     expect(s.overtime.basicHours).toBe(8)
   })
@@ -76,7 +76,7 @@ test.describe("with a multiplier, holiday hours come out first", () => {
       BOXING_DAY,
       rules({ bankHolidayMultiplier: 2, overtimeDailyThresholdHours: 8 }),
     )
-    expect(s.bankHolidayHours).toBe(12)
+    expect(s.enhancedHours).toBe(12)
     expect(s.overtime.overtimeHours).toBe(0)
     expect(s.overtime.totalHours).toBe(0)
   })
@@ -90,7 +90,7 @@ test.describe("payForWeek", () => {
       rules({ bankHolidayMultiplier: 2 }),
     )
     const p = payForWeek(s, 20, rules({ bankHolidayMultiplier: 2 }))
-    expect(p.bankHoliday).toBe(320) // 8 x 40
+    expect(p.enhanced).toBe(320) // 8 x 40
     expect(p.basic).toBe(160)       // 8 x 20
     expect(p.overtime).toBe(0)
     expect(p.total).toBe(480)
@@ -104,7 +104,7 @@ test.describe("payForWeek", () => {
     })
     const s = splitWeek(week(["2026-12-28", 9], ["2026-12-29", 10]), BOXING_DAY, r)
     const p = payForWeek(s, 18.33, r)
-    const sum = Math.round((p.basic! + p.overtime! + p.bankHoliday!) * 100) / 100
+    const sum = Math.round((p.basic! + p.overtime! + p.enhanced!) * 100) / 100
     expect(sum).toBe(p.total)
   })
 
@@ -112,13 +112,13 @@ test.describe("payForWeek", () => {
     // 18.33 x 1.5 = 27.495 -> 27.50, not 27.49.
     const r = rules({ bankHolidayMultiplier: 1.5 })
     const s = splitWeek(week(["2026-12-28", 10]), BOXING_DAY, r)
-    expect(payForWeek(s, 18.33, r).bankHoliday).toBe(275)
+    expect(payForWeek(s, 18.33, r).enhanced).toBe(275)
   })
 
   test("no rate is null throughout", () => {
     const s = splitWeek(week(["2026-12-28", 8]), BOXING_DAY, rules({ bankHolidayMultiplier: 2 }))
     expect(payForWeek(s, null, rules({ bankHolidayMultiplier: 2 }))).toEqual({
-      basic: null, overtime: null, bankHoliday: null, total: null,
+      basic: null, overtime: null, enhanced: null, total: null,
     })
   })
 })

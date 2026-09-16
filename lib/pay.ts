@@ -177,6 +177,10 @@ export type PayRules = {
   overtimeMultiplier: number | null
   /** Applied to the worker's rate for hours on a public holiday. */
   bankHolidayMultiplier: number | null
+  /** Applied to hours worked on a Saturday. */
+  saturdayMultiplier: number | null
+  /** Applied to hours worked on a Sunday. */
+  sundayMultiplier: number | null
 }
 
 /**
@@ -196,6 +200,8 @@ export const NO_PAY_RULES: PayRules = {
   overtimeWeeklyThresholdHours: null,
   overtimeMultiplier: null,
   bankHolidayMultiplier: null,
+  saturdayMultiplier: null,
+  sundayMultiplier: null,
 }
 
 /** Coerce a pay_rules row (or its absence) into rules the engine can use. */
@@ -216,6 +222,8 @@ export function toPayRules(row: any | null | undefined): PayRules {
     overtimeWeeklyThresholdHours: numberOrNull(row.overtime_weekly_threshold_hours),
     overtimeMultiplier: numberOrNull(row.overtime_multiplier),
     bankHolidayMultiplier: numberOrNull(row.bank_holiday_multiplier),
+    saturdayMultiplier: numberOrNull(row.saturday_multiplier),
+    sundayMultiplier: numberOrNull(row.sunday_multiplier),
   }
 }
 
@@ -529,61 +537,104 @@ function round2(n: number): number {
 // Bank holidays
 // ---------------------------------------------------------------------------
 
+export type EnhancedDay = {
+  date: string
+  hours: number
+  /** Which rule enhanced it, for the payslip line. */
+  kind: "bank_holiday" | "saturday" | "sunday"
+  multiplier: number
+}
+
 export type WeekSplit = {
-  /** Hours on a public holiday, paid at the bank holiday multiplier. */
-  bankHolidayHours: number
+  /** Days paid at an enhanced rate, each with the multiplier that applied. */
+  enhanced: EnhancedDay[]
+  /** Total enhanced hours, for a summary line. */
+  enhancedHours: number
   /** Everything else, already split into basic and overtime. */
   overtime: OvertimeSplit
 }
 
 /**
- * Split a week into bank holiday hours and ordinary hours, then split the
- * ordinary hours into basic and overtime.
+ * Which enhanced rate, if any, a date attracts.
  *
- * Bank holiday hours come OUT FIRST and never reach splitOvertime(). See
- * 20260915190000_pay_rules_bank_holidays.sql for the three possible readings
- * and why this is the one implemented: the day is already enhanced, so it must
- * not also receive an overtime multiplier, and it does not push the rest of the
- * week over a weekly threshold.
+ * WHERE A DAY IS BOTH a weekend day and a bank holiday -- Christmas Day on a
+ * Sunday, and every substitute day in between -- the HIGHEST SINGLE multiplier
+ * applies. They are never multiplied together: nobody's contract says a Sunday
+ * bank holiday pays four times. The two alternative readings (bank holiday
+ * always wins, weekend always wins) are each wrong for half of real contracts,
+ * and highest-single is the one nobody argues with.
+ */
+export function enhancementFor(
+  date: string,
+  holidayDates: Set<string>,
+  rules: PayRules,
+): { kind: EnhancedDay["kind"]; multiplier: number } | null {
+  const key = String(date || "").slice(0, 10)
+  const candidates: Array<{ kind: EnhancedDay["kind"]; multiplier: number }> = []
+
+  const bh = rules.bankHolidayMultiplier
+  if (bh && bh > 1 && holidayDates.has(key)) {
+    candidates.push({ kind: "bank_holiday", multiplier: bh })
+  }
+
+  // Parsed as UTC noon so a timezone offset can never roll the date onto the
+  // previous or next day and turn a Friday into a Saturday.
+  const parsed = Date.parse(`${key}T12:00:00Z`)
+  if (Number.isFinite(parsed)) {
+    const dow = new Date(parsed).getUTCDay()
+    const sat = rules.saturdayMultiplier
+    const sun = rules.sundayMultiplier
+    if (dow === 6 && sat && sat > 1) candidates.push({ kind: "saturday", multiplier: sat })
+    if (dow === 0 && sun && sun > 1) candidates.push({ kind: "sunday", multiplier: sun })
+  }
+
+  if (candidates.length === 0) return null
+  // Highest single multiplier. Ties resolve to the first, which is the bank
+  // holiday -- the more specific reason for the enhancement.
+  return candidates.reduce((best, c) => (c.multiplier > best.multiplier ? c : best))
+}
+
+/**
+ * Split a week into enhanced days and ordinary days, then split the ordinary
+ * days into basic and overtime.
  *
- * `holidayDates` is a set of local YYYY-MM-DD. The caller loads them from
- * public_holidays for the company's country, because which dates are holidays
- * is a record, not arithmetic.
+ * Enhanced hours come OUT FIRST and never reach splitOvertime(): the day is
+ * already enhanced, so it must not also take an overtime multiplier, and it
+ * does not push the rest of the week over a weekly threshold.
+ *
+ * A multiplier of exactly 1, or none at all, means the day is ORDINARY and
+ * flows through the overtime rules like any other. Pulling those hours out
+ * anyway would silently drop them from a weekly threshold for a company that
+ * never asked for weekend pay.
  */
 export function splitWeek(
   days: DayHours[],
   holidayDates: Set<string>,
   rules: PayRules,
 ): WeekSplit {
-  // With no multiplier set, a bank holiday is an ordinary working day and must
-  // flow through the overtime rules exactly as one. Separating the hours anyway
-  // would silently exclude them from a weekly threshold.
-  const enhanced = rules.bankHolidayMultiplier && rules.bankHolidayMultiplier >= 1
-
-  if (!enhanced) {
-    return { bankHolidayHours: 0, overtime: splitOvertime(days, rules) }
-  }
-
-  const holiday: DayHours[] = []
+  const enhanced: EnhancedDay[] = []
   const ordinary: DayHours[] = []
+
   for (const d of days) {
-    const key = String(d?.date || "").slice(0, 10)
-    if (holidayDates.has(key)) holiday.push(d)
-    else ordinary.push(d)
+    const hours = Number(d?.hours)
+    if (!Number.isFinite(hours) || hours <= 0) continue
+    const e = enhancementFor(d.date, holidayDates, rules)
+    if (e) {
+      enhanced.push({ date: String(d.date).slice(0, 10), hours, kind: e.kind, multiplier: e.multiplier })
+    } else {
+      ordinary.push(d)
+    }
   }
 
-  const bankHolidayHours = round2(
-    holiday.reduce((sum, d) => {
-      const h = Number(d?.hours)
-      return Number.isFinite(h) && h > 0 ? sum + h : sum
-    }, 0),
-  )
-
-  return { bankHolidayHours, overtime: splitOvertime(ordinary, rules) }
+  return {
+    enhanced,
+    enhancedHours: round2(enhanced.reduce((sum, e) => sum + e.hours, 0)),
+    overtime: splitOvertime(ordinary, rules),
+  }
 }
 
 /**
- * Pay for a full week, bank holidays included.
+ * Pay for a full week, enhanced days included.
  *
  * Each component is rounded to the penny on its own and the total is their sum,
  * so the figures on screen add up to the figure at the bottom.
@@ -592,25 +643,32 @@ export function payForWeek(
   split: WeekSplit,
   rate: number | null,
   rules: PayRules,
-): { basic: number | null; overtime: number | null; bankHoliday: number | null; total: number | null } {
+): {
+  basic: number | null
+  overtime: number | null
+  enhanced: number | null
+  total: number | null
+} {
   if (rate === null || !Number.isFinite(rate)) {
-    return { basic: null, overtime: null, bankHoliday: null, total: null }
+    return { basic: null, overtime: null, enhanced: null, total: null }
   }
 
   const ot = payForSplit(split.overtime, rate, rules)
 
-  const multiplier =
-    rules.bankHolidayMultiplier && rules.bankHolidayMultiplier >= 1 ? rules.bankHolidayMultiplier : 1
-  // Rounded in pence for the same reason the overtime rate is: rounding
-  // rate * multiplier in pounds loses a penny on every half.
-  const holidayRate = Math.round(Math.round(rate * 100) * multiplier) / 100
-  const bankHoliday = payFor(split.bankHolidayHours, holidayRate) ?? 0
+  let enhancedPence = 0
+  for (const day of split.enhanced) {
+    // Rounded in pence for the same reason the overtime rate is: rounding
+    // rate x multiplier in pounds loses a penny on every exact half.
+    const dayRate = Math.round(Math.round(rate * 100) * day.multiplier) / 100
+    enhancedPence += Math.round((payFor(day.hours, dayRate) ?? 0) * 100)
+  }
+  const enhanced = enhancedPence / 100
 
   return {
     basic: ot.basic,
     overtime: ot.overtime,
-    bankHoliday,
-    total: Math.round(((ot.total ?? 0) + bankHoliday) * 100) / 100,
+    enhanced,
+    total: Math.round(((ot.total ?? 0) + enhanced) * 100) / 100,
   }
 }
 

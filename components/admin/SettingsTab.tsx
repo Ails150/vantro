@@ -570,6 +570,8 @@ function PayRulesSection() {
   const [otWeekly, setOtWeekly] = useState("")
   const [otMultiplier, setOtMultiplier] = useState("")
   const [bhMultiplier, setBhMultiplier] = useState("")
+  const [satMultiplier, setSatMultiplier] = useState("")
+  const [sunMultiplier, setSunMultiplier] = useState("")
   const [loading, setLoading] = useState(true)
   const [gated, setGated] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -595,6 +597,8 @@ function PayRulesSection() {
         setOtWeekly(d.rules?.overtimeWeeklyThresholdHours != null ? String(d.rules.overtimeWeeklyThresholdHours) : "")
         setOtMultiplier(d.rules?.overtimeMultiplier != null ? String(d.rules.overtimeMultiplier) : "")
         setBhMultiplier(d.rules?.bankHolidayMultiplier != null ? String(d.rules.bankHolidayMultiplier) : "")
+        setSatMultiplier(d.rules?.saturdayMultiplier != null ? String(d.rules.saturdayMultiplier) : "")
+        setSunMultiplier(d.rules?.sundayMultiplier != null ? String(d.rules.sundayMultiplier) : "")
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -619,6 +623,8 @@ function PayRulesSection() {
           overtimeWeeklyThresholdHours: otWeekly === "" ? null : Number(otWeekly),
           overtimeMultiplier: otMultiplier === "" ? null : Number(otMultiplier),
           bankHolidayMultiplier: bhMultiplier === "" ? null : Number(bhMultiplier),
+          saturdayMultiplier: satMultiplier === "" ? null : Number(satMultiplier),
+          sundayMultiplier: sunMultiplier === "" ? null : Number(sunMultiplier),
         }),
       })
       const body = await res.json().catch(() => ({}))
@@ -768,6 +774,25 @@ function PayRulesSection() {
             overtime hours at basic rate.
           </p>
         </div>
+
+        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-line">
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1">Saturday multiplier</label>
+            <input type="number" min="1" max="3" step="0.1" value={satMultiplier}
+              onChange={e => setSatMultiplier(e.target.value)} placeholder="Ordinary day" className={inp}/>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1">Sunday multiplier</label>
+            <input type="number" min="1" max="3" step="0.1" value={sunMultiplier}
+              onChange={e => setSunMultiplier(e.target.value)} placeholder="Ordinary day" className={inp}/>
+          </div>
+        </div>
+        <p className="text-xs text-ink-subtle -mt-3">
+          Weekend hours leave the week before overtime is worked out, so they
+          never take two multipliers &mdash; and do not count towards a weekly
+          overtime threshold. Where a bank holiday falls on a weekend, the
+          higher of the two applies; they are never multiplied together.
+        </p>
 
         <div className="pt-2 border-t border-line">
           <label className="block text-sm font-medium text-ink mb-1">

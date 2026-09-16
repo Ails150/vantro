@@ -157,6 +157,22 @@ export async function PUT(request: Request) {
     )
   }
 
+  const satMultiplier = optionalDecimal(body.saturdayMultiplier, 1, 3)
+  if (satMultiplier === "bad") {
+    return NextResponse.json(
+      { error: "Saturday multiplier must be between 1 and 3, or blank" },
+      { status: 400 },
+    )
+  }
+
+  const sunMultiplier = optionalDecimal(body.sundayMultiplier, 1, 3)
+  if (sunMultiplier === "bad") {
+    return NextResponse.json(
+      { error: "Sunday multiplier must be between 1 and 3, or blank" },
+      { status: 400 },
+    )
+  }
+
   const direction = body.roundingDirection ?? "nearest"
   if (!["nearest", "up", "down"].includes(direction)) {
     return NextResponse.json({ error: "Rounding direction must be nearest, up or down" }, { status: 400 })
@@ -174,6 +190,8 @@ export async function PUT(request: Request) {
     overtime_weekly_threshold_hours: otWeekly,
     overtime_multiplier: otMultiplier,
     bank_holiday_multiplier: bhMultiplier,
+    saturday_multiplier: satMultiplier,
+    sunday_multiplier: sunMultiplier,
   }
 
   // Upsert on the primary key. The company id IS the key, so this is create or
@@ -195,7 +213,8 @@ export async function PUT(request: Request) {
       `break=${row.unpaid_break_minutes ?? "off"}@${row.break_after_hours ?? "always"} ` +
       `lateness=${row.lateness_grace_minutes ?? "off"} ` +
       `ot=${row.overtime_daily_threshold_hours ?? "-"}d/${row.overtime_weekly_threshold_hours ?? "-"}w` +
-      `x${row.overtime_multiplier ?? 1} bh=x${row.bank_holiday_multiplier ?? 1}`,
+      `x${row.overtime_multiplier ?? 1} bh=x${row.bank_holiday_multiplier ?? 1} ` +
+      `sat=x${row.saturday_multiplier ?? 1} sun=x${row.sunday_multiplier ?? 1}`,
   )
 
   return NextResponse.json({ ok: true, configured: true, rules: toPayRules(data ?? row) })
