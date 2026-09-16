@@ -32,6 +32,7 @@ import { adminNavGroups, tabBadge, DEFAULT_TAB, type AdminTab, type TabBadgeCoun
 import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
 import { canSeeTab, toPlan } from "@/lib/plan"
+import { retentionLabel, retentionState } from "@/lib/retention-policy"
 import { type SupportContacts } from "@/lib/support"
 import { useNow } from "@/components/ui/useNow"
 import BillingTab from "./tabs/BillingTab"
@@ -502,6 +503,21 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
       ? Math.floor((now.getTime() - new Date(oldestPendingQA.created_at).getTime()) / (1000 * 60 * 60))
       : 0
 
+    // The thirty day grace before a newly chosen retention policy first
+    // deletes anything. Computed from the company row, which the page already
+    // has, so this costs no extra query.
+    const retention = retentionState(
+      company?.data_retention_days,
+      company?.retention_policy_set_at,
+      now,
+    )
+    const retentionWarning =
+      retention.warn && retention.firstPurgeAt
+        ? `Anything older than ${retentionLabel(retention.retentionDays)} goes on ` +
+          `${retention.firstPurgeAt.toLocaleDateString("en-GB", { day: "numeric", month: "long" })}` +
+          (retention.daysUntilFirstPurge !== null ? ` — ${retention.daysUntilFirstPurge} days` : "")
+        : null
+
     const injuries = openIncidents.filter((i: any) => i.kind === "injury")
 
     // Retention, split by whether the date has arrived. The states come from
@@ -593,6 +609,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         sub: retentionSoonSub,
         tab: "retention",
         severity: "medium",
+      },
+      // Records are about to start being deleted. Above the setup tasks because
+      // it has a date on it, and it is the only item here whose deadline
+      // destroys something.
+      retentionWarning && {
+        key: "retention",
+        label: "Records will start being deleted",
+        sub: retentionWarning,
+        tab: "settings",
+        severity: "high",
       },
       understaffedJobs.length > 0 && {
         key: "staffing",

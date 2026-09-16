@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { PageTransition, PageHeader, Section } from "@/components/ui/Page"
 import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
+import { RETENTION_OPTIONS, retentionLabel, retentionState } from "@/lib/retention-policy"
 
 export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: boolean }) {
   const [gracePeriod, setGracePeriod] = useState(60)
@@ -310,6 +311,8 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
           </div>
         </div>
       </Section>
+
+      <RetentionSection />
 
       <SecuritySection />
 
@@ -945,6 +948,150 @@ function SecuritySection() {
         )}
 
         {error && <p className="text-sm text-danger">{error}</p>}
+      </div>
+    </Section>
+  )
+}
+
+/**
+ * How long records are kept.
+ *
+ * The one setting on this screen that destroys things. It is written to read
+ * that way: the current position is stated in a sentence before the control,
+ * the consequence of a change is spelled out under it, and the thirty day grace
+ * is named rather than left as a surprise.
+ *
+ * Shorter than three years is not offered. Health and safety records carry
+ * their own statutory minimums, and a subcontractor deleting attendance at
+ * twelve months has destroyed the defence to a dispute they do not yet know is
+ * coming.
+ */
+function RetentionSection() {
+  const [days, setDays] = useState<string>("")
+  const [setAt, setSetAt] = useState<string | null>(null)
+  const [plan, setPlan] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch("/api/admin/settings")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => {
+        const c = d?.company || {}
+        setDays(c.data_retention_days != null ? String(c.data_retention_days) : "")
+        setSetAt(c.retention_policy_set_at ?? null)
+        setPlan(c.plan ?? null)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  async function save(next: string) {
+    setSaving(true)
+    setError(null)
+    setSaved(false)
+    try {
+      const res = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data_retention_days: next === "" ? null : Number(next) }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(body.error || `Save failed (${res.status})`); return }
+      setDays(next)
+      // Re-read rather than guess: the grace countdown is measured from a
+      // timestamp the server sets, and showing a locally invented one would
+      // put the wrong date on the banner.
+      const fresh = await fetch("/api/admin/settings").then(r => r.json()).catch(() => null)
+      setSetAt(fresh?.company?.retention_policy_set_at ?? null)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (e: any) {
+      setError(e?.message || "Save failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading) return null
+
+  // Free companies have a five day window enforced elsewhere and no choice to
+  // make here. Showing them a policy they cannot use would be a paywall
+  // pretending to be a setting.
+  if (plan === "free") return null
+
+  const state = retentionState(days === "" ? null : Number(days), setAt)
+
+  return (
+    <Section title="How long records are kept">
+      <div className="space-y-4">
+        <p className="text-xs text-ink-subtle">
+          Applies to shifts, location pings, diary entries, quality checks,
+          defects, incidents and signatures. Audit packs you have already issued
+          are never deleted &mdash; a client holding one must still be able to
+          verify it.
+        </p>
+
+        <div className="space-y-2">
+          {RETENTION_OPTIONS.map(opt => {
+            const value = opt.days === null ? "" : String(opt.days)
+            const active = value === days
+            return (
+              <label
+                key={opt.label}
+                className={
+                  "flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors " +
+                  (active ? "border-accent bg-accent-wash" : "border-line-strong bg-canvas hover:border-accent")
+                }
+              >
+                <input
+                  type="radio"
+                  name="retention"
+                  checked={active}
+                  disabled={saving}
+                  onChange={() => save(value)}
+                  className="mt-1"
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium text-ink">{opt.label}</span>
+                  <span className="block text-xs text-ink-subtle">{opt.detail}</span>
+                </span>
+              </label>
+            )
+          })}
+        </div>
+
+        {state.warn && state.firstPurgeAt && (
+          <div className="rounded-md border border-warning/50 bg-warning/10 p-3">
+            <p className="text-sm font-medium text-ink">
+              Nothing has been deleted yet.
+            </p>
+            <p className="mt-1 text-xs text-ink-subtle">
+              The first purge runs on{" "}
+              <strong className="text-ink">
+                {state.firstPurgeAt.toLocaleDateString("en-GB", {
+                  day: "numeric", month: "long", year: "numeric",
+                })}
+              </strong>
+              {state.daysUntilFirstPurge !== null && ` — ${state.daysUntilFirstPurge} days from now`}.
+              Until then you can change your mind and nothing is lost. After it,
+              anything older than {retentionLabel(state.retentionDays)} is
+              deleted permanently, every night.
+            </p>
+          </div>
+        )}
+
+        {state.active && (
+          <p className="text-xs text-ink-subtle">
+            Active. Records older than {retentionLabel(state.retentionDays)} are
+            deleted nightly.
+          </p>
+        )}
+
+        {error && <p className="text-sm text-danger">{error}</p>}
+        {saved && <p className="text-xs text-accent-ink">Saved</p>}
       </div>
     </Section>
   )

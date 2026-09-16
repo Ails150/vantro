@@ -33,6 +33,10 @@
     {
       "path": "/api/cron/overlap-check",
       "schedule": "15 2 * * *"
+    },
+    {
+      "path": "/api/cron/retention-purge",
+      "schedule": "45 2 * * *"
     }
   ],
   "headers": [

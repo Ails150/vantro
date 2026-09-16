@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { parseRate } from "@/lib/pay"
+import { isValidRetentionDays } from "@/lib/retention-policy"
 
 const FIELDS = [
   "id",
@@ -18,6 +19,11 @@ const FIELDS = [
   "grace_period_minutes",
   "geofence_radius_metres",
   "default_hourly_rate",
+  "data_retention_days",
+  // Read-only here; the retention section hides itself on free, where the
+  // five day window is enforced by lib/plan.ts instead.
+  "plan",
+  "retention_policy_set_at",
     "leave_year_start_month",
     "leave_year_start_day",
   "background_gps_enabled",
@@ -64,7 +70,7 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
   const { data: u } = await service
     .from("users")
-    .select("company_id, role")
+    .select("id, company_id, role")
     .eq("auth_user_id", user.id)
     .single()
   if (!u || !["admin","foreman","superadmin"].includes(u.role))
@@ -90,6 +96,43 @@ export async function POST(request: Request) {
     updates.grace_period_minutes = body.grace_period_minutes
   if (body.geofence_radius_metres !== undefined)
     updates.geofence_radius_metres = body.geofence_radius_metres
+
+  // Retention policy. Stamped with WHEN it changed, because the thirty day
+  // grace before the first purge is measured from that moment -- and it has to
+  // restart when the policy changes, or a company that shortens its retention
+  // would be purged against a countdown started by the previous setting.
+  if (body.data_retention_days !== undefined) {
+    // Foreman is excluded. This setting destroys records permanently; a
+    // supervisor who can edit the geofence radius has no business choosing how
+    // long the company's evidence survives.
+    if (!["admin", "superadmin"].includes(u.role)) {
+      return NextResponse.json(
+        { error: "Only an administrator can change the retention policy" },
+        { status: 403 },
+      )
+    }
+    if (!isValidRetentionDays(body.data_retention_days)) {
+      return NextResponse.json(
+        { error: "Retention must be at least 30 days, or blank to keep records for ever" },
+        { status: 400 },
+      )
+    }
+    const next =
+      body.data_retention_days === null || body.data_retention_days === ""
+        ? null
+        : Number(body.data_retention_days)
+
+    const { data: current } = await service
+      .from("companies").select("data_retention_days").eq("id", u.company_id).single()
+
+    updates.data_retention_days = next
+    // Only re-stamp on an actual change. Saving the settings page without
+    // touching retention must not silently restart somebody's grace period.
+    if ((current as any)?.data_retention_days !== next) {
+      updates.retention_policy_set_at = next === null ? null : new Date().toISOString()
+      updates.retention_policy_set_by = next === null ? null : u.id
+    }
+  }
 
   // The rate every worker with no rate of their own is paid. Validated through
   // parseRate so a rate typed in pence is refused with a sentence rather than
