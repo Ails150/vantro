@@ -23,38 +23,107 @@ let adminA: Probe | null = null
 let tenantBMarkers: string[] = []
 let tenantBIds: Record<string, string> = {}
 
+/** A tenant B job to attack with, and a second one that is never mentioned. */
+let probeJobId = ""
+let witnessJobId = ""
+
 test.beforeAll(async () => {
   adminA = await createProbe(TENANT_A.id, "admin", "a1-admin-a")
 
-  // Real tenant B ids to attack with, and the markers that prove a leak.
   const service = serviceClient()
-  const [{ data: jobs }, { data: users }, { data: signins }] = await Promise.all([
-    service.from("jobs").select("id, name").eq("company_id", TENANT_B.id).limit(1),
-    service.from("users").select("id, name").eq("company_id", TENANT_B.id).limit(1),
-    service.from("signins").select("id").eq("company_id", TENANT_B.id).limit(1),
-  ])
+
+  // A tenant B job, created rather than found.
+  //
+  // It used to fall back to TENANT_B.id when tenant B had no jobs -- which it
+  // does not, most of the time. That made the company id itself the job id, and
+  // the company id was also a leak MARKER, and it was pushed into the query
+  // string of every request. So any route that echoed the id it was given back
+  // in an error scored as a disclosure. It flagged intermittently, because
+  // whether a route echoes depends on which validation path it takes, which
+  // depends on things like rate-limit state.
+  //
+  // Echoing back an identifier the caller supplied discloses nothing. The test
+  // was wrong, not the product.
+  // TWO jobs: one to attack with, one to detect with.
+  //
+  // The attack job's id goes into every request. The witness job's id and name
+  // go nowhere, so either of them coming back is unambiguous.
+  const makeJob = async (label: string) => {
+    const { data } = await service
+      .from("jobs")
+      .insert({
+        company_id: TENANT_B.id,
+        name: `[TEST] a1 ${label} ${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+        address: "",
+        status: "active",
+      })
+      .select("id, name")
+      .single()
+    return data as any
+  }
+  const targetJob = await makeJob("target")
+  const witnessJob = await makeJob("witness")
+  probeJobId = targetJob?.id || ""
+  witnessJobId = witnessJob?.id || ""
+
+  // Two different tenant B users: one to ATTACK with, one to DETECT with.
+  const { data: users } = await service
+    .from("users").select("id, name").eq("company_id", TENANT_B.id)
+    .order("id").limit(2)
+  const { data: signins } = await service
+    .from("signins").select("id").eq("company_id", TENANT_B.id).limit(1)
+
+  const attackUser = users?.[0]
+  const witnessUser = users?.[1] || users?.[0]
 
   tenantBIds = {
-    defaultId: jobs?.[0]?.id || TENANT_B.id,
+    defaultId: probeJobId || TENANT_B.id,
     defaultToken: "probe-token",
-    id: jobs?.[0]?.id || TENANT_B.id,
-    jobid: jobs?.[0]?.id || TENANT_B.id,
-    userid: users?.[0]?.id || TENANT_B.id,
+    id: probeJobId || TENANT_B.id,
+    jobid: probeJobId || TENANT_B.id,
+    userid: attackUser?.id || TENANT_B.id,
     token: "probe-token",
   }
 
+  // MARKERS ARE IDENTIFIERS, AND ONLY IDENTIFIERS WE DID NOT SEND.
+  //
+  // Not names. The two test tenants were built from the same generated name
+  // list -- forty of tenant B's forty-one worker names also exist in tenant A,
+  // and "[TEST] Kev Armstrong" exists in ten different companies. Using a name
+  // as a marker made /api/admin/team report a cross-tenant leak on every run,
+  // for a person who was simply in both companies. A marker has to be a value
+  // that could ONLY have come from reading tenant B, and in these fixtures that
+  // means a uuid, or a string this file generated itself.
+  const sent = new Set(Object.values(tenantBIds).map(v => String(v).toLowerCase()))
   tenantBMarkers = [
-    TENANT_B.id,
-    TENANT_B.name,
-    jobs?.[0]?.id,
-    jobs?.[0]?.name,
-    users?.[0]?.id,
+    witnessJob?.id,
+    witnessJob?.name,        // generated here, so unique by construction
+    witnessUser?.id,
     signins?.[0]?.id,
-  ].filter(Boolean) as string[]
+  ]
+    .filter(Boolean)
+    .map(String)
+    .filter(m => !sent.has(m.toLowerCase())) as string[]
 })
 
 test.afterAll(async () => {
+  const ids = [probeJobId, witnessJobId].filter(Boolean)
+  if (ids.length) await serviceClient().from("jobs").delete().in("id", ids)
   await destroyProbe(adminA)
+})
+
+test("the markers are unambiguous", () => {
+  // The guard for the guard, and it has caught two different mistakes.
+  //
+  // A marker that is also an attack value fails on any route that politely
+  // echoes its input, and a marker that is not unique to tenant B fails on any
+  // route that returns a person who happens to work for both. Both cost a
+  // morning looking for a cross-tenant leak that is not there.
+  const sent = new Set(Object.values(tenantBIds).map(v => String(v).toLowerCase()))
+  const overlap = tenantBMarkers.filter(m => sent.has(m.toLowerCase()))
+  expect(overlap, `markers that are also attack values: ${overlap.join(", ")}`).toEqual([])
+  expect(tenantBMarkers.length, "not enough distinct markers to detect a leak")
+    .toBeGreaterThan(1)
 })
 
 /**
