@@ -21,20 +21,36 @@ shows up as a change to a file somebody has to reconcile.
 `subprocessors.md` is the exception: it was built from the code and the live
 infrastructure, and its contents are verified rather than drafted.
 
+## The contracting entity — settled
+
+> **CNNCTD Ltd**, a company registered in **Northern Ireland** under company
+> number **NI695071**, trading as **Vantro**.
+
+That form of words is now used identically in every draft here, on
+`/legal/terms`, on `/privacy`, on the audit pack and QA PDF footers, and on the
+public evidence verifier. The live privacy page previously said the trading
+name was *Scale 8 Digital*; it does not any more.
+
+**One consequence worth a decision rather than a default.** NI695071 is a
+Northern Ireland registration, and Northern Ireland is a separate legal
+jurisdiction from England and Wales. `terms.md` and the published terms both
+say English law and the English courts, which an NI company may perfectly well
+choose and most UK SaaS does — but it should be chosen, not inherited from a
+draft.
+
 ## What still has to be filled in
 
 Marked `[TO CONFIRM]` throughout. A solicitor cannot fix these; only the
 business can:
 
-- The registered company name, number and address. The published privacy page
-  at `/privacy` says **CNNCTD Ltd**; the product is branded **Vantro**. Which
-  entity contracts with customers, and whether the other is a trading name,
-  has to be settled before any of this is signed.
+- The **registered office address**. Every document has a hole where it goes.
 - Whether a Data Protection Officer is appointed, and if not, the named
   contact for data protection.
-- The ICO registration number.
-- Governing law and jurisdiction — drafted as England and Wales.
-- Whether the liability cap drafted here is the one the business wants.
+- The **ICO registration number**.
+- Governing law and jurisdiction — see the note above.
+- Whether the liability cap is the one the business wants: it is currently the
+  fees paid in the preceding twelve months, with no floor, in both the draft and
+  the published page.
 - Whether CNNCTD Ltd holds professional indemnity or cyber insurance, and at
   what limit.
 

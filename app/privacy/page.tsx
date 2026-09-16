@@ -7,7 +7,7 @@ export default function PrivacyPolicy() {
       <div className="prose prose-gray max-w-none space-y-6 text-sm leading-relaxed">
         <section>
           <h2 className="text-lg font-semibold mt-6 mb-3">1. Who we are</h2>
-          <p>Vantro is a product of CNNCTD Ltd (NI695071), operating as Scale 8 Digital. We provide workforce management software for construction and trades businesses. This policy explains how we collect, use, and protect personal data processed through the Vantro platform.</p>
+          <p>Vantro is a product of CNNCTD Ltd, a company registered in Northern Ireland under company number NI695071, trading as Vantro. We provide workforce management software for construction and trades businesses. This policy explains how we collect, use, and protect personal data processed through the Vantro platform.</p>
         </section>
 
         <section>

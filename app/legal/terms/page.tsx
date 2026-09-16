@@ -47,8 +47,9 @@ export default function TermsPage() {
 
       <div className="prose prose-gray max-w-none text-sm leading-relaxed text-gray-800">
         <p>
-          These terms are between <strong>CNNCTD Ltd</strong> (company number NI695071),
-          trading as Scale 8 Digital (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;Vantro&rdquo;),
+          These terms are between <strong>CNNCTD Ltd</strong>, a company registered in
+          Northern Ireland under company number <strong>NI695071</strong>, trading as
+          <strong>Vantro</strong> (&ldquo;we&rdquo;, &ldquo;us&rdquo;, &ldquo;Vantro&rdquo;),
           and the company that subscribes to the service (&ldquo;you&rdquo;, &ldquo;your company&rdquo;).
         </p>
         <p>

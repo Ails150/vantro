@@ -12,8 +12,8 @@
 This agreement is made under **Article 28 of the UK GDPR** between:
 
 - **You**, the subscribing company, as **controller**; and
-- **[TO CONFIRM: registered company name]**, company number **[TO CONFIRM]**,
-  as **processor** ("we", "Vantro").
+- **CNNCTD Ltd**, a company registered in Northern Ireland under company number
+  **NI695071**, trading as **Vantro**, as **processor** ("we", "Vantro").
 
 It forms part of the Terms of Service. Where they conflict on data protection,
 this agreement wins.

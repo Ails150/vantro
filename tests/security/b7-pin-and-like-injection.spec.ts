@@ -192,9 +192,13 @@ test.describe("B7: a wildcard is not an email address", () => {
     expect(attack.status).not.toBe(200)
   })
 
-  test("check-only does not answer a pattern", async () => {
+  test("check-only answers nothing at all any more", async () => {
+    // It used to look the address up. It is a constant now -- see the route --
+    // so a pattern cannot learn anything from it because neither can a real
+    // address. Covered properly in the block below.
     const attack = await signIn({ checkOnly: true, email: `${prefix.slice(0, -4)}%@vantro.test` })
-    expect(attack.body.exists, "a pattern confirmed an account exists").not.toBe(true)
+    const real = await signIn({ checkOnly: true, email })
+    expect(JSON.stringify(attack.body)).toBe(JSON.stringify(real.body))
   })
 
   test("setup-pin refuses a pattern", async () => {
@@ -328,16 +332,74 @@ test.describe("B7: what a failure discloses", () => {
     expect(r.status).toBe(400)
   })
 
-  test("check-only is rate limited per address", async () => {
-    // It still answers "does this account exist", which cannot be closed on the
-    // server without a mobile change -- the app uses it to choose between
-    // "enter your PIN" and "set one up". What it must not allow is sweeping a
-    // list: each address now costs the same budget as a sign-in attempt.
-    const target = `sweep-${Date.now()}@vantro.test`
-    const codes: number[] = []
-    for (let i = 0; i < 7; i++) {
-      codes.push((await signIn({ checkOnly: true, email: target })).status)
+  test("THE ORACLE IS CLOSED: check-only cannot distinguish any two addresses", async () => {
+    // It used to answer "does this address have an account, and does it have a
+    // PIN" -- the exact question every other line of this route works to avoid
+    // answering. Rate limiting it only made the answer slower to collect.
+    //
+    // It is a constant now. The app stopped sending it at version 1.5.0; the
+    // branch survives purely so that builds already on people's phones are not
+    // broken, and it performs no lookup.
+    await unlock()
+    const real = await signIn({ checkOnly: true, email })
+    const unknown = await signIn({ checkOnly: true, email: `nobody-${Date.now()}@vantro.test` })
+    const nonsense = await signIn({ checkOnly: true, email: "%" })
+
+    expect(real.status).toBe(unknown.status)
+    expect(JSON.stringify(real.body), "a real address answers differently from an unknown one")
+      .toBe(JSON.stringify(unknown.body))
+    expect(JSON.stringify(nonsense.body)).toBe(JSON.stringify(real.body))
+    // And it says nothing about a PIN either, which was the second half of the
+    // disclosure: "this person has an account but has not set one up yet".
+    expect(real.body.exists).toBe(true)
+    expect(real.body.hasPin).toBe(true)
+  })
+
+  test("the constant sends an old build to the PIN pad, not into a lockout", async () => {
+    // Why it is a constant rather than a deletion. An old build sends
+    // { email, pin: "0000", checkOnly: true } on its email screen. If the
+    // branch were gone that would fall through to the sign-in path as a real
+    // attempt with PIN 0000 -- five taps of Continue and the worker is locked
+    // out of their own account by a screen asking for their email address.
+    await unlock()
+    const before = await serviceClient()
+      .from("users").select("pin_attempts").eq("id", userId).maybeSingle()
+    for (let i = 0; i < 6; i++) {
+      await signIn({ email, pin: "0000", checkOnly: true })
     }
-    expect(codes, `check-only never rate limited: ${codes.join(",")}`).toContain(429)
+    const after = await serviceClient()
+      .from("users").select("pin_attempts, pin_locked_until").eq("id", userId).maybeSingle()
+    expect((after.data as any)?.pin_attempts).toBe((before.data as any)?.pin_attempts ?? 0)
+    expect((after.data as any)?.pin_locked_until).toBeNull()
+  })
+
+  test("setup-pin gives one answer whether the address is unknown or already set", async () => {
+    // The oracle moved here when it left the sign-in route, and moving it is
+    // not removing it. setup-pin used to answer 401 "invite expired" for an
+    // unknown address and 400 "a PIN is already set" for a known one, which is
+    // the same question answered by a different route.
+    const known = await fetch(`${baseUrl()}/api/installer/setup-pin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, pin: "4321" }),
+    })
+    const unknown = await fetch(`${baseUrl()}/api/installer/setup-pin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: `nobody-${Date.now()}@vantro.test`, pin: "4321" }),
+    })
+    expect(known.status, "a known address answers differently from an unknown one")
+      .toBe(unknown.status)
+    expect(await known.text()).toBe(await unknown.text())
+
+    // And the one message it does give names both of the things the person can
+    // actually do next, or it is a dead end.
+    const body = await (await fetch(`${baseUrl()}/api/installer/setup-pin`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, pin: "4321" }),
+    })).json()
+    expect(String(body.error)).toMatch(/forgot pin/i)
+    expect(String(body.error)).toMatch(/manager/i)
   })
 })

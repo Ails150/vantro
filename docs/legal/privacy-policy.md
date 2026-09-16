@@ -5,8 +5,8 @@
 >
 > A different privacy policy is live today at `/privacy` and as a PDF at
 > `public/legal/Vantro_Privacy_Policy.pdf`. **These have not been reconciled.**
-> The live one names **CNNCTD Ltd** as the entity; that needs settling before
-> this replaces it.
+> The entity is now settled and consistent across all three: CNNCTD Ltd,
+> NI695071, trading as Vantro.
 
 **Who this is for.** This policy covers what *we* do with personal data as a
 controller: the people who run the companies that subscribe to Vantro, people
@@ -22,8 +22,8 @@ cannot get an answer.
 
 ## 1. Who we are
 
-**[TO CONFIRM: registered company name]**, company number **[TO CONFIRM]**,
-registered at **[TO CONFIRM]**.
+**CNNCTD Ltd**, a company registered in Northern Ireland under company number
+**NI695071**, trading as **Vantro**. Registered office: **[TO CONFIRM]**.
 
 ICO registration: **[TO CONFIRM]**.
 
@@ -150,8 +150,10 @@ We will post changes here and, for anything material, email customers at least
 
 ### Open questions for review
 
-1. **Which entity.** The live policy says CNNCTD Ltd. Until that is settled this
-   document cannot be published.
+1. ~~Which entity.~~ **Settled: CNNCTD Ltd, company number NI695071, trading as
+   Vantro.** Applied here and on the live `/privacy` page, which previously said
+   the trading name was Scale 8 Digital. Still open: the registered office
+   address and the ICO registration number, neither of which can be invented.
 2. **Cookies and analytics.** Section 2 has a gap that has to be closed by
    looking at the marketing site, not by drafting.
 3. **Log retention** (section 6) should state the truth. The hosting platform

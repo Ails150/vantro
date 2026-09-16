@@ -6,6 +6,18 @@ import { escapeLikePattern } from '@/lib/sql-escape'
 
 const INVITE_EXPIRED = 'Your invite link has expired. Please ask your manager to resend your invite.'
 
+/**
+ * The single answer the email path gives to every failure.
+ *
+ * Deliberately covers both "no such address" and "that account already has a
+ * PIN" without saying which, because the difference between those two answers
+ * is a way to find out who works for a company.
+ */
+const SETUP_REFUSED =
+  'We could not set a PIN for that email address. If you already have a PIN, ' +
+  'use "Forgot PIN" to reset it. If you have just been invited, check the ' +
+  'address with your manager.'
+
 // New-installer PIN setup. The invite email is email-based ("enter this email
 // address and choose a PIN"), so the app sends { email, pin } with NO token —
 // that's the primary path. A token path is also supported (reset links).
@@ -40,10 +52,22 @@ export async function POST(request: Request) {
       .from('users')
       .select('id, pin_hash')
       .ilike('email', escapeLikePattern(String(email).trim()))
-      .single()
-    if (!user) return NextResponse.json({ error: INVITE_EXPIRED }, { status: 401 })
-    if (user.pin_hash) {
-      return NextResponse.json({ error: 'A PIN is already set for this account. Tap "Forgot PIN" to reset it.' }, { status: 400 })
+      .maybeSingle()
+
+    // ONE ANSWER FOR BOTH FAILURES, and that is the point of this block.
+    //
+    // It used to return 401 "invite expired" when the address was unknown and
+    // 400 "a PIN is already set" when it was known. Two different answers is an
+    // account oracle: ask this route about an address and it tells you whether
+    // somebody works there. Closing the oracle on the sign-in route while
+    // leaving it here would have moved it, not removed it.
+    //
+    // The wording has to cover both cases without saying which, so it names the
+    // two things the person can actually do next. Somebody who genuinely has a
+    // PIN is told to use Forgot PIN; somebody mistyping is told to check the
+    // address. Neither learns anything about the other.
+    if (!user || user.pin_hash) {
+      return NextResponse.json({ error: SETUP_REFUSED }, { status: 401 })
     }
     userId = user.id
   } else {

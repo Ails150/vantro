@@ -23,32 +23,30 @@ export async function POST(request: Request) {
   const body = await request.json()
 
   if (body.checkOnly) {
-    // AN ACCOUNT ORACLE, BOUNDED RATHER THAN CLOSED. Everything below this
-    // block works to avoid disclosing whether an address has an account -- one
-    // error message, one status code, a bcrypt comparison against a dummy hash
-    // so the timing matches. This branch answers the question directly.
+    // THE ACCOUNT ORACLE IS GONE. There is no lookup here any more.
     //
-    // It cannot simply be deleted: the app uses it to decide between "enter
-    // your PIN" and "set one up", and a worker at a site gate who is shown the
-    // wrong one is stuck. Closing it properly means always asking for the PIN
-    // and offering setup on failure, which is a mobile change, not a server
-    // one. Recorded in docs/security/PENTEST-SCOPE.md as a known residual.
+    // This branch used to answer "does this address have an account, and does
+    // it have a PIN" — the exact question everything below works to avoid
+    // answering, with its single error message, its single status code and its
+    // bcrypt comparison against a dummy hash so that even the timing gives
+    // nothing away. One convenience call undid all of it.
     //
-    // What IS fixed is the sweep. The per-IP limit above allows 20 requests in
-    // ten minutes, which is enough to test 20 addresses; this adds a per-address
-    // limit so a list cannot be walked from rotating IPs either, and each
-    // address costs the attacker the same budget a real sign-in attempt does.
-    const probe = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
-    if (!probe) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
-    const probeOk = await checkRateLimit(`installer-auth:check:${probe}`, 5, 900)
-    if (!probeOk) {
-      return NextResponse.json({ error: 'Too many attempts. Try again in a few minutes.' }, { status: 429 })
-    }
-
-    const service = await createServiceClient()
-    const { data: user } = await service.from('users').select('id, pin_hash').ilike('email', escapeLikePattern(probe)).maybeSingle()
-    if (!user) return NextResponse.json({ exists: false })
-    return NextResponse.json({ exists: true, hasPin: !!user.pin_hash })
+    // It is a CONSTANT now, not a deletion, and the difference matters. Builds
+    // already on people's phones still send this on the first screen. If the
+    // branch were removed, those requests would fall through to the sign-in
+    // path below carrying the placeholder PIN "0000" — which would not merely
+    // fail, it would burn a failed-attempt against a real account. Five taps of
+    // "Continue" and a worker is locked out of their own phone for fifteen
+    // minutes, by a screen that is only asking for their email address.
+    //
+    // So old builds are told "yes, and you have a PIN", which sends them
+    // straight to the PIN pad. That is exactly what the new build does without
+    // asking, so their behaviour becomes correct rather than broken.
+    //
+    // WHEN THIS CAN GO: once no installed build sends checkOnly. It is only
+    // sent by app/login.tsx at or before version 1.4.0; anything from 1.5.0
+    // onwards does not. Check the oldest active app version before deleting.
+    return NextResponse.json({ exists: true, hasPin: true })
   }
 
   const { pin } = body

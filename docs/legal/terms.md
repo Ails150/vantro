@@ -3,9 +3,10 @@
 > **DRAFT — NOT REVIEWED BY A SOLICITOR. DO NOT PUBLISH.**
 > Version 0.1 draft, 16 September 2026. See `docs/legal/README.md`.
 
-These terms are between **[TO CONFIRM: registered company name]**, company
-number **[TO CONFIRM]**, registered at **[TO CONFIRM]** ("we", "us", "Vantro")
-and the company that subscribes to the service ("you", "your company").
+These terms are between **CNNCTD Ltd**, a company registered in Northern
+Ireland under company number **NI695071**, trading as **Vantro** ("we", "us",
+"Vantro"), registered at **[TO CONFIRM: registered office address]**, and the
+company that subscribes to the service ("you", "your company").
 
 They do not apply to your workers. A worker who signs in on the mobile app is
 using the service on your behalf, under your instructions; what we do with their
@@ -149,10 +150,14 @@ arithmetic and storage. **Check the numbers before you pay anybody.**
 business, lost goodwill, or loss arising from a claim someone else makes
 against you.
 
-**Our total liability in any 12-month period is capped at the greater of the
-fees you paid us in that period, or £[TO CONFIRM].** On a £99/month plan that
-is £1,188. You should consider whether that is enough for how you intend to use
-the service, and insure accordingly.
+**Our total liability in any 12-month period is capped at the fees you paid us
+in that period.** On a £99/month plan that is £1,188. You should consider
+whether that is enough for how you intend to use the service, and insure
+accordingly.
+
+*(This matches what is published at `/legal/terms`. If a minimum floor is wanted
+instead — "the greater of the fees paid or £X" — both documents have to change
+together.)*
 
 The cap does not apply to our obligations under the DPA in respect of a
 personal data breach caused by our breach of it. **[TO CONFIRM: whether the
@@ -187,10 +192,13 @@ the Contracts (Rights of Third Parties) Act 1999.
 of the business, and will tell you.
 
 **Governing law.** England and Wales, exclusive jurisdiction of the English
-courts. **[TO CONFIRM]**
+courts. **[TO CONFIRM: CNNCTD Ltd is registered in NORTHERN IRELAND, which has
+its own legal system. An NI company may choose English law, and most UK SaaS
+does, but it should be a decision rather than a default — and the published
+page at /legal/terms currently says England and Wales.]**
 
-**Contact.** [TO CONFIRM: legal contact address] · privacy@getvantro.com for
-data protection.
+**Contact.** CNNCTD Ltd, **[TO CONFIRM: registered office address]** ·
+privacy@getvantro.com for data protection · security@getvantro.com for security.
 
 ---
 
@@ -204,7 +212,9 @@ data protection.
    its history starts expiring. Section 3 warns about it. A solicitor should
    say whether a warning is enough, and the product should probably warn again
    at the moment of cancelling.
-3. **Which entity contracts.** CNNCTD Ltd or Vantro. See the README.
+3. ~~Which entity contracts.~~ **Settled: CNNCTD Ltd, trading as Vantro,
+   company number NI695071.** Northern Ireland registration raises the
+   governing-law question in section 12.
 4. **Consumer law.** These are drafted business-to-business. A sole trader
    subscribing may still get consumer protections; worth confirming whether
    that changes the cancellation terms.
