@@ -3,6 +3,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { verifyActiveFieldToken } from "@/lib/auth"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { recordFileHash, sha256Hex } from "@/lib/evidence"
+import { checkUpload, uploadKey } from "@/lib/upload-key"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -35,9 +36,24 @@ export async function POST(request: Request) {
   try {
     const formData = await request.formData()
     const file = formData.get("file") as File
-    const path = formData.get("path") as string || `uploads/${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const suggested = formData.get("path") as string | null
 
     if (!file) return NextResponse.json({ error: "No file" }, { status: 400 })
+
+    // THE KEY IS DERIVED, NOT SUPPLIED.
+    //
+    // It used to be `formData.get("path")`, written straight through as the R2
+    // object key. A field token was enough to write to any key in the bucket --
+    // including audit-archive/, because CLOUDFLARE_R2_ARCHIVE_BUCKET is unset in
+    // production and the archive falls back to this same bucket. The thing that
+    // makes an issued pack verifiable years later was writable by any installer.
+    //
+    // The client's suggestion survives only as a category word. The app already
+    // stores whatever `path` this route returns, so nothing downstream changes.
+    const check = checkUpload(file.type, file.size)
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: check.status })
+
+    const path = uploadKey(installer.companyId, check.contentType, suggested)
 
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
@@ -46,7 +62,12 @@ export async function POST(request: Request) {
       Bucket: process.env.CLOUDFLARE_R2_BUCKET!,
       Key: path,
       Body: buffer,
-      ContentType: file.type || "image/jpeg",
+      // The checked type, not file.type. Writing a client-declared Content-Type
+      // to a bucket with a public URL is how you end up hosting somebody's HTML.
+      ContentType: check.contentType,
+      // Belt and braces for the same reason: even if a type slipped through,
+      // the browser is told to download rather than render it.
+      ContentDisposition: "attachment",
     }))
 
     // Phase 1.1: hash the bytes, not the URL. This is the only point in the

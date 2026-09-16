@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { safeNextPath } from "@/lib/safe-redirect"
 
 /**
  * Set up an authenticator.
@@ -120,8 +121,11 @@ export default function EnrolMfaPage() {
   }
 
   function finish() {
+    // startsWith("/") is not enough: "//evil.example.com" starts with "/" and
+    // is a protocol-relative URL the browser resolves to another host. Same
+    // check, same reason, as the verify screen and the auth callback.
     const next = new URLSearchParams(window.location.search).get("next")
-    window.location.assign(next && next.startsWith("/") ? next : "/admin")
+    window.location.assign(safeNextPath(next))
   }
 
   return (
