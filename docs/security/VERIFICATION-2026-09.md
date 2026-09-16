@@ -201,9 +201,16 @@ is a mobile change.
 What is fixed is the sweep. Each address now costs the same budget as a sign-in
 attempt, so a list cannot be walked from rotating IPs.
 
-## Four tests that were wrong, and what about
+## Where it stands
 
-Worth recording, because a security suite that cries wolf gets switched off.
+**206 tests, all passing, run against production.** Plus 401 unit tests in the
+web repo and 63 in the mobile repo.
+
+## Six tests that were wrong, and what about
+
+Worth recording at least as much as the findings. A security suite that cries
+wolf gets switched off, and this one cried wolf six times — twice while
+accusing code that was working perfectly.
 
 1. **B7 accused a working lockout, three times.** Three controls on that route
    all answer "no" and the spec could not tell them apart: the per-address
@@ -220,3 +227,22 @@ Worth recording, because a security suite that cries wolf gets switched off.
 4. **Two scanners flagged their own fixes** for quoting the vulnerable call in
    order to explain it. A scanner that flags the fix for describing the bug is
    one somebody disables.
+5. **C15 tripped the control it was there to protect.** It sends bad signatures
+   on purpose, and the webhook now counts exactly that — ten an hour, because
+   Stripe's signature does not fail to verify. Run as part of the whole suite it
+   exhausted the bucket, got 429 where it expected 400, and reported the
+   signature check broken. Two controls that both answer "no" have to be taken
+   apart before either can be measured.
+6. **A1 accused four routes of a cross-tenant leak, twice, for different
+   reasons.** First it attacked with `TENANT_B.id` and also treated that id as
+   evidence, so any route echoing back the id it was given scored as a
+   disclosure — intermittently, since whether a route echoes depends on which
+   validation path it takes. Then, with that fixed, it failed every run on
+   "[TEST] Kev Armstrong" being returned by `/api/admin/team`.
+
+   Kev Armstrong works for ten companies. The two test tenants were built from
+   the same generated name list: forty of tenant B's forty-one worker names
+   also exist in tenant A. Markers are identifiers only now — a uuid, or a
+   string the spec generated itself — and the sweep creates a witness row whose
+   id and name are never sent, so a marker coming back could only have come
+   from reading the other tenant.
