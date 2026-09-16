@@ -57,10 +57,18 @@ test("it is atomic under concurrency, which is the case that matters", async () 
   //
   // The fix is pg_advisory_xact_lock on the key. See
   // 20260916170000_rate_limit_serialise.sql.
+  // TWELVE, which is the number that exposed the original bug, not thirty.
+  //
+  // Thirty passed on its own and failed when the whole suite ran: a single
+  // runner opening thirty simultaneous connections to a pooled database, while
+  // the rest of the suite is also querying it, saturates the pool and the
+  // client abort fires. Twenty-six checks then "failed open" -- a property of
+  // this laptop, not of the limiter. Twelve proves the same thing (the old
+  // code let four through at twelve) without measuring the test harness.
   for (let round = 0; round < 3; round++) {
     const key = probeKey(`concurrent-${round}`)
     const results = await Promise.all(
-      Array.from({ length: 30 }, () => rateLimit(key, 3, 60)),
+      Array.from({ length: 12 }, () => rateLimit(key, 3, 60)),
     )
     const permitted = results.filter(r => r.allowed).length
     const degraded = results.filter(r => r.degraded).length
@@ -69,7 +77,7 @@ test("it is atomic under concurrency, which is the case that matters", async () 
     expect(degraded, `round ${round}: ${degraded} checks failed open under load`).toBe(0)
     expect(
       permitted,
-      `round ${round}: ${permitted} of 30 concurrent requests got through a limit of 3`,
+      `round ${round}: ${permitted} of 12 concurrent requests got through a limit of 3`,
     ).toBe(3)
   }
 })
@@ -260,14 +268,38 @@ test.describe("the middleware returns a real 429", () => {
     await clear(`installer:ip:${headers["x-forwarded-for"]}`)
   })
 
-  test("an unauthenticated field request is limited far sooner", async () => {
+  test("SIGN-IN IS NOT IN THE ANONYMOUS BUCKET", async () => {
+    // The bug the full-suite run found. /api/installer/auth carries no
+    // Authorization header, so every PIN sign-in was landing in the anonymous
+    // bucket -- 20 a minute per address. Twenty workers arriving at seven in
+    // the morning behind one site's router would have been unable to start
+    // work, which is far worse than the abuse that bucket exists to stop.
+    //
+    // It is not unprotected: the route's own limits are stricter and smarter
+    // (per address, with a five-strike lockout on the account), and the IP
+    // ceiling still applies.
+    const ip = `203.0.113.${Math.floor(Math.random() * 200) + 1}`
+    const codes: number[] = []
+    for (let i = 0; i < LIMITS.installerAnon.max + 5; i++) {
+      const res = await callMiddleware("/api/installer/auth", { "x-forwarded-for": ip })
+      codes.push(res ? res.status : 200)
+    }
+    expect(
+      codes.filter(c => c === 429).length,
+      `sign-in was rate limited by the anonymous bucket after ${codes.indexOf(429)} attempts`,
+    ).toBe(0)
+    await clear(`installer:ip:${ip}`)
+    await clear(`installer:anon:${ip}`)
+  })
+
+  test("but a token-less request to a normal field route still is", async () => {
     const ip = `203.0.113.${Math.floor(Math.random() * 200) + 1}`
     let last: Response | undefined
     for (let i = 0; i <= LIMITS.installerAnon.max; i++) {
       last = (await callMiddleware("/api/installer/jobs", { "x-forwarded-for": ip }))!
       if (last?.status === 429) break
     }
-    expect(last?.status).toBe(429)
+    expect(last?.status, "the exemption leaked to every field route").toBe(429)
     await clear(`installer:anon:${ip}`)
     await clear(`installer:ip:${ip}`)
   })

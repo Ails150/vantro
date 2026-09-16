@@ -61,6 +61,32 @@ export async function tokenBucketId(token: string): Promise<string> {
   return Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("")
 }
 
+/**
+ * Routes that legitimately arrive with no credential, because obtaining one is
+ * what they are for.
+ *
+ * FOUND BY THE SUITE, NOT BY READING. The anonymous bucket is 20 a minute per
+ * address, and /api/installer/auth carries no Authorization header -- so every
+ * PIN sign-in was landing in it. A gang of twenty arriving at seven in the
+ * morning behind one site's 4G router would have hit the limit and been unable
+ * to start work, which is a far worse outcome than the abuse the bucket exists
+ * to stop.
+ *
+ * These routes are not unprotected as a result. Each has its own limits inside
+ * the handler, and they are better than anything this layer could apply: per IP
+ * AND per address, with a five-strike lockout on the account itself. The IP
+ * ceiling above still covers them.
+ */
+const CREDENTIAL_ROUTES = [
+  "/api/installer/auth",
+  "/api/installer/setup-pin",
+  "/api/installer/reset-pin",
+]
+
+export function isCredentialRoute(pathname: string): boolean {
+  return CREDENTIAL_ROUTES.some(p => pathname === p || pathname.startsWith(p + "/"))
+}
+
 export type InstallerLimitOutcome = {
   limited: boolean
   result: RateLimitResult
@@ -81,18 +107,26 @@ export type InstallerLimitOutcome = {
 export async function checkInstallerLimits(
   ip: string,
   token: string | null,
+  pathname: string = "",
 ): Promise<InstallerLimitOutcome> {
   const ceiling = await rateLimit(`installer:ip:${ip}`, INSTALLER_IP_CEILING.max, INSTALLER_IP_CEILING.windowSeconds)
   if (!ceiling.allowed) {
     return { limited: true, result: ceiling, max: INSTALLER_IP_CEILING.max, bucket: "ip" }
   }
 
-  if (!token) {
-    // No credential at all. Nothing legitimate does this in volume: the field
-    // app has a token before it calls anything except sign-in, and sign-in has
-    // its own tighter limit inside the route.
+  if (!token && !isCredentialRoute(pathname)) {
+    // No credential at all, on a route that should have had one. Nothing
+    // legitimate does this in volume: the field app holds a token before it
+    // calls anything except the sign-in family, which is excluded above.
     const anon = await rateLimit(`installer:anon:${ip}`, LIMITS.installerAnon.max, LIMITS.installerAnon.windowSeconds)
     return { limited: !anon.allowed, result: anon, max: LIMITS.installerAnon.max, bucket: "anon" }
+  }
+
+  if (!token) {
+    // A sign-in attempt. The route has its own limits, and they are better than
+    // anything this layer could apply -- per address as well as per IP, with a
+    // lockout on the account itself. The IP ceiling above still applies.
+    return { limited: false, result: ceiling, max: INSTALLER_IP_CEILING.max, bucket: "ip" }
   }
 
   const id = await tokenBucketId(token)
@@ -116,6 +150,7 @@ export async function installerGate(request: Request): Promise<Response | null> 
   const outcome = await checkInstallerLimits(
     getClientIp(request),
     bearerToken(request.headers),
+    new URL(request.url).pathname,
   )
   if (!outcome.limited) return null
   return rateLimitedResponse(
