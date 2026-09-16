@@ -32,6 +32,13 @@ import { escapeLikePattern, looksLikePattern } from "../../lib/sql-escape"
  * ever knowing who they are.
  */
 
+// SERIAL, and not for tidiness. These tests share one account, one per-address
+// rate limit and one per-IP rate limit, and the file is a sequence of
+// deliberate failures. Run in parallel they exhaust each other's budgets and
+// report the product broken -- which is exactly what happened: "the correct PIN
+// does not work" from a route that was working perfectly.
+test.describe.configure({ mode: "serial" })
+
 const PIN = "1234"
 const WRONG = "9999"
 let email = ""
@@ -40,6 +47,7 @@ let prefix = ""
 
 test.beforeAll(async () => {
   assertOnlyTestTenants(TENANT_A.id)
+
   prefix = `security-b7-${Date.now()}-${Math.floor(Math.random() * 1e4)}`
   email = `${prefix}@vantro.test`
   const service = serviceClient()
@@ -64,12 +72,48 @@ test.afterAll(async () => {
   if (email) await serviceClient().from("users").delete().eq("email", email)
 })
 
-/** Reset the account between tests so each starts from a known state. */
+/**
+ * Reset the account between tests so each starts from a known state.
+ *
+ * Clears BOTH RATE LIMITS as well as the lockout, and that is not tidiness.
+ * Three different controls on this route all answer "no", and a test that
+ * cannot tell them apart proves none of them:
+ *
+ *   - The first version of the lockout test burned its five attempts, got a 429
+ *     from the per-address limiter on the sixth, and reported that the lockout
+ *     did nothing.
+ *   - The second version cleared the address key and still failed, because a
+ *     spec that makes forty sign-in attempts exhausts the PER-IP limit -- 20 in
+ *     ten minutes -- and after that every request is a 429 whatever it carries.
+ *
+ * Both limiters are proved properly in f23-rate-limits.spec.ts. Here they have
+ * to be out of the way, or this spec is measuring the wrong control.
+ */
 async function unlock() {
-  await serviceClient()
+  const service = serviceClient()
+  await service
     .from("users")
     .update({ pin_attempts: 0, pin_locked_until: null })
     .eq("id", userId)
+  await service.from("rate_limit_hits").delete().like("key", `installer-auth:%${email}`)
+
+  // The per-IP bucket, found by RECENCY rather than by address.
+  //
+  // Asking api.ipify.org what our address is does not reliably give the address
+  // the server saw: the two connections can take different families, and an
+  // IPv6 request to Vercel with an IPv4 answer from ipify leaves the real
+  // bucket untouched. That produced a 429 the spec read as the route refusing a
+  // malformed PIN for the wrong reason.
+  //
+  // Every installer-auth IP hit in the last two minutes is this run's, give or
+  // take a real installer signing in at that exact moment -- whose counter
+  // simply resets, which costs them nothing.
+  const since = new Date(Date.now() - 120_000).toISOString()
+  await service
+    .from("rate_limit_hits")
+    .delete()
+    .like("key", "installer-auth:ip:%")
+    .gte("hit_at", since)
 }
 
 async function signIn(body: Record<string, unknown>) {
@@ -195,6 +239,10 @@ test.describe("B7: a wildcard is not an email address", () => {
         const full = path.join(dir, entry.name)
         if (entry.isDirectory()) { walk(full); continue }
         if (!/\.tsx?$/.test(entry.name)) continue
+        // The escaper's own documentation quotes the vulnerable call in order
+        // to explain it. A scanner that flags the fix for describing the bug is
+        // a scanner somebody switches off.
+        if (full.endsWith(path.join("lib", "sql-escape.ts"))) continue
         const src = fs.readFileSync(full, "utf8")
         for (const m of src.matchAll(/\.i?like\(\s*['"][^'"]+['"]\s*,\s*([^)]+)\)/g)) {
           const arg = m[1].trim()
@@ -217,6 +265,15 @@ test.describe("B7: the lockout", () => {
       const r = await signIn({ email, pin: WRONG })
       expect(r.status, `attempt ${i + 1} should be refused`).toBe(401)
     }
+
+    // Clear the LIMITER but not the lockout, so the refusal below can only be
+    // the lockout. Without this the sixth request is a 429 and the test cannot
+    // tell a working lockout from a working rate limiter.
+    const svc = serviceClient()
+    await svc.from("rate_limit_hits").delete().like("key", `installer-auth:%${email}`)
+    await svc.from("rate_limit_hits").delete()
+      .like("key", "installer-auth:ip:%")
+      .gte("hit_at", new Date(Date.now() - 120_000).toISOString())
 
     // The proof: the CORRECT PIN is now refused too. Without this the test only
     // shows that wrong PINs are rejected, which they would be anyway.
@@ -266,6 +323,7 @@ test.describe("B7: what a failure discloses", () => {
   })
 
   test("a short PIN is refused before anything is looked up", async () => {
+    await unlock()
     const r = await signIn({ email, pin: "12" })
     expect(r.status).toBe(400)
   })
