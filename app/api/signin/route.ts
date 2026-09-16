@@ -168,7 +168,37 @@ export async function POST(request: Request) {
       })
     }
 
-    // Orphan from previous day or different job — auto-close the old one
+    // A DIFFERENT job, still open, TODAY: refuse.
+    //
+    // This used to auto-close the old shift the way an overnight orphan is
+    // closed. That was wrong for this case and right for the other, and the
+    // difference matters: an orphan from yesterday is somebody who forgot to
+    // sign out and is now standing on a new site, and refusing them would
+    // strand them at the gate. Two open shifts on the SAME DAY is somebody
+    // about to be on two sites at once, which is either a mistake they can fix
+    // in five seconds or a double payment nobody notices until the timesheet.
+    //
+    // Refusing is also the only version that keeps the record true. Auto-close
+    // invents a sign-out time the worker never gave, and the pay engine then
+    // trusts it.
+    if (existingDate >= today) {
+      const openJob = existing.jobs as any
+      return NextResponse.json(
+        {
+          error: `You are still signed in at ${openJob?.name || "another job"}, sign out first`,
+          code: "open_shift_elsewhere",
+          openShift: {
+            signinId: existing.id,
+            jobId: existing.job_id,
+            jobName: openJob?.name || null,
+            signedInAt: existing.signed_in_at,
+          },
+        },
+        { status: 409 },
+      )
+    }
+
+    // Orphan from a previous day — auto-close the old one
     const oldJob = existing.jobs as any
     let closeAt = new Date()
     const closeReason = "auto_orphan_on_new_signin"

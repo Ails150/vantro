@@ -2,7 +2,7 @@
 //
 // Builds the Northbridge payroll proof from the demo tenant's REAL rows.
 //
-//   node --experimental-strip-types scripts/payroll-proof.mjs 37
+//   npx tsx scripts/payroll-proof.mjs 37
 //
 // It imports lib/pay.ts directly rather than reimplementing the arithmetic.
 // That is the whole point: a proof computed by a second implementation proves
@@ -19,8 +19,9 @@ import fs from "fs"
 import path from "path"
 import { createClient } from "@supabase/supabase-js"
 import {
-  payForWeek, payableHours, splitWeek, toPayRules, latenessFor,
+  payForWeek, payableHours, splitWeek, toPayRules, latenessFor, allocateShifts,
 } from "../lib/pay.ts"
+import { buildPayrollLines, toPayrollCsv, totalPay } from "../lib/payroll-export.ts"
 
 dotenv.config({ path: ".env.local", quiet: true })
 
@@ -81,7 +82,7 @@ async function main() {
   if (rulesErr) throw new Error(`pay_rules: ${rulesErr.message}`)
 
   const { data: company } = await service
-    .from("companies").select("id, name, country_code").eq("id", CO).single()
+    .from("companies").select("id, name, country_code, default_hourly_rate").eq("id", CO).single()
 
   const { data: workers, error: wErr } = await service
     .from("users").select("id, name").eq("company_id", CO).in("name", NAMES)
@@ -162,9 +163,32 @@ async function main() {
     })
 
     // One entry per DAY, which is what the daily overtime threshold measures.
+    //
+    // Built from allocateShifts, exactly as the CSV builder does, and NOT
+    // rounded to two decimals on the way. An earlier version rounded here and
+    // the two paths disagreed: 2.46 overtime hours down this one, 2.47 down the
+    // CSV. The true figure is 148 minutes, 2.4667 hours, and rounding either
+    // way before pricing moves the pay.
+    const alloc = allocateShifts(
+      mine
+        .filter(s2 => s2.signed_out_at)
+        .map(s2 => ({
+          id: s2.id,
+          start: Date.parse(s2.signed_in_at),
+          end: Date.parse(s2.signed_out_at),
+        })),
+    )
     const byDate = new Map()
-    for (const row of rows) byDate.set(row.date, r2((byDate.get(row.date) || 0) + row.paidHours))
-    const days = [...byDate.entries()].map(([date, hours]) => ({ date, hours }))
+    for (const s2 of mine) {
+      const paid = alloc.hoursById.get(s2.id)
+      if (paid === undefined) continue
+      const k = dateKey(s2.signed_in_at)
+      byDate.set(k, (byDate.get(k) || 0) + paid)
+    }
+    const days = [...byDate.entries()].map(([date, hours]) => ({
+      date,
+      hours: payableHours(hours, rules),
+    }))
 
     const split = splitWeek(days, holidaySet, rules)
     const pay = payForWeek(split, rate, rules)
@@ -173,54 +197,75 @@ async function main() {
 
     report.workers.push({
       name: w.name, id: w.id, rate,
+      overlapTrimmedHours: r2(alloc.trimmedHours),
       rows, days, split, pay,
       bonuses: mineBonus, bonusTotal,
       grandTotal: r2((pay.total ?? 0) + bonusTotal),
     })
   }
 
-  // --- The Xero export, exactly as /api/payroll/xero builds it -------------
+  // --- The Xero export, through the SAME builder the route uses -----------
   //
-  // Replicated here rather than called, because the route requires an admin
-  // browser session. The shape is copied line for line from that file: one row
-  // per employee, a column per weekday, employees sorted by name, hours to two
-  // decimals. If the two ever diverge, this proof is wrong and not the product.
+  // lib/payroll-export.ts, imported rather than reimplemented. The previous
+  // version of this script copied the route's CSV assembly by hand, which meant
+  // the proof could agree with a copy of the product rather than the product.
   //
-  // It covers the WHOLE company, not just the three workers, because that is
-  // what the route does -- a timesheet with three of eight employees on it
-  // would be a timesheet nobody could file.
+  // Covers the WHOLE company, not just the three workers: a timesheet with
+  // three of eight employees on it is not one anybody could file.
   const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
   const weekStartKey = dateKey(start.toISOString())
 
   const { data: allSignins } = await service
     .from("signins")
-    .select("id, user_id, signed_in_at, signed_out_at, hours_worked, users:user_id (id, name, email)")
+    .select("id, user_id, signed_in_at, signed_out_at, users:user_id (id, name, email)")
     .eq("company_id", CO)
     .gte("signed_in_at", start.toISOString())
     .lt("signed_in_at", end.toISOString())
     .order("signed_in_at", { ascending: true })
 
-  const byEmployee = new Map()
-  let totalHours = 0
+  const { data: staff } = await service
+    .from("users").select("id, name, email, hourly_rate").eq("company_id", CO)
+  const staffById = new Map((staff || []).map(u => [u.id, u]))
+
+  const byWorker = new Map()
   for (const s2 of allSignins || []) {
-    const hours = Number(s2.hours_worked ?? 0)
-    totalHours += hours
-    const dayIndex = DAY_HEADERS.indexOf(london(s2.signed_in_at, { weekday: "short" }))
-    if (dayIndex < 0) continue
-    const entry = byEmployee.get(s2.user_id) || {
-      name: s2.users?.name || "Unknown",
-      email: s2.users?.email || "",
-      days: [0, 0, 0, 0, 0, 0, 0],
+    if (!s2.signed_out_at) continue
+    const u = staffById.get(s2.user_id)
+    const entry = byWorker.get(s2.user_id) || {
+      userId: s2.user_id,
+      name: s2.users?.name || u?.name || "Unknown",
+      email: s2.users?.email || u?.email || "",
+      rate: u?.hourly_rate != null ? Number(u.hourly_rate) : (company.default_hourly_rate ?? null),
+      shifts: [],
+      bonuses: [],
     }
-    entry.days[dayIndex] += hours
-    byEmployee.set(s2.user_id, entry)
+    entry.shifts.push({ id: s2.id, signedInAt: s2.signed_in_at, signedOutAt: s2.signed_out_at })
+    byWorker.set(s2.user_id, entry)
+  }
+  for (const b of bonuses || []) {
+    const e = byWorker.get(b.user_id)
+    if (e) e.bonuses.push({ amount: Number(b.amount), reason: b.reason })
   }
 
+  const dayIndexOf = iso => {
+    const i = DAY_HEADERS.indexOf(london(iso, { weekday: "short" }))
+    return i < 0 ? 0 : i
+  }
+  const dayLabels = DAY_HEADERS.map((d, i) => {
+    const dt = new Date(start.getTime() + i * 86400000)
+    return `${d} ${london(dt.toISOString(), { day: "2-digit", month: "short" })}`
+  })
+
+  const lines = buildPayrollLines(
+    [...byWorker.values()], rules, holidaySet, dayIndexOf, dateKey,
+  )
+  const csv = toPayrollCsv(lines, dayLabels)
   const ref = `VTR-TS-${weekStartKey.replace(/-/g, "")}`
 
   const { data: adminUser } = await service
     .from("users").select("id").eq("company_id", CO).eq("role", "admin").limit(1).single()
 
+  const paidHours = lines.reduce((a, l) => a + (l.hours ?? 0), 0)
   const { data: exportRow, error: expErr } = await service
     .from("payroll_exports")
     .upsert({
@@ -229,7 +274,7 @@ async function main() {
       date_from: start.toISOString(),
       date_to: end.toISOString(),
       signin_count: (allSignins || []).length,
-      total_hours: Number(totalHours.toFixed(2)),
+      total_hours: Number(paidHours.toFixed(2)),
       xero_week_start: weekStartKey,
       xero_timesheet_ref: ref,
       updated_at: new Date().toISOString(),
@@ -238,42 +283,44 @@ async function main() {
     .single()
   if (expErr) throw new Error(`payroll_exports: ${expErr.message}`)
 
-  const csvEscape = v => {
-    if (v === null || v === undefined) return ""
-    const t = String(v)
-    return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t
-  }
-  const dayLabel = i => {
-    const d = new Date(start.getTime() + i * 86400000)
-    return london(d.toISOString(), { day: "2-digit", month: "short" })
-  }
-  const header = [
-    "Employee", "Email", "Earnings Rate",
-    ...DAY_HEADERS.map((d, i) => `${d} ${dayLabel(i)}`),
-    "Total",
-  ]
-  const csvLines = [header.join(",")]
-  for (const e of [...byEmployee.values()].sort((a2, b2) => a2.name.localeCompare(b2.name))) {
-    const t = e.days.reduce((acc, h) => acc + h, 0)
-    csvLines.push([
-      csvEscape(e.name), csvEscape(e.email), csvEscape("Ordinary Hours"),
-      ...e.days.map(h => csvEscape(h.toFixed(2))),
-      csvEscape(t.toFixed(2)),
-    ].join(","))
+  // Who lost time to an overlap, and how much, so the doc can name them.
+  const overlaps = []
+  for (const e of byWorker.values()) {
+    const alloc = allocateShifts(
+      e.shifts.map(sh => ({
+        id: sh.id, start: Date.parse(sh.signedInAt), end: Date.parse(sh.signedOutAt),
+      })),
+    )
+    if (alloc.trimmedIds.size > 0) {
+      overlaps.push({
+        name: e.name,
+        shiftsTrimmed: alloc.trimmedIds.size,
+        hoursTrimmed: alloc.trimmedHours,
+        paidHours: alloc.totalHours,
+      })
+    }
   }
 
   report.xero = {
     ref: exportRow.xero_timesheet_ref,
     exportId: exportRow.id,
     weekStart: weekStartKey,
-    employees: byEmployee.size,
+    employees: byWorker.size,
     signinCount: (allSignins || []).length,
-    totalHours: Number(totalHours.toFixed(2)),
-    csv: csvLines.join("\n"),
+    paidHours: Number(paidHours.toFixed(2)),
+    totalPay: totalPay(lines),
+    threeWorkerPay: Number(
+      lines
+        .filter(l => NAMES.includes(l.employee))
+        .reduce((a, l) => a + l.amount, 0)
+        .toFixed(2),
+    ),
+    overlaps,
+    csv,
   }
 
   fs.mkdirSync(path.join(process.cwd(), "docs", "payroll"), { recursive: true })
-  fs.writeFileSync(path.join(process.cwd(), "docs", "payroll", `${ref}.csv`), csvLines.join("\n") + "\n")
+  fs.writeFileSync(path.join(process.cwd(), "docs", "payroll", `${ref}.csv`), csv + "\n")
   const out = path.join(process.cwd(), "docs", "payroll", `week${week}-data.json`)
   fs.writeFileSync(out, JSON.stringify(report, null, 2))
   console.log(JSON.stringify(report, null, 2))

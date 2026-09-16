@@ -86,13 +86,32 @@ const pick = <T,>(r: () => number, xs: readonly T[]): T => xs[Math.floor(r() * x
 const iso = (d: Date) => d.toISOString()
 const dateOnly = (d: Date) => d.toISOString().slice(0, 10)
 function atLocal(day: Date, hh: number, mm: number): Date {
-  // Demo tenant is Europe/London and the data is illustrative; building the
-  // instant from the UTC date at the given wall-clock hour keeps sign-in and
-  // sign-out an exact number of hours apart, which is what payroll figures in
-  // the demo are read off.
-  const d = new Date(day)
-  d.setUTCHours(hh, mm, 0, 0)
-  return d
+  // The given wall-clock time in EUROPE/LONDON, as an instant.
+  //
+  // This used to do setUTCHours, which is the same thing only in winter. From
+  // late March to late October the UK is an hour ahead, so an intended 08:00
+  // start was stored as 08:00Z and read back as 09:00 local -- making every
+  // summer demo shift an hour late against its own site start time, and every
+  // worker in the demo look 60+ minutes late on a lateness report. It was
+  // found by a payroll proof, not by looking at the screen.
+  //
+  // The offset is derived by asking Intl what the London wall clock reads for a
+  // provisional UTC instant, then correcting by the difference. One correction
+  // is enough: the offset only changes at 01:00 UTC on two Sundays a year, and
+  // the seeded times are all mid-morning and mid-afternoon.
+  const provisional = new Date(day)
+  provisional.setUTCHours(hh, mm, 0, 0)
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/London",
+    hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(provisional)
+  const londonHour = Number(parts.find(p => p.type === "hour")?.value ?? hh)
+  const londonMinute = Number(parts.find(p => p.type === "minute")?.value ?? mm)
+
+  // How far the London clock is ahead of the wall time we asked for.
+  const driftMinutes = (londonHour * 60 + londonMinute) - (hh * 60 + mm)
+  return new Date(provisional.getTime() - driftMinutes * 60000)
 }
 const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86400000)
 
@@ -692,11 +711,21 @@ export async function seedDemo(
 
   // Crews: workers 0-2 Cambridge, 3-5 Ely, 6-7 Newmarket, with the surveyor
   // on all three so the demo has someone who moves between sites.
+  // The surveyor (workers[5]) is assigned to all three sites, because she does
+  // move between them -- but she is NOT given a shift on all three every day.
+  // The sign-in loop below picks one site per day for her. Seeding three
+  // concurrent shifts produced 26.30 hours on a single Monday and 121.42 for
+  // the week, which went onto a Xero timesheet exactly as recorded and was the
+  // finding that prompted the overlap guard.
   const crew: Record<string, string[]> = {
     [jobs[0].id]: [workers[0].id, workers[1].id, workers[2].id, workers[5].id],
     [jobs[1].id]: [workers[3].id, workers[4].id, workers[5].id],
     [jobs[2].id]: [workers[6].id, workers[7].id, workers[5].id],
   }
+
+  // Assignments say who MAY be on a site; the roaming surveyor needs a rule
+  // about where she actually is on a given day.
+  const ROAMING_USER_ID = workers[5].id
   for (const [jobId, ids] of Object.entries(crew)) {
     for (const userId of ids) {
       await service.from("job_assignments").insert({ company_id: companyId, job_id: jobId, user_id: userId })
@@ -724,6 +753,14 @@ export async function seedDemo(
       const [eh, em] = job.end.split(":").map(Number)
 
       for (const userId of crew[job.id]) {
+        // The surveyor is on exactly ONE site per day, chosen by the date so
+        // the rota is stable across re-runs. Without this she is signed in to
+        // Cambridge, Ely and Newmarket simultaneously.
+        if (userId === ROAMING_USER_ID) {
+          const siteForToday = jobs[dayOffset % jobs.length].id
+          if (job.id !== siteForToday) continue
+        }
+
         // Roughly one day in nine is missed: leave, another site, or off sick.
         if (r() < 0.11) continue
 

@@ -451,7 +451,20 @@ export function splitOvertime(days: DayHours[], rules: PayRules): OvertimeSplit 
     byDate.set(key, (byDate.get(key) || 0) + hours)
   }
 
-  const totalHours = round2(Array.from(byDate.values()).reduce((a, b) => a + b, 0))
+  // HOURS ARE NOT ROUNDED HERE, and that is deliberate.
+  //
+  // Two decimal places of an hour is 36 seconds. Rounding the hours and then
+  // pricing the rounded figure loses real money: a 2 hour 28 minute overtime
+  // week is 2.4667 hours, and rounding it to 2.46 or 2.47 before multiplying by
+  // the rate moves the pay by up to 17p a week per person, in whichever
+  // direction the rounding happened to fall. It also made two paths through
+  // this codebase disagree -- found by the Northbridge payroll proof, which got
+  // 2.46 down one path and 2.47 down the other.
+  //
+  // The rule is the same one already applied to money: carry full precision
+  // through the arithmetic and round ONCE, at the end, on the pounds. Callers
+  // that display hours round for display only.
+  const totalHours = Array.from(byDate.values()).reduce((a, b) => a + b, 0)
 
   const dailyThreshold = rules.overtimeDailyThresholdHours
   let fromDaily = 0
@@ -460,21 +473,20 @@ export function splitOvertime(days: DayHours[], rules: PayRules): OvertimeSplit 
       if (hours > dailyThreshold) fromDaily += hours - dailyThreshold
     }
   }
-  fromDaily = round2(fromDaily)
 
   // What is left after daily overtime has been removed. This is the figure the
   // weekly threshold is measured against.
-  const afterDaily = round2(totalHours - fromDaily)
+  const afterDaily = totalHours - fromDaily
 
   const weeklyThreshold = rules.overtimeWeeklyThresholdHours
   let fromWeekly = 0
   if (weeklyThreshold && weeklyThreshold > 0 && afterDaily > weeklyThreshold) {
-    fromWeekly = round2(afterDaily - weeklyThreshold)
+    fromWeekly = afterDaily - weeklyThreshold
   }
 
-  const overtimeHours = round2(fromDaily + fromWeekly)
+  const overtimeHours = fromDaily + fromWeekly
   return {
-    basicHours: round2(totalHours - overtimeHours),
+    basicHours: totalHours - overtimeHours,
     overtimeHours,
     totalHours,
     fromDaily,
@@ -628,7 +640,7 @@ export function splitWeek(
 
   return {
     enhanced,
-    enhancedHours: round2(enhanced.reduce((sum, e) => sum + e.hours, 0)),
+    enhancedHours: enhanced.reduce((sum, e) => sum + e.hours, 0),
     overtime: splitOvertime(ordinary, rules),
   }
 }
@@ -734,4 +746,112 @@ export function addBonuses(
     return { bonuses, total: bonuses === 0 ? null : bonuses }
   }
   return { bonuses, total: Math.round((weekPay.total + bonuses) * 100) / 100 }
+}
+
+// ---------------------------------------------------------------------------
+// Overlapping shifts
+// ---------------------------------------------------------------------------
+//
+// A minute may only be paid once.
+//
+// This exists because it was found paying somebody twice. The demo tenant had a
+// surveyor signed into three sites at the same time and the payroll path summed
+// all three: 26.30 hours on one Monday, 121.42 for the week, straight onto a
+// Xero timesheet. The data was wrong, but the product not noticing was the real
+// defect -- on live data the same thing happens whenever somebody forgets to
+// sign out of yesterday's site.
+//
+// THE RULE: EARLIEST SHIFT KEEPS THE TIME.
+// Where two shifts cover the same minute, it is allocated to the one that
+// STARTED FIRST, and the later shift is trimmed. Not split, not given to the
+// longer one, not given to the one on the more expensive job. First-come is the
+// only rule that is stable (it does not change when an unrelated third shift is
+// added), explainable to a worker in one sentence, and independent of rates --
+// an allocation that chased the higher-paying job would be a system quietly
+// optimising somebody's pay, which is not a thing payroll software should do.
+//
+// Nothing is deleted or edited. The shifts stay exactly as recorded; this
+// decides only what is PAID, and reports which shifts lost time so the
+// timesheet can say so.
+
+export type ShiftInterval = {
+  id: string
+  /** Epoch milliseconds. */
+  start: number
+  /** Epoch milliseconds. An open shift has no end and is excluded by the caller. */
+  end: number
+}
+
+export type Allocation = {
+  /** Paid hours per shift id, after overlapping minutes are removed. */
+  hoursById: Map<string, number>
+  /** Shift ids that lost time to an earlier shift. */
+  trimmedIds: Set<string>
+  /** Total paid hours, with every minute counted once. */
+  totalHours: number
+  /** Hours removed across all shifts. Zero when nothing overlapped. */
+  trimmedHours: number
+}
+
+/**
+ * Allocate overlapping shifts so each instant is paid once.
+ *
+ * Sorted by start, then by end, then by id: the last of those is what makes the
+ * result deterministic for two shifts that start and finish at the same moment.
+ * Without it the answer would depend on the order the database happened to
+ * return rows in, and two runs of the same payroll could differ.
+ */
+export function allocateShifts(intervals: ShiftInterval[]): Allocation {
+  const hoursById = new Map<string, number>()
+  const trimmedIds = new Set<string>()
+
+  const valid = (intervals || [])
+    .filter(i => i && Number.isFinite(i.start) && Number.isFinite(i.end) && i.end > i.start)
+    .sort((a, b) => a.start - b.start || a.end - b.end || String(a.id).localeCompare(String(b.id)))
+
+  // Every shift starts at zero so that one trimmed to nothing still appears in
+  // the map. A shift missing from the timesheet entirely is indistinguishable
+  // from one nobody recorded.
+  for (const i of valid) hoursById.set(i.id, 0)
+
+  let coveredUntil = -Infinity
+  let totalMs = 0
+  let trimmedMs = 0
+
+  for (const shift of valid) {
+    const from = Math.max(shift.start, coveredUntil)
+    const paidMs = Math.max(0, shift.end - from)
+    const lostMs = (shift.end - shift.start) - paidMs
+
+    // Full precision, for the same reason as splitOvertime: the caller
+    // rounds for display, and pricing a rounded hour loses money.
+    hoursById.set(shift.id, paidMs / 3600000)
+    totalMs += paidMs
+    if (lostMs > 0) {
+      trimmedIds.add(shift.id)
+      trimmedMs += lostMs
+    }
+
+    // Never moves backwards: a short shift wholly inside a long one must not
+    // reopen the window and let a later shift double-count the tail.
+    if (shift.end > coveredUntil) coveredUntil = shift.end
+  }
+
+  return {
+    hoursById,
+    trimmedIds,
+    totalHours: totalMs / 3600000,
+    trimmedHours: trimmedMs / 3600000,
+  }
+}
+
+/** Do any of these intervals overlap? Cheap check for a warning banner. */
+export function hasOverlap(intervals: ShiftInterval[]): boolean {
+  const valid = (intervals || [])
+    .filter(i => i && Number.isFinite(i.start) && Number.isFinite(i.end) && i.end > i.start)
+    .sort((a, b) => a.start - b.start)
+  for (let i = 1; i < valid.length; i++) {
+    if (valid[i].start < valid[i - 1].end) return true
+  }
+  return false
 }

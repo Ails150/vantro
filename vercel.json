@@ -29,6 +29,10 @@
     {
       "path": "/api/cron/weekly-report",
       "schedule": "0 16,17 * * 5"
+    },
+    {
+      "path": "/api/cron/overlap-check",
+      "schedule": "15 2 * * *"
     }
   ],
   "headers": [

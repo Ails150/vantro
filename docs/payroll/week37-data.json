@@ -11,7 +11,7 @@
     "rounding_direction": "nearest",
     "minimum_paid_minutes": null,
     "created_at": "2026-09-16T07:48:05.783527+00:00",
-    "updated_at": "2026-09-16T07:54:41.822621+00:00",
+    "updated_at": "2026-09-16T08:37:33.255059+00:00",
     "unpaid_break_minutes": null,
     "break_after_hours": null,
     "lateness_grace_minutes": 5,
@@ -27,6 +27,7 @@
       "name": "Tom Ashworth",
       "id": "ea2f2a4c-cd8d-4ab6-94e8-e5f8351e26df",
       "rate": 18,
+      "overlapTrimmedHours": 0,
       "rows": [
         {
           "date": "2026-09-07",
@@ -84,7 +85,7 @@
       "days": [
         {
           "date": "2026-09-07",
-          "hours": 8.58
+          "hours": 8.583333333333334
         },
         {
           "date": "2026-09-08",
@@ -104,26 +105,27 @@
         "enhancedHours": 0,
         "overtime": {
           "basicHours": 32,
-          "overtimeHours": 2.23,
-          "totalHours": 34.23,
-          "fromDaily": 2.23,
+          "overtimeHours": 2.2333333333333343,
+          "totalHours": 34.233333333333334,
+          "fromDaily": 2.2333333333333343,
           "fromWeekly": 0
         }
       },
       "pay": {
         "basic": 576,
-        "overtime": 60.21,
+        "overtime": 60.3,
         "enhanced": 0,
-        "total": 636.21
+        "total": 636.3
       },
       "bonuses": [],
       "bonusTotal": 0,
-      "grandTotal": 636.21
+      "grandTotal": 636.3
     },
     {
       "name": "Priya Raman",
       "id": "11ffa644-822d-4aeb-98f4-1a5cab8925a8",
       "rate": 19.5,
+      "overlapTrimmedHours": 0,
       "rows": [
         {
           "date": "2026-09-07",
@@ -185,7 +187,7 @@
         },
         {
           "date": "2026-09-08",
-          "hours": 8.58
+          "hours": 8.583333333333334
         },
         {
           "date": "2026-09-10",
@@ -201,26 +203,27 @@
         "enhancedHours": 0,
         "overtime": {
           "basicHours": 32,
-          "overtimeHours": 2.03,
-          "totalHours": 34.03,
-          "fromDaily": 2.03,
+          "overtimeHours": 2.033333333333333,
+          "totalHours": 34.03333333333333,
+          "fromDaily": 2.033333333333333,
           "fromWeekly": 0
         }
       },
       "pay": {
         "basic": 624,
-        "overtime": 59.38,
+        "overtime": 59.48,
         "enhanced": 0,
-        "total": 683.38
+        "total": 683.48
       },
       "bonuses": [],
       "bonusTotal": 0,
-      "grandTotal": 683.38
+      "grandTotal": 683.48
     },
     {
       "name": "Marcus Vane",
       "id": "567abf7d-056a-4cd8-8e5f-8bb98a2ecef8",
       "rate": 22,
+      "overlapTrimmedHours": 0,
       "rows": [
         {
           "date": "2026-09-07",
@@ -295,19 +298,19 @@
         },
         {
           "date": "2026-09-08",
-          "hours": 8.63
+          "hours": 8.633333333333333
         },
         {
           "date": "2026-09-09",
-          "hours": 8.38
+          "hours": 8.383333333333333
         },
         {
           "date": "2026-09-10",
-          "hours": 8.58
+          "hours": 8.583333333333334
         },
         {
           "date": "2026-09-11",
-          "hours": 8.47
+          "hours": 8.466666666666667
         }
       ],
       "split": {
@@ -315,21 +318,21 @@
         "enhancedHours": 0,
         "overtime": {
           "basicHours": 40,
-          "overtimeHours": 2.46,
-          "totalHours": 42.46,
-          "fromDaily": 2.46,
+          "overtimeHours": 2.466666666666667,
+          "totalHours": 42.46666666666667,
+          "fromDaily": 2.466666666666667,
           "fromWeekly": 0
         }
       },
       "pay": {
         "basic": 880,
-        "overtime": 81.18,
+        "overtime": 81.4,
         "enhanced": 0,
-        "total": 961.18
+        "total": 961.4
       },
       "bonuses": [],
       "bonusTotal": 0,
-      "grandTotal": 961.18
+      "grandTotal": 961.4
     }
   ],
   "xero": {
@@ -338,7 +341,17 @@
     "weekStart": "2026-09-07",
     "employees": 8,
     "signinCount": 46,
-    "totalHours": 398.62,
-    "csv": "Employee,Email,Earnings Rate,Mon 07 Sept,Tue 08 Sept,Wed 09 Sept,Thu 10 Sept,Fri 11 Sept,Sat 12 Sept,Sun 13 Sept,Total\nDanny Fitzgerald,demo+nb5@getvantro.com,Ordinary Hours,8.50,8.50,8.57,8.62,8.38,0.00,0.00,42.57\nEllie Brandt,demo+nb6@getvantro.com,Ordinary Hours,26.30,26.16,25.62,17.67,25.67,0.00,0.00,121.42\nJoanne Petrie,demo+nb8@getvantro.com,Ordinary Hours,9.05,9.07,9.08,9.15,9.13,0.00,0.00,45.48\nMarcus Vane,demo+nb1@getvantro.com,Ordinary Hours,8.40,8.63,8.38,8.58,8.47,0.00,0.00,42.46\nPriya Raman,demo+nb2@getvantro.com,Ordinary Hours,8.45,8.58,0.00,8.45,8.55,0.00,0.00,34.03\nRavi Chaudhary,demo+nb7@getvantro.com,Ordinary Hours,9.02,0.00,9.07,9.12,9.05,0.00,0.00,36.26\nSian Okonjo,demo+nb4@getvantro.com,Ordinary Hours,8.50,8.50,8.02,8.53,8.62,0.00,0.00,42.17\nTom Ashworth,demo+nb3@getvantro.com,Ordinary Hours,8.58,8.65,0.00,8.50,8.50,0.00,0.00,34.23"
+    "paidHours": 323.93,
+    "totalPay": 2281.18,
+    "threeWorkerPay": 2281.18,
+    "overlaps": [
+      {
+        "name": "Ellie Brandt",
+        "shiftsTrimmed": 9,
+        "hoursTrimmed": 74.65,
+        "paidHours": 46.75
+      }
+    ],
+    "csv": "Employee,Email,Earnings Rate,Hours,Rate,Amount,Mon 07 Sept,Tue 08 Sept,Wed 09 Sept,Thu 10 Sept,Fri 11 Sept,Sat 12 Sept,Sun 13 Sept,Overlap Trimmed\nDanny Fitzgerald,demo+nb5@getvantro.com,Ordinary Hours,40.00,,0.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,\nDanny Fitzgerald,demo+nb5@getvantro.com,Overtime 1.5,2.57,,0.00,0.50,0.50,0.57,0.62,0.38,0.00,0.00,\nEllie Brandt,demo+nb6@getvantro.com,Ordinary Hours,40.00,,0.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,yes\nEllie Brandt,demo+nb6@getvantro.com,Overtime 1.5,6.73,,0.00,1.58,1.52,1.48,1.12,1.03,0.00,0.00,yes\nJoanne Petrie,demo+nb8@getvantro.com,Ordinary Hours,40.00,,0.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,\nJoanne Petrie,demo+nb8@getvantro.com,Overtime 1.5,5.48,,0.00,1.05,1.07,1.08,1.15,1.13,0.00,0.00,\nMarcus Vane,demo+nb1@getvantro.com,Ordinary Hours,40.00,22.00,880.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,\nMarcus Vane,demo+nb1@getvantro.com,Overtime 1.5,2.47,33.00,81.40,0.40,0.63,0.38,0.58,0.47,0.00,0.00,\nPriya Raman,demo+nb2@getvantro.com,Ordinary Hours,32.00,19.50,624.00,8.00,8.00,0.00,8.00,8.00,0.00,0.00,\nPriya Raman,demo+nb2@getvantro.com,Overtime 1.5,2.03,29.25,59.48,0.45,0.58,0.00,0.45,0.55,0.00,0.00,\nRavi Chaudhary,demo+nb7@getvantro.com,Ordinary Hours,32.00,,0.00,8.00,0.00,8.00,8.00,8.00,0.00,0.00,\nRavi Chaudhary,demo+nb7@getvantro.com,Overtime 1.5,4.25,,0.00,1.02,0.00,1.07,1.12,1.05,0.00,0.00,\nSian Okonjo,demo+nb4@getvantro.com,Ordinary Hours,40.00,,0.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,\nSian Okonjo,demo+nb4@getvantro.com,Overtime 1.5,2.17,,0.00,0.50,0.50,0.02,0.53,0.62,0.00,0.00,\nTom Ashworth,demo+nb3@getvantro.com,Ordinary Hours,32.00,18.00,576.00,8.00,8.00,0.00,8.00,8.00,0.00,0.00,\nTom Ashworth,demo+nb3@getvantro.com,Overtime 1.5,2.23,27.00,60.30,0.58,0.65,0.00,0.50,0.50,0.00,0.00,\nTOTAL,,,,,2281.18,,,,,,,,"
   }
 }

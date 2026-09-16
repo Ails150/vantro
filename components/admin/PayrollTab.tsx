@@ -6,8 +6,8 @@ import { isFieldRole } from '@/lib/roles'
 
 import { formatIn, formatTime } from "@/lib/format-time"
 import {
-  NO_PAY_RULES, formatPay, latenessFor, payFor, payableHours, resolveRate,
-  scheduledStartFor, type PayRules,
+  NO_PAY_RULES, allocateShifts, formatPay, latenessFor, payFor, payableHours,
+  resolveRate, scheduledStartFor, type PayRules,
 } from "@/lib/pay"
 interface Props { teamMembers: any[]; defaultHourlyRate?: number | null }
 
@@ -127,6 +127,25 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
     return { late, worstMinutes }
   }
 
+  /**
+   * Overlap allocation for one worker's shifts in the period.
+   *
+   * Returns the paid hours per shift after overlapping minutes are removed, so
+   * the row shows what will actually be paid rather than what the shifts add up
+   * to. A worker signed into two jobs at once used to show both in full.
+   */
+  function getAllocation(ss: any[]) {
+    return allocateShifts(
+      ss
+        .filter((s: any) => s.signed_in_at && s.signed_out_at)
+        .map((s: any) => ({
+          id: s.id,
+          start: Date.parse(s.signed_in_at),
+          end: Date.parse(s.signed_out_at),
+        })),
+    )
+  }
+
   function getByDay(ss: any[]) {
     const days: Record<string, number> = {}
     ss.forEach((s: any) => {
@@ -183,7 +202,9 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
         {installers.length === 0 ? <div className={"px-6 py-16 text-center " + sub}>No installers yet</div>
         : installers.map((m: any) => {
           const ms = getInstallerSignins(m.id)
-          const total = getTotalHours(ms)
+          const allocation = getAllocation(ms)
+          // Allocated hours, not the raw sum: each minute counted once.
+          const total = allocation.totalHours
           const byDay = getByDay(ms)
           const byJob = getByJob(ms)
           const lateness = getLateness(ms)
@@ -198,6 +219,14 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
                   {/* Only rendered when lateness reporting is switched on AND
                       somebody was actually late, so a punctual crew shows a
                       clean list rather than a row of green ticks. */}
+                  {allocation.trimmedIds.size > 0 && (
+                    <div className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                      overlap trimmed
+                      <span className="font-normal">
+                        &minus;{allocation.trimmedHours.toFixed(2)}h
+                      </span>
+                    </div>
+                  )}
                   {lateness.late > 0 && (
                     <div className="text-xs text-amber-600 mt-0.5">
                       {lateness.late} late {lateness.late === 1 ? "arrival" : "arrivals"}

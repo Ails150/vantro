@@ -1,9 +1,18 @@
-Employee,Email,Earnings Rate,Mon 07 Sept,Tue 08 Sept,Wed 09 Sept,Thu 10 Sept,Fri 11 Sept,Sat 12 Sept,Sun 13 Sept,Total
-Danny Fitzgerald,demo+nb5@getvantro.com,Ordinary Hours,8.50,8.50,8.57,8.62,8.38,0.00,0.00,42.57
-Ellie Brandt,demo+nb6@getvantro.com,Ordinary Hours,26.30,26.16,25.62,17.67,25.67,0.00,0.00,121.42
-Joanne Petrie,demo+nb8@getvantro.com,Ordinary Hours,9.05,9.07,9.08,9.15,9.13,0.00,0.00,45.48
-Marcus Vane,demo+nb1@getvantro.com,Ordinary Hours,8.40,8.63,8.38,8.58,8.47,0.00,0.00,42.46
-Priya Raman,demo+nb2@getvantro.com,Ordinary Hours,8.45,8.58,0.00,8.45,8.55,0.00,0.00,34.03
-Ravi Chaudhary,demo+nb7@getvantro.com,Ordinary Hours,9.02,0.00,9.07,9.12,9.05,0.00,0.00,36.26
-Sian Okonjo,demo+nb4@getvantro.com,Ordinary Hours,8.50,8.50,8.02,8.53,8.62,0.00,0.00,42.17
-Tom Ashworth,demo+nb3@getvantro.com,Ordinary Hours,8.58,8.65,0.00,8.50,8.50,0.00,0.00,34.23
+Employee,Email,Earnings Rate,Hours,Rate,Amount,Mon 07 Sept,Tue 08 Sept,Wed 09 Sept,Thu 10 Sept,Fri 11 Sept,Sat 12 Sept,Sun 13 Sept,Overlap Trimmed
+Danny Fitzgerald,demo+nb5@getvantro.com,Ordinary Hours,40.00,,0.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,
+Danny Fitzgerald,demo+nb5@getvantro.com,Overtime 1.5,2.57,,0.00,0.50,0.50,0.57,0.62,0.38,0.00,0.00,
+Ellie Brandt,demo+nb6@getvantro.com,Ordinary Hours,40.00,,0.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,yes
+Ellie Brandt,demo+nb6@getvantro.com,Overtime 1.5,6.73,,0.00,1.58,1.52,1.48,1.12,1.03,0.00,0.00,yes
+Joanne Petrie,demo+nb8@getvantro.com,Ordinary Hours,40.00,,0.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,
+Joanne Petrie,demo+nb8@getvantro.com,Overtime 1.5,5.48,,0.00,1.05,1.07,1.08,1.15,1.13,0.00,0.00,
+Marcus Vane,demo+nb1@getvantro.com,Ordinary Hours,40.00,22.00,880.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,
+Marcus Vane,demo+nb1@getvantro.com,Overtime 1.5,2.47,33.00,81.40,0.40,0.63,0.38,0.58,0.47,0.00,0.00,
+Priya Raman,demo+nb2@getvantro.com,Ordinary Hours,32.00,19.50,624.00,8.00,8.00,0.00,8.00,8.00,0.00,0.00,
+Priya Raman,demo+nb2@getvantro.com,Overtime 1.5,2.03,29.25,59.48,0.45,0.58,0.00,0.45,0.55,0.00,0.00,
+Ravi Chaudhary,demo+nb7@getvantro.com,Ordinary Hours,32.00,,0.00,8.00,0.00,8.00,8.00,8.00,0.00,0.00,
+Ravi Chaudhary,demo+nb7@getvantro.com,Overtime 1.5,4.25,,0.00,1.02,0.00,1.07,1.12,1.05,0.00,0.00,
+Sian Okonjo,demo+nb4@getvantro.com,Ordinary Hours,40.00,,0.00,8.00,8.00,8.00,8.00,8.00,0.00,0.00,
+Sian Okonjo,demo+nb4@getvantro.com,Overtime 1.5,2.17,,0.00,0.50,0.50,0.02,0.53,0.62,0.00,0.00,
+Tom Ashworth,demo+nb3@getvantro.com,Ordinary Hours,32.00,18.00,576.00,8.00,8.00,0.00,8.00,8.00,0.00,0.00,
+Tom Ashworth,demo+nb3@getvantro.com,Overtime 1.5,2.23,27.00,60.30,0.58,0.65,0.00,0.50,0.50,0.00,0.00,
+TOTAL,,,,,2281.18,,,,,,,,
