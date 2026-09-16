@@ -5,6 +5,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { SENTRY_RELEASE, SENTRY_ENVIRONMENT } from "@/lib/sentry-release";
+import { scrubBreadcrumb, scrubEvent } from "@/lib/sentry-scrub";
 
 Sentry.init({
   dsn: "https://7252288369772967b46c6352eae1860c@o4511309963591680.ingest.de.sentry.io/4511310010253392",
@@ -20,7 +21,16 @@ Sentry.init({
   // Enable logs to be sent to Sentry
   enableLogs: true,
 
-  // Enable sending user PII (Personally Identifiable Information)
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
-  sendDefaultPii: true,
+  // OFF. It was true, which is the setting that sends request headers -- and on
+  // this product that means the Cookie header carrying a complete working
+  // Supabase session, and the Authorization header carrying a ninety-day field
+  // token. With tracesSampleRate at 1 that was not limited to crashes: every
+  // request produced a transaction and every transaction carried them.
+  sendDefaultPii: false,
+
+  // Belt and braces. sendDefaultPii: false is a promise the SDK makes; these
+  // are checks we make, in a module with its own tests, because a scrubbing
+  // rule that lives only inside Sentry.init() is one nobody can prove.
+  beforeSend: scrubEvent,
+  beforeBreadcrumb: scrubBreadcrumb,
 });
