@@ -107,3 +107,68 @@ export function verifyFieldToken(request: Request): FieldPayload | null {
     return null
   }
 }
+
+/**
+ * Verify a field token AND confirm the worker is still allowed in.
+ *
+ * WHY THIS EXISTS. verifyFieldToken() checks a signature and an expiry and
+ * nothing else, which means a token keeps working after the person it belongs
+ * to has been deactivated. A field token lasts 10 hours, or 90 DAYS for one
+ * issued through a join link, so a sacked worker kept full access to their
+ * company's jobs, diary, photographs and sign-in for up to three months. Found
+ * by tests/security/a2-b8-field-tokens.spec.ts.
+ *
+ * It also defeated erasure: anonymising somebody under UK GDPR Article 17 sets
+ * is_active false and clears their credentials, but any token already in their
+ * phone carried on working.
+ *
+ * THE COST IS ONE INDEXED LOOKUP PER FIELD REQUEST. That is a real cost on the
+ * hot path and it is the right trade: the alternative is an unrevocable
+ * credential, and a revocation that does not take effect is not a revocation.
+ *
+ * Returns null for the same reasons verifyFieldToken does, plus: the user row
+ * is gone, is_active is false, they have been anonymised, or the token's
+ * company no longer matches theirs. The last one matters because a worker moved
+ * between tenants must not keep reading the old one.
+ */
+export async function verifyActiveFieldToken(
+  request: Request,
+): Promise<FieldPayload | null> {
+  const payload = verifyFieldToken(request)
+  if (!payload) return null
+
+  try {
+    // Imported here rather than at module scope: lib/auth.ts is imported by
+    // edge-adjacent code paths, and pulling the server Supabase client in at
+    // the top would drag it along with them.
+    const { createServiceClient } = await import("@/lib/supabase/server")
+    const service = await createServiceClient()
+
+    const { data: user, error } = await service
+      .from("users")
+      .select("id, company_id, is_active, anonymised_at")
+      .eq("id", payload.userId)
+      .maybeSingle()
+
+    if (error) {
+      // FAILS CLOSED, unlike the RAMS gate. That gate fails open because a
+      // broken lookup must not stop every site in the country from starting
+      // work. This is the authentication decision itself: letting a request
+      // through because we could not check who it was is how a revoked
+      // credential keeps working, and a worker seeing a sign-in error is
+      // recoverable in a way that is not.
+      console.error("[auth] could not verify field token holder:", error.message)
+      return null
+    }
+
+    if (!user) return null
+    if ((user as any).is_active === false) return null
+    if ((user as any).anonymised_at) return null
+    if ((user as any).company_id !== payload.companyId) return null
+
+    return payload
+  } catch (err: any) {
+    console.error("[auth] field token check threw:", err?.message || err)
+    return null
+  }
+}

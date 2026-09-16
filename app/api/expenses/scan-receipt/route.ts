@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { verifyFieldToken } from "@/lib/auth"
+import { verifyActiveFieldToken } from "@/lib/auth"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
 
   let installer
   try {
-    installer = await verifyFieldToken(request)
+    installer = await verifyActiveFieldToken(request)
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

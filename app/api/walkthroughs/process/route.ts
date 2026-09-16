@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { createServiceClient } from "@/lib/supabase/server"
 import { WALKTHROUGH_SYSTEM_PROMPT, buildUserMessage } from "@/lib/ai/walkthrough-prompt"
-import { verifyFieldToken } from "@/lib/auth"
+import { verifyActiveFieldToken } from "@/lib/auth"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   // audit-guard-2026-05-19 - security hardening pass
   let _installer
   try {
-    _installer = await verifyFieldToken(req)
+    _installer = await verifyActiveFieldToken(req)
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }

@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { createServiceClient } from "@/lib/supabase/server"
-import { verifyFieldToken } from "@/lib/auth"
+import { verifyActiveFieldToken } from "@/lib/auth"
 import { recordFileHash, sha256Hex } from "@/lib/evidence"
 
 const KINDS = ["near_miss", "injury", "hazard"] as const
@@ -21,7 +21,7 @@ const ACCEPTED = new Set(["image/jpeg", "image/png", "image/webp", "image/heic",
 const R2_BUCKET = process.env.CLOUDFLARE_R2_BUCKET || "vantro-photos"
 
 export async function GET(request: Request) {
-  const installer = verifyFieldToken(request)
+  const installer = await verifyActiveFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const jobId = new URL(request.url).searchParams.get("jobId")
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const installer = verifyFieldToken(request)
+  const installer = await verifyActiveFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const form = await request.formData().catch(() => null)

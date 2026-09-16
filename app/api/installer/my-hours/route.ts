@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
-import { verifyFieldToken } from "@/lib/auth"
+import { verifyActiveFieldToken } from "@/lib/auth"
 
 // GET /api/installer/my-hours
 // Returns the signed-in installer's last 14 days of work record:
@@ -11,7 +11,7 @@ import { verifyFieldToken } from "@/lib/auth"
 // payroll evidence and dispute protection.
 export async function GET(request: Request) {
   try {
-    const installer = verifyFieldToken(request)
+    const installer = await verifyActiveFieldToken(request)
     if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
     const service = await createServiceClient()

@@ -9,7 +9,7 @@
 
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
-import { verifyFieldToken } from "@/lib/auth"
+import { verifyActiveFieldToken } from "@/lib/auth"
 import { getRamsGate } from "@/lib/rams"
 
 /** Shared with toolbox talks: an SVG data URI of drawn strokes, nothing else.
@@ -32,7 +32,7 @@ function validateSignature(raw: unknown): { ok: true; svg: string } | { ok: fals
 }
 
 export async function GET(request: Request) {
-  const installer = verifyFieldToken(request)
+  const installer = await verifyActiveFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const jobId = new URL(request.url).searchParams.get("jobId")
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const installer = verifyFieldToken(request)
+  const installer = await verifyActiveFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const body = await request.json().catch(() => null)

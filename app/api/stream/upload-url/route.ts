@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { verifyFieldToken } from "@/lib/auth"
+import { verifyActiveFieldToken } from "@/lib/auth"
 import { checkRateLimit } from "@/lib/rate-limit"
 
 const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const installer = verifyFieldToken(request)
+  const installer = await verifyActiveFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {

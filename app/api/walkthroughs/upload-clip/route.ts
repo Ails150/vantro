@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { waitUntil } from "@vercel/functions"
 import { createServiceClient } from "@/lib/supabase/server"
-import { verifyFieldToken } from "@/lib/auth"
+import { verifyActiveFieldToken } from "@/lib/auth"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { WALKTHROUGH_SYSTEM_PROMPT, buildUserMessage } from "@/lib/ai/walkthrough-prompt"
 import { checkRateLimit } from "@/lib/rate-limit"
@@ -270,7 +270,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const installer = verifyFieldToken(request)
+  const installer = await verifyActiveFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   try {
