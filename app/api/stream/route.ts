@@ -1,12 +1,35 @@
 import { NextResponse } from "next/server"
 import { verifyActiveFieldToken } from "@/lib/auth"
+import { getClientIp, rateLimit, rateLimitedResponse } from "@/lib/rate-limit"
+import { bearerToken, tokenBucketId } from "@/lib/installer-rate-limit"
 
 const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
 const CF_STREAM_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN
 
+/** Video upload. Tighter than the general field limit, because each one is a file. */
+const STREAM_LIMIT = { max: 20, windowSeconds: 3600 }
+
 export async function POST(request: Request) {
   const auth = request.headers.get("authorization")
   if (!auth?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+  // Limited here rather than in middleware because this route is /api/stream,
+  // not /api/installer, so the field-app choke point does not see it -- and it
+  // is the most expensive thing a field token can do: every call uploads a
+  // video to Cloudflare and is billed.
+  //
+  // Keyed on the token before it is verified, so that a flood of forged tokens
+  // cannot consume a real worker's allowance. Twenty an hour is more
+  // walkthrough video than anybody records in a day.
+  const token = bearerToken(request.headers)
+  if (token) {
+    const limit = await rateLimit(`stream:token:${await tokenBucketId(token)}`, STREAM_LIMIT.max, STREAM_LIMIT.windowSeconds)
+    if (!limit.allowed) return rateLimitedResponse(limit, STREAM_LIMIT.max, "Too many uploads. Try again later.")
+  } else {
+    const limit = await rateLimit(`stream:ip:${getClientIp(request)}`, STREAM_LIMIT.max, STREAM_LIMIT.windowSeconds)
+    if (!limit.allowed) return rateLimitedResponse(limit, STREAM_LIMIT.max, "Too many uploads. Try again later.")
+  }
+
   const installer = await verifyActiveFieldToken(request)
   if (!installer) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 

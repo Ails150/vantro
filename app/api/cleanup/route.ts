@@ -30,13 +30,32 @@ export async function GET(request: Request) {
     totalDeleted += count || 0
   }
 
+  // Prune the rate limiter's own table.
+  //
+  // Here rather than on the hot path: deleting on every check would make a
+  // write out of every rate-limit decision, on the busiest table in the system,
+  // to reclaim rows that cost almost nothing to leave for a day. 24 hours is
+  // comfortably longer than the longest window any caller uses, so nothing
+  // still in scope is removed.
+  //
+  // It is not fatal. The rest of the cleanup has already run by this point, and
+  // a failure here means the table is slightly larger tomorrow.
+  let rateLimitRowsPruned = 0
+  const { data: pruned, error: pruneErr } = await service.rpc("prune_rate_limit_hits")
+  if (pruneErr) console.error("[cleanup] rate limit prune failed:", pruneErr.message)
+  else rateLimitRowsPruned = Number(pruned) || 0
+
   // Log the cleanup
   await service.from("audit_log").insert({
     company_id: companies[0]?.id || '00000000-0000-0000-0000-000000000000',
     action: "data_retention_cleanup",
     entity_type: "system",
-    details: { total_deleted: totalDeleted, run_at: new Date().toISOString() },
+    details: {
+      total_deleted: totalDeleted,
+      rate_limit_rows_pruned: rateLimitRowsPruned,
+      run_at: new Date().toISOString(),
+    },
   })
 
-  return NextResponse.json({ success: true, deleted: totalDeleted })
+  return NextResponse.json({ success: true, deleted: totalDeleted, rateLimitRowsPruned })
 }

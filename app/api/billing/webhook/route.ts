@@ -4,6 +4,7 @@ import Stripe from 'stripe'
 import { planForPriceId } from '@/lib/billing'
 import { generateSlug, getInitials } from '@/lib/provisioning'
 import { acceptanceColumns } from '@/lib/legal'
+import { LIMITS, getClientIp, rateLimit, rateLimitedResponse } from '@/lib/rate-limit'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -16,12 +17,31 @@ export const dynamic = 'force-dynamic'
 
 
 export async function POST(request: Request) {
+  const ip = getClientIp(request)
+
+  // A ceiling on the whole endpoint, set high because Stripe legitimately
+  // retries and a webhook we refuse is a subscription that does not get
+  // provisioned. This is not the interesting limit.
+  const ceiling = await rateLimit(`webhook:stripe:ip:${ip}`, LIMITS.webhook.max, LIMITS.webhook.windowSeconds)
+  if (!ceiling.allowed) return rateLimitedResponse(ceiling, LIMITS.webhook.max)
+
   const body = await request.text()
   const sig = request.headers.get('stripe-signature')!
   let event: Stripe.Event
   try {
     event = getStripe().webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!)
   } catch (err: any) {
+    // THIS is the interesting limit. Stripe's signature never fails to verify;
+    // if it is failing, either somebody is probing the endpoint or forging
+    // subscription events, and both want stopping quickly rather than
+    // generously. Counted only on failure, so real Stripe traffic never
+    // touches this bucket however busy it gets.
+    const bad = await rateLimit(
+      `webhook:stripe-bad-sig:ip:${ip}`,
+      LIMITS.webhookBadSignature.max,
+      LIMITS.webhookBadSignature.windowSeconds,
+    )
+    if (!bad.allowed) return rateLimitedResponse(bad, LIMITS.webhookBadSignature.max)
     return NextResponse.json({ error: 'Webhook signature error' }, { status: 400 })
   }
   const service = await createServiceClient()

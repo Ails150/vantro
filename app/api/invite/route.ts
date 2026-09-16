@@ -1,10 +1,24 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { LIMITS, rateLimit, rateLimitedResponse } from '@/lib/rate-limit'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Limited even though it needs a session.
+  //
+  // This route sends email to an address chosen by the caller. That makes a
+  // compromised or careless admin account into a way to send Vantro-branded
+  // mail to anybody, at any volume -- which costs us a sending reputation that
+  // takes months to rebuild and cannot be bought back. Ten an hour is far more
+  // than onboarding a gang and far less than useful to anyone abusing it.
+  const limit = await rateLimit(`invite:user:${user.id}`, LIMITS.invite.max, LIMITS.invite.windowSeconds)
+  if (!limit.allowed) {
+    return rateLimitedResponse(limit, LIMITS.invite.max, 'Too many invites sent. Try again shortly.')
+  }
+
   const service = await createServiceClient()
   const { email, name, role } = await request.json()
 

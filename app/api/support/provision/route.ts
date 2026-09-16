@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { PLATFORM_SENTINEL_COMPANY_ID } from "@/lib/company-context"
+import { LIMITS, getClientIp, rateLimit, rateLimitedResponse } from "@/lib/rate-limit"
 
 // One-time bootstrap: provision Aileen as a platform "support" user.
 // Protected by SUPPORT_BOOTSTRAP_SECRET (set it in env, then call once with
@@ -13,6 +14,19 @@ const AILEEN_EMAIL = "aileen@applyscale8.com"
 const AILEEN_NAME = "Aileen O'Doherty"
 
 export async function POST(request: Request) {
+  // Limited BEFORE the secret is compared, which is the only ordering that
+  // helps: the thing being defended against here is somebody guessing the
+  // shared secret, and a limit that only applies after a correct guess is not
+  // a limit on guessing. Ten an hour per address turns a brute force into a
+  // geological exercise.
+  const ip = getClientIp(request)
+  const limit = await rateLimit(
+    `support-provision:ip:${ip}`,
+    LIMITS.supportProvision.max,
+    LIMITS.supportProvision.windowSeconds,
+  )
+  if (!limit.allowed) return rateLimitedResponse(limit, LIMITS.supportProvision.max)
+
   const secret = request.headers.get("x-bootstrap-secret")
   if (!process.env.SUPPORT_BOOTSTRAP_SECRET || secret !== process.env.SUPPORT_BOOTSTRAP_SECRET) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
