@@ -207,52 +207,74 @@ test.describe("D16: evidence cannot be altered without trace", () => {
     ).toBeTruthy()
   })
 
-  test("a direct PostgREST edit is still RECORDED as an amendment", async () => {
-    // THE FINDING BEHIND THIS TEST. RLS on signins allows any authenticated
-    // member of the company to UPDATE, so an admin or foreman can edit an
-    // attendance row straight through PostgREST, bypassing every check in the
-    // route layer. That is load bearing, not an oversight: the "sign everyone
-    // out of this job" button in AdminDashboard.tsx:1026 is exactly such a
-    // write, so tightening the policy would break a shipped feature and needs
-    // that write moved to a server route first.
+  test("no client session can UPDATE an evidence table at all", async () => {
+    // This assertion got STRONGER on 2026-09-16. It used to say only that a
+    // direct edit was RECORDED, because RLS permitted any authenticated company
+    // member to write to signins through PostgREST and one shipped feature --
+    // the bulk sign-out in AdminDashboard -- depended on that.
     //
-    // What makes it survivable is that the amendment trigger fires REGARDLESS
-    // of who did the writing. The guarantee is not "evidence cannot be edited";
-    // it is "evidence cannot be edited WITHOUT A RECORD". That is what this
-    // asserts, because asserting the stronger claim would be asserting
-    // something untrue.
+    // That write moved to POST /api/admin/jobs/sign-out-all, and restrictive
+    // policies now refuse UPDATE and DELETE to authenticated and anon on every
+    // evidential table. service_role bypasses RLS, so the routes are unchanged.
     expect(probe).toBeTruthy()
-    const service = serviceClient()
     const asWorker = anonClient(probe!.token)
+
+    const allowed: string[] = []
+    for (const { table } of EVIDENCE) {
+      const { error, count } = await asWorker
+        .from(table)
+        .update({ within_range: false } as any, { count: "exact" })
+        .eq("company_id", TENANT_A.id)
+      if (!error && (count ?? 0) > 0) allowed.push(`${table}: ${count} row(s)`)
+    }
+
+    const detail = allowed.join(String.fromCharCode(10))
+    expect(allowed, "a client session updated evidence: " + detail).toEqual([])
+  })
+
+  test("the amendment trigger still fires for writes that DO get through", async () => {
+    // The server still writes, and when it changes evidence that has to leave a
+    // record. Proving the lock without proving this would mean a database where
+    // nothing can be edited and nothing is accounted for either.
+    const service = serviceClient()
 
     const before = (await service
       .from("evidence_hashes").select("id").eq("entity_id", signinId!)).data ?? []
 
-    const { error } = await asWorker
+    const { error } = await service
       .from("signins").update({ within_range: false }).eq("id", signinId!)
-    expect(error, "the direct update failed, so this proves nothing").toBeFalsy()
+    expect(error, "the service-role update failed").toBeFalsy()
 
     const after = (await service
       .from("evidence_hashes").select("id, event").eq("entity_id", signinId!)).data ?? []
 
-    expect(
-      after.length,
-      "a direct PostgREST edit changed evidence and left NO hash behind",
-    ).toBeGreaterThan(before.length)
+    expect(after.length, "evidence changed and no hash was written")
+      .toBeGreaterThan(before.length)
     expect(after.some(h => (h as any).event === "amended")).toBe(true)
   })
 
-  test("immutable columns are refused even through PostgREST", async () => {
-    // The route layer is bypassed, so the DATABASE has to be the thing that
-    // refuses. company_id is the one that matters: it would move a shift
-    // between tenants.
+  test("a client session cannot move a shift between tenants", async () => {
+    // Asserted on the OUTCOME, not on an error. Since the restrictive policy
+    // landed, RLS filters the row out before the immutability trigger ever sees
+    // it, so PostgREST answers success with zero rows changed rather than
+    // raising. Both are refusals; only the row still being where it started
+    // proves it.
     expect(probe).toBeTruthy()
+    const service = serviceClient()
     const asWorker = anonClient(probe!.token)
-    const { error } = await asWorker
+
+    await asWorker
       .from("signins")
       .update({ company_id: "00000000-0000-0000-0000-000000000002" })
       .eq("id", signinId!)
-    expect(error, "a worker moved a shift between tenants via PostgREST").toBeTruthy()
+
+    const { data: row } = await service
+      .from("signins").select("company_id").eq("id", signinId!).single()
+
+    expect(
+      (row as any)?.company_id,
+      "a client session moved a shift into another tenant",
+    ).toBe(TENANT_A.id)
   })
 
   test("a worker's own token cannot DELETE evidence directly", async () => {

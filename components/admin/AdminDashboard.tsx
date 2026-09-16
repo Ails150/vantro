@@ -1023,7 +1023,15 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     const updateRes = await fetch("/api/admin/jobs", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jobId, name: editJobName.trim(), address: editJobAddress.trim(), lat: editJobLat, lng: editJobLng, ...(editJobPlaceSelected ? { gps_source: "manual" } : {}), status: newStatus, start_time: editJobStartTime, sign_out_time: editJobSignOutTime, distance_from_site_km: editJobDistanceKm.trim() === "" ? null : Number(editJobDistanceKm), contractor: editJobContractor.trim() || null, geofence_radius_metres: editJobGeofenceRadius.trim() === "" ? null : Number(editJobGeofenceRadius), required_trades: multiTradeEnabled ? (editJobRequiredTrades || []) : [] }) })
     const updateData = await updateRes.json().catch(() => ({}))
     if (newStatus === "completed" || newStatus === "cancelled") {
-      await supabase.from("signins").update({ signed_out_at: new Date().toISOString() }).eq("job_id", jobId).is("signed_out_at", null)
+      // Through a server route, not the browser client. This single line was
+      // the reason RLS on signins had to let any authenticated company member
+      // UPDATE evidence, which let an admin or foreman edit any attendance row
+      // through PostgREST. See app/api/admin/jobs/sign-out-all/route.ts.
+      await fetch("/api/admin/jobs/sign-out-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId }),
+      })
     }
     if (!updateRes.ok) { setFormError([updateData.error, updateData.hint, updateData.details].filter(Boolean).join(" · ") || "Could not update job"); setSaving(false); return }
     const { error: delErr } = await supabase.from("job_checklists").delete().eq("job_id", jobId)
