@@ -5,6 +5,9 @@ import { config as loadEnv } from "dotenv"
 // keys with blank values. Nothing here has a default: a missing variable should
 // fail loudly in the spec rather than silently point the suite somewhere else.
 loadEnv({ path: ".env.e2e" })
+// The security suite also needs the Supabase keys, which live in .env.local.
+// Loaded second so .env.e2e wins on any key they share.
+loadEnv({ path: ".env.local" })
 
 export default defineConfig({
   forbidOnly: !!process.env.CI,
@@ -24,6 +27,18 @@ export default defineConfig({
       testDir: "./tests/unit",
       fullyParallel: true,
       timeout: 10_000,
+      retries: 0,
+    },
+    {
+      // The standing penetration-test approximation. Mostly HTTP and direct
+      // database calls rather than a browser, so it is fast enough to run on
+      // every commit. One worker: several specs write to the [TEST] tenants and
+      // must not race each other.
+      name: "security",
+      testDir: "./tests/security",
+      workers: 1,
+      fullyParallel: false,
+      timeout: 180_000,
       retries: 0,
     },
     {
