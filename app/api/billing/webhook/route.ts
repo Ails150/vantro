@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
 import { planForPriceId } from '@/lib/billing'
 import { generateSlug, getInitials } from '@/lib/provisioning'
+import { acceptanceColumns } from '@/lib/legal'
 
 function getStripe(): Stripe {
   const key = process.env.STRIPE_SECRET_KEY
@@ -48,10 +49,34 @@ export async function POST(request: Request) {
         const slug = generateSlug(companyName)
         const defaultSchedule = { mon: { enabled: true, start: "08:00", end: "17:00" }, tue: { enabled: true, start: "08:00", end: "17:00" }, wed: { enabled: true, start: "08:00", end: "17:00" }, thu: { enabled: true, start: "08:00", end: "17:00" }, fri: { enabled: true, start: "08:00", end: "17:00" }, sat: { enabled: false }, sun: { enabled: false } }
         const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-        const { data: company, error: compErr } = await service.from('companies').insert({ name: companyName, slug, plan, installer_limit: parseInt(meta.installer_limit || '40', 10), stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, subscription_status: 'trialing', default_schedule: defaultSchedule, ai_audit_enabled: true, ai_audit_trial_ends_at: trialEndsAt, trial_ends_at: trialEndsAt }).select('id').single()
+        // When the terms were accepted, and by whom.
+        //
+        // Carried in the checkout metadata from /api/signup/initiate, where the
+        // person actually ticked the box. Stamping new Date() here would record
+        // the moment Stripe called us, which is not the moment anybody agreed
+        // to anything and would be a worse answer to give a court than none.
+        //
+        // A session with no acceptance in its metadata predates this feature or
+        // did not come from our signup page. The company is still provisioned
+        // -- refusing to create a company somebody has paid for, because of a
+        // missing metadata key, is the wrong failure -- but the columns stay
+        // null and the compliance panel shows the gap for an admin to close.
+        const acceptedAt = meta.accepted_terms_at ? new Date(meta.accepted_terms_at) : null
+        const acceptance = acceptedAt && !Number.isNaN(acceptedAt.getTime())
+          ? acceptanceColumns(meta.accepted_terms_by || adminName, acceptedAt)
+          : {}
+        if (!acceptedAt) console.warn('[webhook] no terms acceptance in checkout metadata for', companyName)
+
+        const { data: company, error: compErr } = await service.from('companies').insert({ name: companyName, slug, plan, installer_limit: parseInt(meta.installer_limit || '40', 10), stripe_customer_id: customerId, stripe_subscription_id: subscriptionId, subscription_status: 'trialing', default_schedule: defaultSchedule, ai_audit_enabled: true, ai_audit_trial_ends_at: trialEndsAt, trial_ends_at: trialEndsAt, ...acceptance }).select('id').single()
         if (compErr || !company) { console.error('[webhook] company insert failed:', compErr); break }
-        const { error: userErr } = await service.from('users').insert({ company_id: company.id, auth_user_id: authUserId, email: adminEmail, name: adminName, initials: getInitials(adminName), role: 'admin', is_active: true })
+        const { data: adminUser, error: userErr } = await service.from('users').insert({ company_id: company.id, auth_user_id: authUserId, email: adminEmail, name: adminName, initials: getInitials(adminName), role: 'admin', is_active: true }).select('id').single()
         if (userErr) { await service.from('companies').delete().eq('id', company.id); console.error('[webhook] user insert failed:', userErr); break }
+        // Link the acceptance to the admin now that they have a row. Not fatal:
+        // the name and timestamp on the company are the record.
+        if (acceptedAt && adminUser?.id) {
+          const { error: linkErr } = await service.from('companies').update({ dpa_accepted_by_user_id: adminUser.id }).eq('id', company.id)
+          if (linkErr) console.error('[webhook] acceptance user link failed:', linkErr)
+        }
         console.log('[webhook] provisioned company', company.id)
         break
       }

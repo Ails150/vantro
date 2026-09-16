@@ -5,6 +5,7 @@ import Stripe from 'stripe'
 import { PLANS } from '@/lib/billing'
 import type { Plan } from '@/lib/plan'
 import { generateSlug, getInitials, defaultSchedule as makeDefaultSchedule } from '@/lib/provisioning'
+import { acceptanceColumns } from '@/lib/legal'
 
 /**
  * Email a one-tap sign-in link.
@@ -93,8 +94,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const { email, password, companyName, yourName, teamSize, plan } = body
+  const { email, password, companyName, yourName, teamSize, plan, acceptedTerms } = body
   const isFree = (plan as Plan) === 'free'
+
+  // Checked here, not only in the browser.
+  //
+  // The checkbox on the signup page is how a person agrees. This is what makes
+  // the agreement a fact: a disabled submit button is a courtesy to somebody
+  // filling in a form, and anybody posting to this route directly has bypassed
+  // it without trying. If the acceptance record is going to be the evidence
+  // that a company agreed to the terms and the DPA, then the one place it must
+  // be impossible to create a company without one is the server.
+  //
+  // Strict true. A truthy "false" string, or a 1, means something built this
+  // request rather than somebody ticking a box.
+  if (acceptedTerms !== true) {
+    return NextResponse.json({
+      error: 'Please accept the Terms of Service and the Data Processing Agreement',
+    }, { status: 400 })
+  }
 
   // Validation. Free is the two-field path, so only the two fields are
   // required; the paid path still needs everything Stripe and the webhook
@@ -185,6 +203,15 @@ export async function POST(request: Request) {
         plan: 'free',
         subscription_status: 'free',
         default_schedule: defaultSchedule,
+        // Stamped in the same insert as the company, not in a follow-up
+        // update. An update can fail and leave a company that exists with no
+        // record of having agreed to anything -- which is the one outcome this
+        // whole feature is for.
+        //
+        // The admin's user row does not exist yet, so dpa_accepted_by_user_id
+        // is filled in below once it does. The name and the timestamp are here,
+        // and those are what the record has to carry.
+        ...acceptanceColumns(adminDisplayName),
       })
       .select('id')
       .single()
@@ -195,7 +222,7 @@ export async function POST(request: Request) {
     }
 
     const adminName = adminDisplayName
-    const { error: userErr } = await service.from('users').insert({
+    const { data: adminUser, error: userErr } = await service.from('users').insert({
       company_id: company.id,
       auth_user_id: authUserId,
       email: email.toLowerCase().trim(),
@@ -203,13 +230,26 @@ export async function POST(request: Request) {
       initials: getInitials(adminName),
       role: 'admin',
       is_active: true,
-    })
+    }).select('id').single()
 
     if (userErr) {
       // Roll the company back rather than leave one nobody can sign in to.
       await service.from('companies').delete().eq('id', company.id)
       console.error('[signup] free user insert failed:', userErr)
       return NextResponse.json({ error: 'Could not create your account' }, { status: 500 })
+    }
+
+    // Now that the admin has a row, point the acceptance at it. Deliberately
+    // not fatal: the name and the timestamp are already on the company and are
+    // what the record is made of. Losing the foreign key costs a join; failing
+    // the signup over it would throw away a working account for a link that can
+    // be repaired.
+    if (adminUser?.id) {
+      const { error: linkErr } = await service
+        .from('companies')
+        .update({ dpa_accepted_by_user_id: adminUser.id })
+        .eq('id', company.id)
+      if (linkErr) console.error('[signup] acceptance user link failed:', linkErr)
     }
 
     // There is no password and no checkout, so the only way in is the link.
@@ -270,6 +310,14 @@ export async function POST(request: Request) {
         auth_user_id: authUserId,
         company_name: companyName.trim(),
         plan,
+        // The paid company is created by the checkout webhook, minutes later
+        // and in a different process. The acceptance happened HERE, when the
+        // person ticked the box, so the moment it happened travels with the
+        // session rather than being invented at provisioning time -- a
+        // timestamp written when Stripe got round to calling us is not a record
+        // of when anybody agreed to anything.
+        accepted_terms_at: new Date().toISOString(),
+        accepted_terms_by: adminDisplayName,
       },
     })
 

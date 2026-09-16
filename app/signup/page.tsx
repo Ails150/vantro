@@ -16,10 +16,16 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { PLANS, SIGNUP_PLAN } from '@/lib/billing'
+import { DPA_URL, PRIVACY_URL, TERMS_URL } from '@/lib/legal'
 
 export default function SignupPage() {
   const [companyName, setCompanyName] = useState('')
   const [email, setEmail] = useState('')
+  // Unticked, and it stays unticked until somebody ticks it. A pre-ticked box
+  // is not agreement: UK GDPR recital 32 and the Consumer Rights Act both say
+  // so, and a signup that pre-ticks it has produced a worthless record at the
+  // one moment it was trying to produce a valuable one.
+  const [accepted, setAccepted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [sentTo, setSentTo] = useState<string | null>(null)
@@ -39,6 +45,11 @@ export default function SignupPage() {
           email: email.trim(),
           companyName: companyName.trim(),
           plan: SIGNUP_PLAN,
+          // The server checks this again and refuses without it. The checkbox
+          // is how a person agrees; this field is only how that fact travels,
+          // and anything that can be turned off in a browser cannot be the
+          // record that a contract was accepted.
+          acceptedTerms: accepted,
         }),
       })
       const data = await res.json()
@@ -148,6 +159,27 @@ export default function SignupPage() {
                 </p>
               </div>
 
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={accepted}
+                  onChange={(e) => setAccepted(e.target.checked)}
+                  disabled={loading}
+                  required
+                  data-testid="signup-accept-terms"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-white/20 bg-[#243040] text-[#00d4a0] accent-[#00d4a0] focus:outline-none focus:ring-1 focus:ring-[#00d4a0]/40 disabled:opacity-60"
+                />
+                <span className="text-xs text-[#8fa3b8] leading-relaxed">
+                  I have read and accept the{' '}
+                  <a href={TERMS_URL} target="_blank" rel="noopener noreferrer" className="text-[#00d4a0] hover:text-[#00a87e] underline">Terms of Service</a>
+                  {' '}and the{' '}
+                  <a href={DPA_URL} target="_blank" rel="noopener noreferrer" className="text-[#00d4a0] hover:text-[#00a87e] underline">Data Processing Agreement</a>,
+                  {' '}and I am authorised to accept them for this company.
+                  {' '}
+                  <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer" className="text-[#4d6478] hover:text-[#8fa3b8] underline">Privacy policy</a>.
+                </span>
+              </label>
+
               {error && (
                 <p className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-lg px-4 py-3">
                   {error}
@@ -156,9 +188,12 @@ export default function SignupPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                // Disabled rather than hidden, and the label above is the only
+                // thing that enables it. Somebody who has not ticked it can see
+                // exactly what is stopping them.
+                disabled={loading || !accepted}
                 data-testid="signup-submit"
-                className="w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-50 text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors"
+                className="w-full bg-[#00d4a0] hover:bg-[#00a87e] disabled:opacity-50 disabled:cursor-not-allowed text-[#0f1923] font-semibold rounded-xl py-3 text-sm transition-colors"
               >
                 {loading ? 'Setting up…' : 'Create account'}
               </button>
