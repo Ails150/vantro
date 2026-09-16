@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
 import { isFieldRole } from '@/lib/roles'
+import { escapeLikePattern } from '@/lib/sql-escape'
 
 export async function POST(request: Request) {
   const { email } = await request.json()
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
   const { data: user } = await service.from('users')
     .select('id, name, email, role')
-    .ilike('email', email.trim())
+    .ilike('email', escapeLikePattern(email.trim()))
     .single()
 
   // Silent success for security (do not reveal whether email exists)

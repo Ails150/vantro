@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { createFieldToken } from '@/lib/auth'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
+import { escapeLikePattern } from '@/lib/sql-escape'
 
 const MAX_PIN_ATTEMPTS = 5
 const LOCKOUT_MINUTES = 15
@@ -22,8 +23,30 @@ export async function POST(request: Request) {
   const body = await request.json()
 
   if (body.checkOnly) {
+    // AN ACCOUNT ORACLE, BOUNDED RATHER THAN CLOSED. Everything below this
+    // block works to avoid disclosing whether an address has an account -- one
+    // error message, one status code, a bcrypt comparison against a dummy hash
+    // so the timing matches. This branch answers the question directly.
+    //
+    // It cannot simply be deleted: the app uses it to decide between "enter
+    // your PIN" and "set one up", and a worker at a site gate who is shown the
+    // wrong one is stuck. Closing it properly means always asking for the PIN
+    // and offering setup on failure, which is a mobile change, not a server
+    // one. Recorded in docs/security/PENTEST-SCOPE.md as a known residual.
+    //
+    // What IS fixed is the sweep. The per-IP limit above allows 20 requests in
+    // ten minutes, which is enough to test 20 addresses; this adds a per-address
+    // limit so a list cannot be walked from rotating IPs either, and each
+    // address costs the attacker the same budget a real sign-in attempt does.
+    const probe = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
+    if (!probe) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+    const probeOk = await checkRateLimit(`installer-auth:check:${probe}`, 5, 900)
+    if (!probeOk) {
+      return NextResponse.json({ error: 'Too many attempts. Try again in a few minutes.' }, { status: 429 })
+    }
+
     const service = await createServiceClient()
-    const { data: user } = await service.from('users').select('id, pin_hash').ilike('email', body.email).single()
+    const { data: user } = await service.from('users').select('id, pin_hash').ilike('email', escapeLikePattern(probe)).maybeSingle()
     if (!user) return NextResponse.json({ exists: false })
     return NextResponse.json({ exists: true, hasPin: !!user.pin_hash })
   }
@@ -50,7 +73,7 @@ export async function POST(request: Request) {
   const { data: user } = await service
     .from('users')
     .select('id, name, company_id, subcontractor_id, pin_hash, pin_attempts, pin_locked_until, role, gps_tracking_acknowledged')
-    .ilike('email', email)
+    .ilike('email', escapeLikePattern(email))
     .eq('is_active', true)
     .not('pin_hash', 'is', null)
     .maybeSingle()

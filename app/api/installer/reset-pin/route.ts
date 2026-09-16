@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import crypto from 'crypto'
+import { escapeLikePattern } from '@/lib/sql-escape'
 
 export async function POST(request: Request) {
   const { email } = await request.json()
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   }
 
   const service = await createServiceClient()
-  const { data: user } = await service.from('users').select('id, name, email').ilike('email', email.trim()).single()
+  const { data: user } = await service.from('users').select('id, name, email').ilike('email', escapeLikePattern(email.trim())).single()
   if (!user) return NextResponse.json({ success: true }) // silent fail for security
 
   const token = crypto.randomBytes(32).toString('hex')

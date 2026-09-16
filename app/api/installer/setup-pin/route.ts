@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
+import { escapeLikePattern } from '@/lib/sql-escape'
 
 const INVITE_EXPIRED = 'Your invite link has expired. Please ask your manager to resend your invite.'
 
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     const { data: user } = await service
       .from('users')
       .select('id, pin_hash')
-      .ilike('email', String(email).trim())
+      .ilike('email', escapeLikePattern(String(email).trim()))
       .single()
     if (!user) return NextResponse.json({ error: INVITE_EXPIRED }, { status: 401 })
     if (user.pin_hash) {
