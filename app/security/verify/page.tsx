@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useState } from "react"
 import { createClient } from "@/lib/supabase/client"
+import { safeNextPath } from "@/lib/safe-redirect"
 
 /**
  * Step up a signed-in session to aal2 by entering a code.
@@ -97,8 +98,10 @@ export default function VerifyMfaPage() {
 
     // Full navigation, not a soft push: the session cookie has just been
     // upgraded and the next request has to carry it.
+    // startsWith("/") is not enough: "//evil.example.com" starts with "/" and
+    // is a protocol-relative URL that the browser resolves to another host.
     const next = new URLSearchParams(window.location.search).get("next")
-    window.location.assign(next && next.startsWith("/") ? next : "/admin")
+    window.location.assign(safeNextPath(next))
   }
 
   return (
