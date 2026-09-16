@@ -49,7 +49,7 @@ and admins; where you record them, site visitors and subcontractors' staff.
 |---|---|
 | Identity | Name, initials, email address, role, employee reference |
 | Authentication | Password hash (admins), PIN hash (installers), session tokens |
-| **Location** | Latitude and longitude at sign-in and sign-out, distance from the job site, whether the worker was inside the geofence |
+| **Location** | Latitude and longitude at sign-in and sign-out, distance from the job site, whether the worker was inside the geofence, and position traces while signed in (see below) |
 | Working time | Sign-in and sign-out times, breaks, lateness against schedule, hours by category |
 | Pay | Hourly rate, overtime bands, bonuses, calculated pay |
 | Images and media | Site photographs, receipt images, walkthrough video and audio, signatures |
@@ -66,7 +66,21 @@ employment law obligations.
 
 **Location is the sensitive one.** Not special category in law, but it is the
 data your workers did not choose to share and the thing that will generate
-complaints. We record it only at sign-in and sign-out, not continuously.
+complaints. Precisely what is recorded, because a wrong answer here is the one
+that ends up at the ICO:
+
+- A fix at **sign-in** and at **sign-out**, stored on the shift record.
+- While a worker is signed in, a **150-metre geofence** around the job site,
+  which records a position when they leave it and when they return.
+- While a worker is signed in, a position **at most once an hour**.
+- **Nothing outside the shift window.** Recording runs from sign-in until
+  sign-out or the expected finish time, whichever is first. Not before, not
+  after, not on a non-working day.
+
+The during-shift traces are held in a separate table with their own **90-day
+cap**, applied regardless of the retention policy you choose — they are
+telemetry supporting the automatic sign-out rule, not evidence, and retention
+is a floor on privacy rather than a licence to keep them.
 
 **Duration:** for as long as you are a customer, plus whatever your retention
 policy allows — section 8.

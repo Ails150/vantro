@@ -78,9 +78,11 @@ Agreement, and we do not decide what is collected, who sees it, or how long it
 is kept.
 
 What is recorded, in outline, so nobody has to guess: name and contact details,
-sign-in and sign-out times, **location at those moments**, hours and pay,
-photographs and other site media, and free-text entries the worker or their
-supervisor wrote. `worker-privacy-notice.md` sets it out properly.
+sign-in and sign-out times, **location at those moments and while the worker is
+signed in** — a 150-metre geofence around the site plus a position at most once
+an hour, stopping at sign-out — hours and pay, photographs and other site media,
+and free-text entries the worker or their supervisor wrote.
+`worker-privacy-notice.md` sets it out properly.
 
 ## 5. Who else sees it
 

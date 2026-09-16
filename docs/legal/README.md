@@ -67,6 +67,11 @@ changed:
   rewrite issued audit packs — `lib/gdpr.ts`, `ERASURE_CAVEATS`.
 - Evidence tables are append-only and hash-chained; no client session can write
   to them — migration `20260916140000_evidence_no_client_writes.sql`.
+- Location is recorded at sign-in and sign-out, **and while the worker is signed
+  in**: a 150-metre geofence around the site, plus a position at most once an
+  hour, stopping at sign-out or the expected finish time — `lib/locationTracker.ts`,
+  `lib/activeShift.ts` in the mobile repo. Those traces have their own 90-day
+  cap — `20260916120000_retention_policy.sql`.
 - Database and application hosting are in the EU; object storage is in the EU
   jurisdiction — `docs/legal/subprocessors.md`.
 - Email, AI classification, address lookup, push and billing involve transfers

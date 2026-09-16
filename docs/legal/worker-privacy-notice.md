@@ -41,16 +41,25 @@ can do about it.
 **When you sign in and out.** The time, to the minute.
 
 **Where you were when you did it.** Your location at the moment you sign in and
-at the moment you sign out — nothing in between. The app checks whether you were
-at the job site and records how far away you were if you were not.
+at the moment you sign out. The app checks whether you were at the job site and
+records how far away you were if you were not.
 
-> **The app does not follow you around.** It does not record your location
-> during the day, on your break, on the way home, or at any time you are not
-> signed in. Two points a day, both of them at moments you chose.
->
-> **[EMPLOYER: if you have enabled background location for automatic sign-out,
-> delete this box — it is no longer true, and leaving it in is worse than never
-> having said it.]**
+**Where you are while you are signed in.** This is the part people are usually
+surprised by, so it is written out plainly:
+
+- The app watches whether you go more than **150 metres** from the job site, and
+  records your position when you leave that circle and when you come back.
+- It also records your position **at most once an hour** while you are signed
+  in.
+
+> **It stops when your shift does.** Recording runs from when you sign in until
+> you sign out, or until your expected finish time, whichever comes first.
+> Nothing is recorded before your shift, after it, on the way home, at the
+> weekend, or on a day you did not sign in. If you are not signed in, the app is
+> not recording where you are.
+
+These during-shift positions are kept for **90 days** and then deleted, whatever
+retention policy the company has chosen for everything else.
 
 **Your hours and your pay.** Hours worked, breaks, lateness against your
 schedule, overtime, and what you are owed.
