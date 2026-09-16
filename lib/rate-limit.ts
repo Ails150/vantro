@@ -81,10 +81,15 @@ export async function rateLimit(
         p_max_hits: maxHits,
         p_window_seconds: windowSeconds,
       }),
-      // Never let the limiter be the slow part of a request. If the database is
-      // taking two seconds to answer a counted index lookup, the request has
-      // bigger problems than whether it was rate limited.
-      signal: AbortSignal.timeout(2000),
+      // Longer than the SQL function's own 1s lock_timeout, deliberately.
+      //
+      // The function serialises callers per key, so a burst on one key queues.
+      // If the client abort fires first, the wrapper fails OPEN and a flood
+      // gets through unlimited -- the limiter failing at exactly the moment it
+      // is needed. Letting the database be the one to give up means contention
+      // comes back as a refusal instead. Three seconds is the ceiling on how
+      // slow the limiter is allowed to make a request.
+      signal: AbortSignal.timeout(3000),
     })
 
     if (!res.ok) {

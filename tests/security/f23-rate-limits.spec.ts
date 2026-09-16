@@ -44,16 +44,34 @@ test("the limiter refuses once the limit is reached", async () => {
 })
 
 test("it is atomic under concurrency, which is the case that matters", async () => {
-  // THE BUG THIS EXISTS FOR. The old limiter counted and then inserted as two
-  // statements, so ten simultaneous requests all read the same count and all
-  // proceeded. It held against a human clicking a button and dissolved against
-  // a script, which is the only caller worth defending against.
-  const key = probeKey("concurrent")
-  const results = await Promise.all(
-    Array.from({ length: 12 }, () => rateLimit(key, 3, 60)),
-  )
-  const permitted = results.filter(r => r.allowed).length
-  expect(permitted, "more than the limit got through concurrently").toBe(3)
+  // THE BUG THIS EXISTS FOR, TWICE.
+  //
+  // First the limiter counted and then inserted as two round trips from the
+  // application, so simultaneous requests all read the same count and all
+  // proceeded. Moving both into one plpgsql function did NOT fix it: a function
+  // body is not a critical section, and at READ COMMITTED the SELECT takes a
+  // snapshot and locks nothing. This test passed twice and then let four
+  // through at a limit of three, which is the whole reason it is written as
+  // several rounds rather than one -- a concurrency test that passes once is
+  // not evidence of anything.
+  //
+  // The fix is pg_advisory_xact_lock on the key. See
+  // 20260916170000_rate_limit_serialise.sql.
+  for (let round = 0; round < 3; round++) {
+    const key = probeKey(`concurrent-${round}`)
+    const results = await Promise.all(
+      Array.from({ length: 30 }, () => rateLimit(key, 3, 60)),
+    )
+    const permitted = results.filter(r => r.allowed).length
+    const degraded = results.filter(r => r.degraded).length
+    // A degraded result is a fail-open, and under load it counts as allowed.
+    // Reported separately so a failure says which of the two things broke.
+    expect(degraded, `round ${round}: ${degraded} checks failed open under load`).toBe(0)
+    expect(
+      permitted,
+      `round ${round}: ${permitted} of 30 concurrent requests got through a limit of 3`,
+    ).toBe(3)
+  }
 })
 
 test("a refusal says how long to wait", async () => {
