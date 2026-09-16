@@ -18,6 +18,7 @@ import IncidentsTab from "@/components/admin/IncidentsTab"
 import RetentionTab from "@/components/admin/RetentionTab"
 import JobRetentionCard from "@/components/admin/JobRetentionCard"
 import TeamRateField from "@/components/admin/TeamRateField"
+import WorkerDataRights from "@/components/admin/WorkerDataRights"
 import SettingsTab from "@/components/admin/SettingsTab"
 import ScheduleTab from "@/components/admin/ScheduleTab"
 import CalendarTab from "@/components/admin/CalendarTab" // calendar_tab_marker
@@ -2114,6 +2115,16 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                               )}
                             </div>
                           )}
+
+                          {/* Subject access and erasure, on the person's own
+                              card: a request arrives as "Marek wants his data"
+                              and the first move is to find Marek. */}
+                          <WorkerDataRights
+                            userId={m.id}
+                            userName={m.name}
+                            anonymisedAt={m.anonymised_at}
+                            onErased={() => router.refresh()}
+                          />
 
                           {/* Pay rate. Shown for anyone who can be on site and
                               therefore on a payroll export; admins are paid
