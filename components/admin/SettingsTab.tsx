@@ -1,5 +1,6 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { PageTransition, PageHeader, Section } from "@/components/ui/Page"
 import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 
@@ -309,6 +310,8 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
           </div>
         </div>
       </Section>
+
+      <SecuritySection />
 
       <PayRulesSection />
 
@@ -822,6 +825,101 @@ function PayRulesSection() {
           </button>
           {saved && <span className="text-xs text-accent-ink">Saved</span>}
         </div>
+      </div>
+    </Section>
+  )
+}
+
+/**
+ * Two-factor, from the settings screen.
+ *
+ * Shows state rather than a toggle, because enrolment is a flow with a QR code
+ * in the middle of it and cannot honestly be represented as a switch. Removing
+ * one is a switch, and is here.
+ *
+ * A superadmin sees that it is required and gets no remove button: the
+ * middleware and the admin page would send them straight back to enrolment, and
+ * offering an action that immediately undoes itself is worse than not offering
+ * it.
+ */
+function SecuritySection() {
+  const [factors, setFactors] = useState<any[]>([])
+  const [role, setRole] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      const [{ data: mfa }, meRes] = await Promise.all([
+        supabase.auth.mfa.listFactors(),
+        fetch("/api/admin/me").then(r => (r.ok ? r.json() : null)).catch(() => null),
+      ])
+      setFactors((mfa?.totp ?? []).filter((f: any) => f.status === "verified"))
+      setRole(meRes?.role ?? null)
+    } catch (e: any) {
+      setError(e?.message || "Could not read two-factor state")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  async function remove(factorId: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.mfa.unenroll({ factorId })
+      if (error) { setError(error.message); return }
+      await load()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (loading) return null
+
+  const required = role === "superadmin" || role === "support"
+  const enrolled = factors.length > 0
+
+  return (
+    <Section title="Two-factor authentication">
+      <div className="space-y-4">
+        <p className="text-xs text-ink-subtle">
+          {required
+            ? "Required for your role. Your account can reach every company on the platform, so a password on its own is not enough."
+            : "Optional, but once it is on it cannot be skipped — you will be asked for a code every time you sign in."}
+        </p>
+
+        {enrolled ? (
+          <div className="rounded-md border border-line-strong bg-surface p-4">
+            <p className="text-sm font-medium text-ink">Authenticator active</p>
+            <p className="text-xs text-ink-subtle mt-1">
+              You are asked for a code when you sign in.
+            </p>
+            {!required && (
+              <button
+                onClick={() => remove(factors[0].id)}
+                disabled={busy}
+                className="mt-3 text-xs text-danger underline hover:opacity-80 disabled:opacity-50"
+              >
+                {busy ? "Removing…" : "Remove two-factor"}
+              </button>
+            )}
+          </div>
+        ) : (
+          <a
+            href="/security/enrol?next=/admin%3Ftab%3Dsettings"
+            className="inline-block bg-accent hover:bg-accent-ink text-white font-bold rounded-md px-5 py-2 text-sm transition-colors"
+          >
+            Set up two-factor
+          </a>
+        )}
+
+        {error && <p className="text-sm text-danger">{error}</p>}
       </div>
     </Section>
   )

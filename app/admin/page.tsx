@@ -5,6 +5,7 @@ import AdminDashboard from '@/components/admin/AdminDashboard'
 import SupportBanner from '@/components/support/SupportBanner'
 import { getCallerContext } from '@/lib/company-context'
 import { getSupportContacts } from '@/lib/support'
+import { assuranceLevelFromToken, hasVerifiedFactor, mfaOutcome } from '@/lib/mfa'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -18,6 +19,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const ctx = await getCallerContext()
   if (!ctx) redirect('/login')
   if (!DASHBOARD_ROLES.includes(ctx.role)) redirect('/onboarding')
+
+  // The mandatory half of the two-factor policy.
+  //
+  // The step-up check ("has a factor, has not used it") lives in middleware,
+  // because it needs nothing but the token and therefore covers every API route
+  // for free. THIS half needs the role, which the middleware would have to query
+  // on every request to learn, so it is enforced here where ctx.role is already
+  // in hand. See lib/mfa.ts for the policy and lib/supabase/middleware.ts for
+  // why it is split.
+  //
+  // Only "must_enrol" is acted on here; the other outcomes are already handled
+  // upstream by the time a request reaches this page.
+  if (mfaOutcome(ctx.role, {
+    currentLevel: assuranceLevelFromToken((await supabase.auth.getSession()).data.session?.access_token),
+    hasVerifiedFactor: hasVerifiedFactor((await supabase.auth.getUser()).data.user),
+  }) === 'must_enrol') {
+    redirect('/security/enrol?next=/admin')
+  }
 
   // Support users must pick a company first (their effective company comes from
   // the switcher cookie, not their own row).
