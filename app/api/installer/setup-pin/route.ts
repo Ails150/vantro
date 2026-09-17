@@ -50,9 +50,33 @@ export async function POST(request: Request) {
     // has been set yet, so it can't be used to overwrite an existing PIN.
     const { data: user } = await service
       .from('users')
-      .select('id, pin_hash')
+      .select('id, pin_hash, role')
       .ilike('email', escapeLikePattern(String(email).trim()))
       .maybeSingle()
+
+    // FIELD ROLES ONLY, and this was found the hard way.
+    //
+    // A probe against production sent this route an ADMIN's email address with
+    // a four-digit PIN, and it set one — 200, no credential, no invite token.
+    // The route looks a user up by address and sets a PIN if they do not have
+    // one, and it never asked what kind of account it was doing that to.
+    //
+    // An admin signs in with a password, not a PIN. They have no reason to have
+    // one, which means they permanently satisfy the "no PIN yet" condition —
+    // every admin account was standing open to anybody who knew the address.
+    // The PIN would then mint a field token for that person: their jobs, their
+    // hours, sign-ins recorded in their name.
+    //
+    // What this does NOT fix, and is a decision rather than a bug: an installer
+    // who has been invited but has not yet set their PIN can still have it set
+    // by anybody who knows their address. That is the documented new-installer
+    // flow — the invite email says "enter your email and choose a PIN" — and
+    // closing it means issuing a token per invite. Worth doing; bigger than
+    // this commit.
+    const FIELD_ROLES = ['installer', 'subcontractor']
+    if (user && !FIELD_ROLES.includes(String(user.role))) {
+      return NextResponse.json({ error: SETUP_REFUSED }, { status: 401 })
+    }
 
     // ONE ANSWER FOR BOTH FAILURES, and that is the point of this block.
     //

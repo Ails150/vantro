@@ -373,6 +373,72 @@ test.describe("B7: what a failure discloses", () => {
     expect((after.data as any)?.pin_locked_until).toBeNull()
   })
 
+  test("setup-pin refuses to give an ADMIN a PIN", async () => {
+    // Found by a probe against production, not by reading. It sent this route
+    // an admin's address with four digits and got 200 -- a PIN set on an
+    // administrator's account, with no credential and no invite token.
+    //
+    // An admin signs in with a password and has no reason to hold a PIN, which
+    // means they permanently satisfy the route's "no PIN yet" condition. Every
+    // admin account was standing open to anybody who knew the address, and the
+    // PIN would mint a field token in their name.
+    const service = serviceClient()
+    const adminEmail = `security-b7-admin-${Date.now()}@vantro.test`
+    const { data: made } = await service
+      .from("users")
+      .insert({
+        company_id: TENANT_A.id, email: adminEmail, name: "[TEST] b7 admin",
+        initials: "TA", role: "admin", is_active: true,
+      })
+      .select("id")
+      .single()
+    expect(made, "could not create the admin probe").toBeTruthy()
+
+    try {
+      const res = await fetch(`${baseUrl()}/api/installer/setup-pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: adminEmail, pin: "4321" }),
+      })
+      expect(res.status, "an admin account was given a PIN by an anonymous request")
+        .not.toBe(200)
+
+      const { data: after } = await service
+        .from("users").select("pin_hash").eq("id", (made as any).id).single()
+      expect((after as any)?.pin_hash, "a PIN was actually written to an admin account")
+        .toBeFalsy()
+    } finally {
+      await service.from("users").delete().eq("email", adminEmail)
+    }
+  })
+
+  test("and it still works for an installer, which is what it is for", async () => {
+    // The control. Refusing everybody would "fix" the test above and break
+    // onboarding for every new worker.
+    const service = serviceClient()
+    const newbie = `security-b7-newbie-${Date.now()}@vantro.test`
+    const { data: made } = await service
+      .from("users")
+      .insert({
+        company_id: TENANT_A.id, email: newbie, name: "[TEST] b7 newbie",
+        initials: "TN", role: "installer", is_active: true,
+      })
+      .select("id")
+      .single()
+    expect(made).toBeTruthy()
+
+    try {
+      const res = await fetch(`${baseUrl()}/api/installer/setup-pin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: newbie, pin: "4321" }),
+      })
+      expect(res.status, "a new installer can no longer set their PIN").toBe(200)
+    } finally {
+      await service.from("users").delete().eq("email", newbie)
+    }
+  })
+
   test("setup-pin gives one answer whether the address is unknown or already set", async () => {
     // The oracle moved here when it left the sign-in route, and moving it is
     // not removing it. setup-pin used to answer 401 "invite expired" for an
