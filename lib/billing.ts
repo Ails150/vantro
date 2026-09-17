@@ -68,3 +68,47 @@ export function formatTrialDaysRemaining(trialEndsAt: string): number {
   const diff = end.getTime() - Date.now()
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
 }
+
+/**
+ * Why a plan cannot be bought right now.
+ *
+ * `!PLANS[plan]?.priceId` was answering "Invalid plan" to two completely
+ * different situations, and the difference is the difference between a typo and
+ * an outage:
+ *
+ *   - `free` genuinely has no Stripe price and never will.
+ *   - A PAID plan has no price id when STRIPE_PRICE_PAYROLL or
+ *     STRIPE_PRICE_SUITE is not set in the environment.
+ *
+ * The second one happened. Neither variable is set in production -- the ones
+ * that are set are STRIPE_PRICE_STARTER, _GROWTH and _SCALE, from the pricing
+ * model this file's own header says was replaced. So every upgrade and every
+ * checkout returns 400 "Invalid plan", which reads like the caller's fault, and
+ * nobody can pay for Vantro.
+ *
+ * A misconfiguration that reports itself as a client error is a bug that can
+ * run for months, because the logs look like users clicking the wrong thing.
+ */
+export type PurchasableResult =
+  | { ok: true; priceId: string }
+  | { ok: false; reason: "free_plan" | "unknown_plan" | "not_configured"; detail: string }
+
+export function purchasable(plan: Plan): PurchasableResult {
+  const tier = PLANS[plan]
+  if (!tier) {
+    return { ok: false, reason: "unknown_plan", detail: `There is no plan called "${plan}".` }
+  }
+  if (plan === "free") {
+    return { ok: false, reason: "free_plan", detail: "The Free plan has nothing to buy." }
+  }
+  if (!tier.priceId) {
+    return {
+      ok: false,
+      reason: "not_configured",
+      // Names the variable, because the person reading this log is the person
+      // who has to go and set it.
+      detail: `${tier.name} has no Stripe price configured. Set STRIPE_PRICE_${plan.toUpperCase()} and redeploy.`,
+    }
+  }
+  return { ok: true, priceId: tier.priceId }
+}

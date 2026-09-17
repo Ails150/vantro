@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import Stripe from 'stripe'
-import { PLANS } from '@/lib/billing'
+import { purchasable, PLANS } from '@/lib/billing'
 import type { Plan } from '@/lib/plan'
 
 function getStripe(): Stripe {
@@ -16,7 +16,16 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { newPlan } = await request.json() as { newPlan: Plan }
-  if (!PLANS[newPlan]?.priceId) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+  const buyable = purchasable(newPlan)
+  if (!buyable.ok) {
+    // 503, not 400, when the plan is real but unconfigured: it is our
+    // fault, not the caller's, and a 400 hides it in the noise.
+    if (buyable.reason === 'not_configured') {
+      console.error('[billing] plan not purchasable:', buyable.detail)
+      return NextResponse.json({ error: 'That plan is temporarily unavailable. Please contact support.' }, { status: 503 })
+    }
+    return NextResponse.json({ error: 'Invalid plan', detail: buyable.detail }, { status: 400 })
+  }
 
   const service = await createServiceClient()
 
