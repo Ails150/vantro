@@ -168,7 +168,12 @@ design rather than limitation:
    erasure. The record survives; the person is replaced by a stable pseudonym so
    the evidence still hangs together.
 3. **Backups** roll off on their own retention schedule and are not rewritten in
-   place.
+   place. **[TO CONFIRM: what that schedule actually is.** Four documents make
+   this claim and none of them states the window, which makes it a sentence
+   nobody can check — including us. A data subject told their record survives
+   "for a while" is entitled to a number. It is set by the Supabase plan and
+   whether point-in-time recovery is enabled, and has to be read off the
+   dashboard.**]**
 
 The product tells the admin all three at the moment they erase somebody, so the
 answer they give the worker is accurate.

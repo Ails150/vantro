@@ -53,6 +53,12 @@ business can:
   the published page.
 - Whether CNNCTD Ltd holds professional indemnity or cyber insurance, and at
   what limit.
+- **The backup retention window.** `dpa.md`, `terms.md`,
+  `worker-privacy-notice.md` and the published `/legal/terms` all say backups
+  "roll off on their own schedule". None says what the schedule is, so the claim
+  cannot be checked by a reader or by us. Read it off the Supabase dashboard —
+  it depends on the plan and on whether point-in-time recovery is on — and put
+  the number in all four.
 
 ## Where these documents disagree with what is already published
 
