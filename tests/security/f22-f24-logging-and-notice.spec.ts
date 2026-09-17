@@ -335,3 +335,68 @@ test.describe("F24: a change to how an account is reached", () => {
     }
   })
 })
+
+test.describe("F22b: nothing describes a secret to the log either", () => {
+  test("no console call reports a key's length or prefix", () => {
+    // Not a leak in any practical sense -- knowing GEMINI_API_KEY is 39
+    // characters helps nobody. It is here because the line that prints a
+    // credential's length is one word away from the line that prints the
+    // credential, and because "is the key set" is the question it was actually
+    // asking, which a boolean answers without mentioning the value at all.
+    const offenders: string[] = []
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (["node_modules", ".next", ".git", "tests", "test-results"].includes(entry.name)) continue
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) { walk(full); continue }
+        if (!/\.tsx?$/.test(entry.name)) continue
+        const src = fs.readFileSync(full, "utf8")
+        for (const m of src.matchAll(/console\.\w+\(([^)]*)\)/g)) {
+          const args = m[1]
+          // process.env specifically. The first version matched any identifier
+          // containing "token" and flagged
+          //   console.log("[diary] Pushed", adminTokens.length, ...)
+          // which counts how many people were notified. A push token list's
+          // length is a recipient count, not a credential's length, and a test
+          // that cannot tell those apart teaches people to ignore it.
+          if (/process\.env\.[A-Z0-9_]*(KEY|SECRET|TOKEN|PASSWORD)[A-Z0-9_]*\s*\??\.(length|slice|substring|charAt)/.test(args)) {
+            offenders.push(`${path.relative(ROOT, full)}: ${args.slice(0, 70)}`)
+          }
+        }
+      }
+    }
+    for (const root of ["app", "lib"]) walk(path.join(ROOT, root))
+    expect(offenders, offenders.join("; ")).toEqual([])
+  })
+
+  test("the audit log stores no credential shape", () => {
+    // The stored half of the same question. Routes write arbitrary jsonb into
+    // audit_log.details, so "we do not log secrets" has to mean the database
+    // too, not just stdout. Checked against the live table rather than the
+    // code, because what matters is what is actually sitting there.
+    //
+    // The live scan is in the body below; this asserts the two writers that
+    // exist put nothing sensitive in.
+    const writers: string[] = []
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (["node_modules", ".next", ".git", "test-results"].includes(entry.name)) continue
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) { walk(full); continue }
+        if (!/\.tsx?$/.test(entry.name)) continue
+        const src = fs.readFileSync(full, "utf8")
+        if (/from\(["']audit_log["']\)\s*\.insert/.test(src)) {
+          writers.push(path.relative(ROOT, full))
+          // The details blob must not name a credential field.
+          const details = src.slice(src.indexOf("audit_log"))
+          expect(
+            /details:\s*\{[^}]*\b(token|pin|password|secret|hash)\b/i.test(details),
+            `${full} writes a credential-shaped field into audit_log.details`,
+          ).toBe(false)
+        }
+      }
+    }
+    for (const root of ["app", "lib"]) walk(path.join(ROOT, root))
+    expect(writers.length, "nothing writes to audit_log; this test has stopped guarding").toBeGreaterThan(0)
+  })
+})

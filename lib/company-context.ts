@@ -10,6 +10,29 @@ export const SUPPORT_COMPANY_COOKIE = "vantro_support_company"
 // paths ignore the row's own company_id.
 export const PLATFORM_SENTINEL_COMPANY_ID = "00000000-0000-0000-0000-000000000001"
 
+/**
+ * Who may use the dashboard at all.
+ *
+ * Written out by hand in twenty different route files before this existed, in
+ * at least four different spellings and orderings. A list repeated twenty times
+ * is a list that will not be twenty copies for long: the day a role is added,
+ * nineteen of them get it and one does not, and nobody finds out from the code.
+ *
+ * Note what is NOT here. `installer` and `subcontractor` are field roles. They
+ * sign in with a PIN and a field token, not a Supabase session -- but the
+ * invite and magic-link paths do hand some of them a session (app/auth/callback
+ * routes a signed-in installer to /installer/setup), so "they cannot get a
+ * session" is not a control, it is a habit.
+ */
+export const DASHBOARD_ROLES = ["admin", "foreman", "superadmin", "support"] as const
+
+/** Roles that may change company-wide settings, money or people. */
+export const OWNER_ROLES = ["admin", "superadmin", "support"] as const
+
+export function isDashboardRole(role: string | null | undefined): boolean {
+  return (DASHBOARD_ROLES as readonly string[]).includes(String(role))
+}
+
 export type CallerContext = {
   authUserId: string
   userId: string

@@ -1,14 +1,31 @@
 import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getCallerContext, isDashboardRole } from "@/lib/company-context"
 
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  // The one a grep missed and a test caught.
+  //
+  // A search for routes mentioning "role" passed this file, because it selects
+  // users(name, role) from the database. It never READ the caller's role. The
+  // difference between a file that contains the word and a file that checks the
+  // thing is exactly the difference a static scan is bad at and a request with
+  // an installer's cookie is good at.
+  //
+  // What it returns is the live position of every person signed in today:
+  // coordinates from the sign-in, the last GPS breadcrumb, distance from site,
+  // whether they are inside the geofence. Company-scoped, so no other company's
+  // -- but readable by any member of this one, including the people on the map.
+  // A worker being able to pull up where every colleague is standing is the
+  // single most sensitive read in the product.
+  const ctx = await getCallerContext()
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!isDashboardRole(ctx.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  if (!ctx.companyId) return NextResponse.json({ error: "No company selected" }, { status: 400 })
 
   const service = await createServiceClient()
-  const { data: u } = await service.from("users").select("company_id").eq("auth_user_id", user.id).single()
-  if (!u) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  const u = { company_id: ctx.companyId }
 
   // Get all active signins with user and job location.
   // Select signins.lat/lng (captured at sign-in) and within_range/distance so the

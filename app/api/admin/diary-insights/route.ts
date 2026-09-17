@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getCallerContext, isDashboardRole } from "@/lib/company-context"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 export const runtime = "nodejs"
@@ -13,19 +14,25 @@ const TTL_MS = 60 * 60 * 1000
 
 export async function GET(request: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    // Authenticated and company-scoped, but it had no role check.
+    //
+    // This one is worse than the alerts feed it sits next to: it sends the
+    // company's diary entries to Gemini and returns an AI summary of them --
+    // what the crews have been complaining about, where work is slipping, who
+    // is raising problems. That is a management read of the workforce's own
+    // free text, and any signed-in member of the company could ask for it.
+    //
+    // It is also billable. An unguarded route that calls a paid model on every
+    // cache miss is somebody else's bill as well as somebody else's data.
+    const ctx = await getCallerContext()
+    if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!isDashboardRole(ctx.role)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+    if (!ctx.companyId) return NextResponse.json({ error: "No company selected" }, { status: 400 })
 
     const service = await createServiceClient()
-    const { data: userData } = await service
-      .from("users")
-      .select("company_id")
-      .eq("auth_user_id", user.id)
-      .single()
-    if (!userData) return NextResponse.json({ error: "Not found" }, { status: 404 })
-
-    const companyId = userData.company_id
+    const companyId = ctx.companyId
     const { searchParams } = new URL(request.url)
     const force = searchParams.get("refresh") === "1"
 

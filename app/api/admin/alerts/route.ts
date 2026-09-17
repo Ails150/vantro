@@ -1,13 +1,30 @@
 import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getCallerContext, isDashboardRole } from "@/lib/company-context"
 
 export async function GET(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  // Authenticated AND company-scoped, but it had no role check.
+  //
+  // That is not the same as safe. This returns every alert the company has --
+  // geofence breaches, late sign-ins, flagged diary entries with the worker's
+  // own video and photographs attached -- and an installer with a Supabase
+  // session could read the lot. Installers usually authenticate with a PIN and
+  // a field token instead, which is why it went unnoticed, but the invite and
+  // magic-link paths do hand some of them a session: app/auth/callback has a
+  // branch that routes a signed-in installer to /installer/setup.
+  //
+  // Company scoping stops you reading another company's alerts. It does
+  // nothing about reading your own company's management view from the shop
+  // floor, which is what a role check is for.
+  const ctx = await getCallerContext()
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!isDashboardRole(ctx.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  if (!ctx.companyId) return NextResponse.json({ error: "No company selected" }, { status: 400 })
+
   const service = await createServiceClient()
-  const { data: userData } = await service.from("users").select("company_id").eq("auth_user_id", user.id).single()
-  if (!userData) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  const userData = { company_id: ctx.companyId }
 
   // Defaults: unread, last 7 days, max 200.
   // Override with ?days=N (1-365), ?all=true (no time filter), ?includeResolved=true.

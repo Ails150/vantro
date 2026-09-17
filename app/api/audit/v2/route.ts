@@ -274,7 +274,11 @@ export async function POST(request: Request) {
   }
 
   if (aiAuditActive && process.env.GEMINI_API_KEY && !cacheHit) {
-    console.log("[audit/v2] Starting AI generation, key length:", process.env.GEMINI_API_KEY?.length)
+    // Logs THAT the key is configured, not anything about it. The length was
+    // going to the log before, which is not a leak in any practical sense --
+    // but it is a line that answers a question about a credential, and the
+    // edit that turns it into something worse is a one-word edit.
+    console.log("[audit/v2] Starting AI generation, key configured: true")
     try {
       const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" })
