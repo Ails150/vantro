@@ -273,6 +273,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [companyTrades, setCompanyTrades] = useState<Array<{ trade_key: string; label: string; enabled: boolean }>>([])
   const [openIncidents, setOpenIncidents] = useState<any[]>([])
   const [retentionJobs, setRetentionJobs] = useState<any[]>([])
+  const [captured, setCaptured] = useState<{ pence: number; sentence: string } | null>(null)
 
   // Open incidents, for the Today pin. Loaded here rather than inside the tab
   // because the whole point is that they are visible without opening the tab:
@@ -301,6 +302,18 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     fetch("/api/admin/retention")
       .then(r => (r.ok ? r.json() : null))
       .then(d => { if (d && !cancelled) setRetentionJobs(d.jobs || []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // Captured this month, for the one line on Today. Once per load, like
+  // retention: it moves when somebody approves or applies for something, not
+  // by the minute. Refused below Suite and for non-owners, silently.
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/admin/captured")
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d && !cancelled) setCaptured({ pence: d.pence, sentence: d.sentence }) })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
@@ -1457,6 +1470,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             plan={toPlan(company?.plan)}
             nowMs={nowMs}
             onNavigate={setActiveTab}
+            captured={captured}
           />
         )}
 

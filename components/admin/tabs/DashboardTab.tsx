@@ -44,6 +44,12 @@ type Props = {
    */
   nowMs: number
   onNavigate: (tab: string) => void
+  /**
+   * Captured this month and not on a payment application, from
+   * /api/admin/captured. Null until loaded, and for anyone the endpoint
+   * refuses (below Suite, or not an owner) -- the line is simply not drawn.
+   */
+  captured?: { pence: number; sentence: string } | null
 }
 
 /** Action-queue icons. Colour lands here and nowhere else on the row. */
@@ -143,6 +149,7 @@ export default function DashboardTab({
   plan = "free",
   nowMs,
   onNavigate,
+  captured = null,
 }: Props) {
   const peopleThisWeek = React.useMemo(() => {
     return (teamMembers || [])
@@ -215,6 +222,13 @@ export default function DashboardTab({
           hours on this board are verified -- because an upsell that implies the
           numbers above cannot be trusted is an argument against the product. */}
       {plan === "free" && <FreePlanLine onNavigate={onNavigate} />}
+
+      {/* One sentence, one number: what the site recorded this month that is
+          not yet on a payment application. Above the tiles because it is the
+          only figure on this page that is money owed to the company. */}
+      {plan === "suite" && captured && (
+        <CapturedLine captured={captured} onNavigate={onNavigate} />
+      )}
 
       {/* Four tiles, 12px gutters. Label, figure, one line of context. */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -586,6 +600,28 @@ function ShareInviteButton() {
  * Free-plan line. One sentence, one link, no box: it sits between the title
  * and the figures, and must not compete with either.
  */
+function CapturedLine({
+  captured,
+  onNavigate,
+}: {
+  captured: { pence: number; sentence: string }
+  onNavigate: (tab: string) => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onNavigate("variations")}
+      className="group mb-4 flex w-full items-center justify-between gap-3 rounded-lg border border-line bg-canvas px-4 py-3 text-left transition-colors duration-fast ease-out hover:bg-surface-hover"
+    >
+      <span className="text-sm text-ink">
+        <span className="text-xs font-medium uppercase tracking-wide text-ink-subtle">Captured this month</span>
+        <span className="mt-0.5 block">{captured.sentence}</span>
+      </span>
+      <ArrowRight size={14} className="shrink-0 text-ink-subtle transition-transform duration-fast ease-out group-hover:translate-x-0.5" />
+    </button>
+  )
+}
+
 function FreePlanLine({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const days = historyDays("free")
   return (
