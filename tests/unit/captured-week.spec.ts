@@ -60,3 +60,17 @@ test("hours and week labels", () => {
   expect(hoursText(37.25)).toBe("37.3 hours")
   expect(weekLabel("2026-10-26")).toBe("26 Oct to 1 Nov")
 })
+
+test("hours logged are the weekly report's hours: stored hours first, else signed out minus signed in", async () => {
+  // The same summariseWeek the free plan's Friday PDF uses. Open shifts count
+  // for nothing rather than for the hours so far.
+  const { summariseWeek } = await import("../../lib/weekly-report")
+  const shifts = [
+    { user_id: "u1", job_id: "j1", signed_in_at: "2026-09-14T07:00:00Z", signed_out_at: "2026-09-14T15:30:00Z", hours_worked: 8.25 },
+    { user_id: "u2", job_id: "j1", signed_in_at: "2026-09-15T07:00:00Z", signed_out_at: "2026-09-15T16:06:00Z", hours_worked: null },
+    { user_id: "u2", job_id: "j1", signed_in_at: "2026-09-16T07:00:00Z", signed_out_at: null, hours_worked: null },
+  ]
+  const hours = summariseWeek("Holts", "2026-09-14", shifts, null).totalHours
+  expect(hours).toBeCloseTo(8.25 + 9.1, 6)
+  expect(capturedWeekLines({ ...week, hoursLogged: hours })[3]).toBe("17.4 hours logged")
+})
