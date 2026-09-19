@@ -134,6 +134,12 @@ async function emailLink(a: {
   if (!key) return { ok: false, why: "RESEND_API_KEY is not set" }
   const what = a.kind === "daywork" ? "daywork sheet" : "variation"
   const esc = (s: string) => s.replace(/[&<>"']/g, ch => `&#${ch.charCodeAt(0)};`)
+  // Names are whatever somebody typed. Resend refuses a subject over 2000
+  // characters, and a refused email is a link nobody receives; found by the
+  // worked example on a tenant whose job names are two million characters.
+  const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
+  const jobName = clip(a.jobName.replace(/\s+/g, " ").trim(), 80)
+  const companyName = clip(a.companyName.replace(/\s+/g, " ").trim(), 80)
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -142,17 +148,17 @@ async function emailLink(a: {
         from: "Vantro <noreply@getvantro.com>",
         to: [a.to],
         ...(a.replyTo ? { reply_to: a.replyTo } : {}),
-        subject: `${a.companyName}: ${what} ${a.reference} on ${a.jobName} for your signature`,
+        subject: `${companyName}: ${what} ${a.reference} on ${jobName} for your signature`,
         html: `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px">
-          <h2 style="color:#0A1A14;font-size:1.3rem;margin-bottom:12px">${esc(a.reference)} &middot; ${esc(a.jobName)}</h2>
+          <h2 style="color:#0A1A14;font-size:1.3rem;margin-bottom:12px">${esc(a.reference)} &middot; ${esc(jobName)}</h2>
           <p style="color:#4A6158;line-height:1.6">
-            ${esc(a.companyName)} has sent you a ${what} for ${esc(a.price)} to review and sign.
+            ${esc(companyName)} has sent you a ${what} for ${esc(a.price)} to review and sign.
             It includes the description, photographs and hours recorded on site.
           </p>
           <a href="${a.url}" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;margin:16px 0">Review and sign</a>
           <p style="color:#888;font-size:12px;line-height:1.5">
             The link is personal to you and works for 30 days. You can also decline it with a reason.
-            Replies to this email go to ${esc(a.companyName)}.
+            Replies to this email go to ${esc(companyName)}.
           </p>
         </div>`,
       }),
