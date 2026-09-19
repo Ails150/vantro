@@ -79,12 +79,13 @@ type Application = {
   totalPence: number
 }
 
-type Filter = "open" | "pending" | "sent" | "signed" | "invoiced" | "closed" | "all"
+type Filter = "open" | "pending" | "approved" | "sent" | "signed" | "invoiced" | "closed" | "all"
 
 const FILTERS: Array<{ id: Filter; label: string; match: (v: Variation) => boolean }> = [
   { id: "open", label: "In progress", match: v => ["pending", "approved", "sent", "signed"].includes(v.status) },
   { id: "pending", label: "Needs pricing", match: v => v.status === "pending" },
-  { id: "sent", label: "Awaiting signature", match: v => v.status === "sent" || v.status === "approved" },
+  { id: "approved", label: "Approved, not sent", match: v => v.status === "approved" },
+  { id: "sent", label: "Awaiting signature", match: v => v.status === "sent" },
   { id: "signed", label: "Signed", match: v => v.status === "signed" },
   { id: "invoiced", label: "On an application", match: v => v.status === "invoiced" },
   { id: "closed", label: "Rejected or declined", match: v => v.status === "rejected" || v.status === "declined" },
@@ -250,7 +251,7 @@ function VariationCard({ v, onChanged }: { v: Variation; onChanged: () => void }
   const closed = v.status === "rejected" || v.status === "declined" || v.status === "invoiced"
 
   return (
-    <div className={`rounded-lg border p-4 ${v.status === "pending" ? "border-warning/50" : "border-line"} bg-surface ${v.status === "rejected" ? "opacity-70" : ""}`}>
+    <div className={`rounded-lg border p-4 ${v.status === "pending" ? "border-warn/50" : "border-line"} bg-surface ${v.status === "rejected" ? "opacity-70" : ""}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h3 className="truncate font-semibold text-ink">
@@ -427,7 +428,7 @@ function Applications({ applications, onChanged }: { applications: Application[]
                 {a.submittedAt ? ` · submitted ${shortDate(a.submittedAt)}` : ""}
               </p>
             </div>
-            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${a.status === "draft" ? "bg-warning/20 text-warning" : "bg-ok-wash text-ok"}`}>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${a.status === "draft" ? "bg-warn-wash text-warn" : "bg-ok-wash text-ok"}`}>
               {a.status === "draft" ? "Draft" : "Submitted"}
             </span>
           </div>
@@ -491,7 +492,7 @@ function Figure({ label, value, sub, tone }: { label: string; value: string; sub
   return (
     <div className="rounded-lg border border-line bg-surface p-4">
       <p className="text-xs uppercase tracking-wide text-ink-subtle">{label}</p>
-      <p className={`num mt-1 text-2xl font-bold ${tone === "warning" ? "text-warning" : "text-ink"}`}>{value}</p>
+      <p className={`num mt-1 text-2xl font-bold ${tone === "warning" ? "text-warn" : "text-ink"}`}>{value}</p>
       {sub && <p className="mt-0.5 text-xs text-ink-subtle">{sub}</p>}
     </div>
   )
@@ -499,7 +500,7 @@ function Figure({ label, value, sub, tone }: { label: string; value: string; sub
 
 function badgeTone(status: string): string {
   switch (status) {
-    case "pending": return "bg-warning/20 text-warning"
+    case "pending": return "bg-warn-wash text-warn"
     case "sent": return "bg-accent-wash text-accent-ink"
     case "signed": return "bg-ok-wash text-ok"
     case "declined": return "bg-danger/15 text-danger"
