@@ -31,6 +31,10 @@
       "schedule": "0 16,17 * * 5"
     },
     {
+      "path": "/api/cron/captured-week",
+      "schedule": "0 16,17 * * 5"
+    },
+    {
       "path": "/api/cron/overlap-check",
       "schedule": "15 2 * * *"
     },
