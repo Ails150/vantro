@@ -24,7 +24,7 @@ import type { LucideIcon } from "lucide-react"
 import {
   BadgeCheck, Banknote, Bell, BookOpen, Briefcase, Building2, Calendar,
   CreditCard,
-  CalendarClock, ChartColumn, FileSearch, Footprints, Gauge, HardHat, LayoutDashboard,
+  CalendarClock, ChartColumn, FilePenLine, FileSearch, Footprints, Gauge, HardHat, LayoutDashboard,
   LifeBuoy, ListChecks, Map, MapPinned, PiggyBank, Settings, ShieldCheck, Siren, TrendingUp, TriangleAlert,
   Users, Wrench,
 } from "lucide-react"
@@ -97,8 +97,12 @@ const manageTabs: AdminTab[] = [
 // Tab ids are unchanged, so every ?tab= link, every stored last-tab and every
 // hiddenTabs entry still resolves. Only the grouping moved, which is exactly
 // what this file's header says is safe to change.
+//
+// Variations sits between them: it is the money the company is owed for work
+// outside the contract, and it ends on a payment application.
 const moneyTabs: AdminTab[] = [
   { id: "payroll", label: "Payroll", icon: Banknote },
+  { id: "variations", label: "Variations", icon: FilePenLine },
   { id: "retention", label: "Retention", icon: PiggyBank },
 ]
 

@@ -72,6 +72,11 @@ export type Feature =
    * thing.
    */
   | "retentionTracking"
+  /**
+   * Variations and dayworks: raised on site, priced, signed by the main
+   * contractor, and carried onto a payment application.
+   */
+  | "variations"
 
 /** The lowest plan that includes each feature. */
 const MINIMUM: Record<Feature, Plan> = {
@@ -93,6 +98,7 @@ const MINIMUM: Record<Feature, Plan> = {
   walkthroughs: "suite",
   subcontractors: "suite",
   retentionTracking: "suite",
+  variations: "suite",
 }
 
 /**
@@ -154,6 +160,7 @@ export const TAB_FEATURE: Record<string, Feature> = {
   walkthroughs: "walkthroughs",
   subcontractors: "subcontractors",
   retention: "retentionTracking",
+  variations: "variations",
 }
 
 export function canSeeTab(plan: Plan | null | undefined, tabId: string): boolean {

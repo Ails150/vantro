@@ -222,4 +222,10 @@ export const LIMITS = {
   webhookBadSignature: { max: 10, windowSeconds: 3600 },
   /** Inbound support provisioning, which carries a shared secret. */
   supportProvision: { max: 10, windowSeconds: 3600 },
+  /**
+   * Signing or declining a variation from an emailed link, by IP. A main
+   * contractor signs a handful in a sitting; the token is 256 bits, so this is
+   * about stopping a loop, not about guessing.
+   */
+  variationSign: { max: 30, windowSeconds: 3600 },
 } as const

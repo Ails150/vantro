@@ -16,6 +16,7 @@ import ToolboxTalksTab from "@/components/admin/ToolboxTalksTab"
 import RamsTab from "@/components/admin/RamsTab"
 import IncidentsTab from "@/components/admin/IncidentsTab"
 import RetentionTab from "@/components/admin/RetentionTab"
+import VariationsTab from "@/components/admin/VariationsTab"
 import JobRetentionCard from "@/components/admin/JobRetentionCard"
 import TeamRateField from "@/components/admin/TeamRateField"
 import WorkerDataRights from "@/components/admin/WorkerDataRights"
@@ -87,6 +88,12 @@ interface Props {
   serverNow: number
 }
 
+/**
+ * Tabs gated by plan in the nav. Only tabs that are new -- see the comment at
+ * the filter below for why the older ones are not in this list.
+ */
+const NEW_GATED_TABS = new Set(["retention", "variations"])
+
 export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid, support, serverNow }: Props) {
   // One clock for the whole dashboard. It reads `serverNow` on the first
   // render -- matching the server HTML exactly -- then switches to the real
@@ -115,7 +122,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
             // real product decision and not one that belongs in a commit about
             // retention. Retention is gated because it is new: nobody can lose
             // a tab they have never seen.
-            .filter(t => t.id !== "retention" || canSeeTab(companyPlan, t.id)),
+            //
+            // Variations joins it on the same terms: new, Suite-only, and never
+            // shown to anyone below Suite before.
+            .filter(t => !NEW_GATED_TABS.has(t.id) || canSeeTab(companyPlan, t.id)),
         }))
         .filter(g => g.items.length > 0),
     [vertical, companyPlan],
@@ -2558,6 +2568,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "rams" && <RamsTab jobs={jobs.map((j: any) => ({ id: j.id, name: j.name }))} />}
         {activeTab === "incidents" && <IncidentsTab />}
         {activeTab === "retention" && <RetentionTab />}
+        {activeTab === "variations" && <VariationsTab />}
         {activeTab === "settings" && <SettingsTab isSuperadmin={viewerIsSuperadmin} />}
 
         {activeTab === "support" && <SupportTab />}
