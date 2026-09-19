@@ -209,7 +209,7 @@ function RetentionRow({
           : job.state === "claimable"
             ? "border-danger/60 bg-surface"
             : job.state === "due_soon"
-              ? "border-warning/50 bg-surface"
+              ? "border-warn/50 bg-surface"
               : "border-line bg-surface")
       }
     >
@@ -299,7 +299,7 @@ function StateBadge({ state }: { state: RetentionState }) {
     state === "claimable"
       ? "bg-danger/15 text-danger"
       : state === "due_soon"
-        ? "bg-warning/20 text-warning"
+        ? "bg-warn/20 text-warn"
         : state === "released"
           ? "bg-surface-hover text-ink-subtle"
           : "bg-surface-hover text-ink-subtle"
@@ -323,7 +323,7 @@ function Figure({
       <p
         className={
           "num text-2xl font-bold mt-1 " +
-          (tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : "text-ink")
+          (tone === "danger" ? "text-danger" : tone === "warning" ? "text-warn" : "text-ink")
         }
       >
         {value}
