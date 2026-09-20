@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import crypto from 'crypto'
 import { escapeLikePattern } from '@/lib/sql-escape'
+import { canHoldPin } from '@/lib/roles'
 
 export async function POST(request: Request) {
   const { email } = await request.json()
@@ -17,8 +18,26 @@ export async function POST(request: Request) {
   }
 
   const service = await createServiceClient()
-  const { data: user } = await service.from('users').select('id, name, email').ilike('email', escapeLikePattern(email.trim())).single()
+  const { data: user } = await service.from('users').select('id, name, email, role').ilike('email', escapeLikePattern(email.trim())).single()
   if (!user) return NextResponse.json({ success: true }) // silent fail for security
+
+  // THE SAME ALLOWLIST setup-pin ENFORCES, because this route reached the same
+  // end by a longer road. setup-pin refuses to put a PIN on an office account:
+  // an admin signs in with a password, has no reason to hold a PIN, and a PIN
+  // on their row mints a field token in their name. Forgot-PIN asked only
+  // whether the address existed, so anybody who knew an admin's email could
+  // have a reset link sent to that admin's inbox and, if they could read it,
+  // set a four-digit PIN on an administrator account.
+  //
+  // The refusal is SILENT and identical to the unknown-address answer above.
+  // Saying "that account cannot have a PIN" would turn this route into the
+  // account oracle the rest of the PIN paths were hardened to close: ask it
+  // about an address and it would tell you whether that person runs the
+  // company. Nothing is written and no email goes.
+  if (!canHoldPin(user.role)) {
+    console.warn('[reset-pin] refused for a non-field role')
+    return NextResponse.json({ success: true })
+  }
 
   const token = crypto.randomBytes(32).toString('hex')
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
