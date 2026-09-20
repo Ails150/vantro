@@ -62,3 +62,25 @@ test.describe("who may hold a PIN", () => {
     expect(mayHoldPin({ role: "admin", works_on_site: null })).toBe(false)
   })
 })
+
+test.describe("the company name signup no longer asks for", () => {
+  test("a business domain becomes the business", async () => {
+    const { companyNameFromEmail } = await import("../../lib/provisioning")
+    expect(companyNameFromEmail("dan@barrow-glazing.co.uk")).toBe("Barrow Glazing")
+    expect(companyNameFromEmail("dan@barrowglazing.co.uk")).toBe("Barrowglazing")
+    expect(companyNameFromEmail("office@kestrel.construction")).toBe("Kestrel")
+  })
+
+  test("a public mailbox falls back to the person, never 'Gmail'", async () => {
+    const { companyNameFromEmail } = await import("../../lib/provisioning")
+    expect(companyNameFromEmail("dan.mercer@gmail.com")).toBe("Dan Mercer")
+    expect(companyNameFromEmail("dan_mercer@hotmail.co.uk")).toBe("Dan Mercer")
+  })
+
+  test("nonsense in, something usable out", async () => {
+    const { companyNameFromEmail } = await import("../../lib/provisioning")
+    expect(companyNameFromEmail("")).toBe("My company")
+    expect(companyNameFromEmail("@nothing.com")).toBe("My company")
+    expect(companyNameFromEmail("nodomain")).toBe("My company")
+  })
+})
