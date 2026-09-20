@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toVertical, verticalConfig } from "@/lib/vertical"
 
@@ -53,6 +53,23 @@ export default function SetupWizard({
 
   const hasJob = jobsCount > 0
   const hasWorker = teamCount > 0 || soloDone
+
+  // SETUP FINISHES ITSELF. The requirement is one job; when the page loads and
+  // that is true, there is nothing left for a "Go to dashboard" tap to decide.
+  // A confirmation button whose only possible answer is yes is a tax on
+  // somebody who has already done the thing.
+  //
+  // It still shows the card for a moment, and the button stays as the manual
+  // way out if this ever fails -- a first run must not be able to strand
+  // somebody on a screen that is trying and failing to leave itself.
+  const [autoCompleting, setAutoCompleting] = useState(false)
+  useEffect(() => {
+    if (!hasJob || autoCompleting || completing) return
+    setAutoCompleting(true)
+    fetch("/api/admin/setup/complete", { method: "POST" })
+      .then(res => { if (res.ok) router.push("/admin") })
+      .catch(() => { /* the button below is still there */ })
+  }, [hasJob, autoCompleting, completing, router])
 
   async function completeOnboarding() {
     setCompleting(true)
@@ -198,7 +215,8 @@ export default function SetupWizard({
             <>
               <h3 className="font-semibold text-gray-900 mb-1">That is enough to start.</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Working hours and who works where are on the dashboard when you want them.
+                Taking you to your dashboard. Working hours and who works where are waiting there
+                when you want them.
               </p>
             </>
           ) : (

@@ -25,6 +25,7 @@ import { NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import { createServiceClient } from "@/lib/supabase/server"
 import { getCallerContext, OWNER_ROLES } from "@/lib/company-context"
+import { maybeCompleteSetup } from "@/lib/setup-complete"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -99,6 +100,9 @@ export async function POST(request: Request) {
     if (assignErr) console.error("[setup/solo] assignment failed:", assignErr.message)
     else assigned = toAdd.length
   }
+
+  // If they did this after adding their job, they are done.
+  await maybeCompleteSetup(service, ctx.companyId)
 
   console.log(`[setup/solo] company=${ctx.companyId} owner set up as a worker, ${assigned} job(s) assigned`)
   return NextResponse.json({ ok: true, assignedJobs: assigned + already.size })

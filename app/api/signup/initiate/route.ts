@@ -4,7 +4,7 @@ import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import Stripe from 'stripe'
 import { PLANS } from '@/lib/billing'
 import type { Plan } from '@/lib/plan'
-import { generateSlug, getInitials, defaultSchedule as makeDefaultSchedule } from '@/lib/provisioning'
+import { generateSlug, getInitials, defaultSchedule as makeDefaultSchedule, companyNameFromEmail } from '@/lib/provisioning'
 import { acceptanceColumns } from '@/lib/legal'
 
 /**
@@ -120,7 +120,12 @@ export async function POST(request: Request) {
   if (!email?.trim()) {
     return NextResponse.json({ error: 'Email is required' }, { status: 400 })
   }
-  if (!companyName?.trim()) {
+  // NOT REQUIRED ANY MORE on the free path. A company name is four keystrokes
+  // between somebody and the product, for a field they can correct in Settings
+  // in less time than it takes to type. It is derived from the address instead
+  // and the dashboard asks them to confirm it. The paid path still collects it
+  // because Stripe puts it on an invoice.
+  if (!isFree && !companyName?.trim()) {
     return NextResponse.json({ error: 'Company name is required' }, { status: 400 })
   }
   if (!PLANS[plan as Plan]) {
@@ -148,6 +153,8 @@ export async function POST(request: Request) {
     .replace(/\b\w/g, (c: string) => c.toUpperCase())
     .trim() || 'Admin'
   const adminDisplayName = (yourName?.trim() || derivedName)
+  // What the company is called until somebody says otherwise.
+  const effectiveCompanyName = companyName?.trim() || companyNameFromEmail(String(email))
 
   const tier = PLANS[plan as Plan]
   const service = await createServiceClient()
@@ -164,7 +171,7 @@ export async function POST(request: Request) {
     email_confirm: true, // Auto-confirm; we'll trust Stripe's verification of the email
     user_metadata: {
       full_name: adminDisplayName,
-      company_name: companyName.trim(),
+      company_name: effectiveCompanyName,
       pending_plan: plan,
       ...(isFree ? {} : { pending_team_size: teamSize }),
     },
@@ -192,13 +199,13 @@ export async function POST(request: Request) {
   // created directly. Everything else about the company is identical, which is
   // what lets an upgrade later be a plan change rather than a migration.
   if ((plan as Plan) === 'free') {
-    const slug = generateSlug(companyName.trim())
+    const slug = generateSlug(effectiveCompanyName)
     const defaultSchedule = makeDefaultSchedule()
 
     const { data: company, error: compErr } = await service
       .from('companies')
       .insert({
-        name: companyName.trim(),
+        name: effectiveCompanyName,
         slug,
         plan: 'free',
         subscription_status: 'free',
@@ -270,10 +277,10 @@ export async function POST(request: Request) {
   // Step 2: Create Stripe customer immediately so we can attach metadata
   const customer = await getStripe().customers.create({
     email: email.toLowerCase().trim(),
-    name: companyName.trim(),
+    name: effectiveCompanyName,
     metadata: {
       auth_user_id: authUserId,
-      company_name: companyName.trim(),
+      company_name: effectiveCompanyName,
       admin_name: adminDisplayName,
       plan,
       team_size: String(teamSize),
@@ -296,7 +303,7 @@ export async function POST(request: Request) {
         },
         metadata: {
           auth_user_id: authUserId,
-          company_name: companyName.trim(),
+          company_name: effectiveCompanyName,
           admin_name: adminDisplayName,
           admin_email: email.toLowerCase().trim(),
           plan,
@@ -308,7 +315,7 @@ export async function POST(request: Request) {
       cancel_url: `${appUrl}/signup?cancelled=true`,
       metadata: {
         auth_user_id: authUserId,
-        company_name: companyName.trim(),
+        company_name: effectiveCompanyName,
         plan,
         // The paid company is created by the checkout webhook, minutes later
         // and in a different process. The acceptance happened HERE, when the

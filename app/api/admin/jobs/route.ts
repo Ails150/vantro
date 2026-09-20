@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from "next/server"
 import { maybeAutoAssignSoleWorker } from "@/lib/auto-assign"
+import { maybeCompleteSetup } from "@/lib/setup-complete"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // True if a Postgres/PostgREST error is about a given column not existing.
@@ -69,6 +70,10 @@ export async function POST(request: Request) {
   // One job, one worker, nobody linked: link them. An unassigned worker sees
   // an empty app and is told nothing about why.
   await maybeAutoAssignSoleWorker(service, u.company_id)
+
+  // The first job is the whole requirement to finish setup, so finishing it is
+  // this route's job rather than a button's.
+  await maybeCompleteSetup(service, u.company_id)
 
   return NextResponse.json({ id: data?.id })
 }

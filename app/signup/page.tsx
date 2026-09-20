@@ -19,7 +19,6 @@ import { PLANS, SIGNUP_PLAN } from '@/lib/billing'
 import { DPA_URL, PRIVACY_URL, TERMS_URL } from '@/lib/legal'
 
 export default function SignupPage() {
-  const [companyName, setCompanyName] = useState('')
   const [email, setEmail] = useState('')
   // Unticked, and it stays unticked until somebody ticks it. A pre-ticked box
   // is not agreement: UK GDPR recital 32 and the Consumer Rights Act both say
@@ -43,7 +42,6 @@ export default function SignupPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: email.trim(),
-          companyName: companyName.trim(),
           plan: SIGNUP_PLAN,
           // The server checks this again and refuses without it. The checkbox
           // is how a person agrees; this field is only how that fact travels,
@@ -118,19 +116,6 @@ export default function SignupPage() {
           <div className="bg-[#1a2635] border border-white/5 rounded-2xl p-8">
             <h1 className="text-xl font-semibold text-white mb-6">Create your account</h1>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-[#8fa3b8] mb-2">Company name</label>
-                <input
-                  type="text"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  placeholder="e.g. Smith Glazing Ltd"
-                  required
-                  disabled={loading}
-                  data-testid="signup-company"
-                  className="w-full bg-[#243040] border border-white/5 rounded-xl px-4 py-3 text-white placeholder-[#4d6478] focus:outline-none focus:border-[#00d4a0]/40 text-sm disabled:opacity-60"
-                />
-              </div>
 
               <div>
                 <label className="block text-sm font-medium text-[#8fa3b8] mb-2">Work email</label>

@@ -1054,7 +1054,19 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
   async function addJob() {
     if (!jobName.trim()) { setFormError("Enter a job name"); return }
-    if (!jobPlaceSelected && !jobDistanceKm.trim()) { setFormError("Select an address from the dropdown, or enter a distance from site for remote locations with no address"); return }
+    // NO ADDRESS REQUIRED. The job form used to refuse to save without a
+    // Places-verified address or a distance-from-site, which is a geography
+    // exam standing between somebody and their first job. The server has never
+    // needed it: a job with no coordinates is anchored by the FIRST sign-in,
+    // from the worker's own GPS (app/api/signin/route.ts), and the geofence is
+    // skipped for that one shift. So an address is worth asking for and not
+    // worth refusing over.
+    // NO ADDRESS REQUIRED. This used to refuse to save without a
+    // Places-verified address or a distance-from-site: a geography exam
+    // between somebody and their first job. The server never needed it -- a
+    // job with no coordinates is anchored by the FIRST sign-in, from the
+    // worker's own GPS (app/api/signin/route.ts), and the geofence is skipped
+    // for that one shift. Worth asking for, not worth refusing over.
     setSaving(true); setFormError("")
     const createRes = await fetch("/api/admin/jobs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: jobName.trim(), address: jobAddress.trim(), status: "active", checklist_template_id: jobTemplateId || null, lat: jobLat, lng: jobLng, gps_source: (jobLat != null && jobLng != null) ? "manual" : null, start_time: jobStartTime, sign_out_time: jobSignOutTime, distance_from_site_km: jobDistanceKm.trim() === "" ? null : Number(jobDistanceKm), contractor: jobContractor.trim() || null, geofence_radius_metres: jobGeofenceRadius.trim() === "" ? null : Number(jobGeofenceRadius), required_trades: multiTradeEnabled ? jobRequiredTrades : null }) })
     const createData = await createRes.json().catch(() => ({}))
@@ -1583,7 +1595,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                     <input data-testid="job-name" value={jobName} onChange={e => setJobName(e.target.value)} placeholder="Job name" className={field}/>
                   </div>
                   <div>
-                    <label className={fieldLabel}>Address</label>
+                    <label className={fieldLabel}>Address <span className="font-normal text-ink-subtle">(optional &mdash; the first sign-in pins the job by GPS)</span></label>
                     <div className="relative">
                       <input ref={addAddressRef} value={jobAddress} onChange={e => { setJobAddress(e.target.value); setJobPlaceSelected(false) }} placeholder="Start typing, then select from the dropdown" className={field}/>
                       {jobAddress && (
