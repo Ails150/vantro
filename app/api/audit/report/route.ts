@@ -4,6 +4,7 @@ import Anthropic from "@anthropic-ai/sdk"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 import { fetchAuditData } from "@/lib/audit/data"
+import { attendanceCells } from "@/lib/audit/attendance"
 import { createPackRecord, type PackIntegrity } from "@/lib/audit/pack"
 
 import { formatDateTime, formatIn, formatTime } from "@/lib/format-time"
@@ -409,6 +410,10 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
 
   // Sections
   const attendanceRows = signins.map((s: any) => {
+    // A shift that is still running, or one too short to round to 0.1h, said
+    // "—" in both columns -- a gap where a figure belongs, in the document
+    // somebody reads before paying for the work. See lib/audit/attendance.ts.
+    const cells = attendanceCells(s, fmtDateTime)
     const flags: string[] = []
     if (s.auto_closed) flags.push(`<span class="chip chip-warn">Auto-closed</span>`)
     if (s.departed_early) flags.push(`<span class="chip chip-warn">Early ${s.early_departure_minutes ? `(${s.early_departure_minutes}m)` : ""}</span>`)
@@ -419,8 +424,8 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
       <tr>
         <td>${escapeHtml(s.users?.name || "Unknown")}</td>
         <td>${fmtDateTime(s.signed_in_at)}<br><span class="muted">${s.distance_from_site_metres != null ? "GPS " + s.distance_from_site_metres + "m" : "GPS not recorded"}</span></td>
-        <td>${fmtDateTime(s.signed_out_at)}<br><span class="muted">${s.sign_out_distance_metres != null ? "GPS " + s.sign_out_distance_metres + "m" : s.signed_out_at ? "GPS not recorded" : ""}</span></td>
-        <td class="num">${s.hours_worked ? Number(s.hours_worked).toFixed(1) + "h" : "—"}</td>
+        <td>${cells.inProgress ? `<span class="chip chip-warn">${cells.signedOut}</span>` : escapeHtml(cells.signedOut)}<br><span class="muted">${s.sign_out_distance_metres != null ? "GPS " + s.sign_out_distance_metres + "m" : s.signed_out_at ? "GPS not recorded" : ""}</span></td>
+        <td class="num">${escapeHtml(cells.hours)}</td>
         <td>${flags.join(" ") || "—"}</td>
         <td>${s.flag_reason ? `<span class="muted">${escapeHtml(s.flag_reason)}</span>` : ""}</td>
       </tr>`
