@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { getCallerContext } from "@/lib/company-context"
 import { FIELD_ROLE, FIELD_ROLES, normaliseRole } from '@/lib/roles'
 import { getInitials } from '@/lib/provisioning'
+import { maybeAutoAssignSoleWorker } from '@/lib/auto-assign'
 import { parseRate } from "@/lib/pay"
 
 // Accepts the legacy word on input for one release, stores the new one.
@@ -68,6 +69,9 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ error: "Could not add team member", detail: error.message }, { status: 400 })
   }
+
+  // The worker who completes the only pairing there is gets linked to it.
+  await maybeAutoAssignSoleWorker(service, ctx.companyId)
 
   return NextResponse.json({ success: true, member: inserted })
 }

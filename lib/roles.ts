@@ -67,6 +67,24 @@ export function canHoldPin(role?: string | null): boolean {
   return PIN_ROLES.includes(String(role || ''))
 }
 
+/**
+ * The whole question, for one account: may this person hold a PIN?
+ *
+ * A field role may. So may an office account whose owner has said they also
+ * work on site (users.works_on_site) -- the solo subcontractor who is the
+ * company and the crew, and who otherwise has to choose between running the
+ * business and being able to sign in to their own job.
+ *
+ * That flag is set from an authenticated dashboard session by the person
+ * themselves. It is NOT inferred from already having a PIN: an account with no
+ * PIN permanently satisfies "has no PIN yet", which is precisely how anybody
+ * who knew an admin's email address could put one on their account.
+ */
+export function mayHoldPin(user: { role?: string | null; works_on_site?: boolean | null } | null | undefined): boolean {
+  if (!user) return false
+  return canHoldPin(user.role) || user.works_on_site === true
+}
+
 /** visit_assignments.role: what a person is on a visit, not their account role. */
 export const VISIT_ROLE_DEFAULT = 'operative'
 export const LEGACY_VISIT_ROLE = 'installer'

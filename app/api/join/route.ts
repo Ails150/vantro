@@ -14,6 +14,7 @@
 // else -- it cannot name them, promote them, or reach another tenant.
 
 import { NextResponse } from "next/server"
+import { maybeAutoAssignSoleWorker } from "@/lib/auto-assign"
 import { createServiceClient } from "@/lib/supabase/server"
 import { createFieldToken, verifyInviteToken } from "@/lib/auth"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
@@ -111,6 +112,10 @@ export async function POST(request: Request) {
 
   // Persistent, because this worker has no password and no PIN to fall back
   // on. See FieldTokenLife in lib/auth.
+  // Somebody joining from the invite link is very often the only worker on
+  // the only job. Link them rather than showing an empty app.
+  await maybeAutoAssignSoleWorker(service, invite.companyId)
+
   const fieldToken = createFieldToken(userId, invite.companyId, null, "persistent")
 
   return NextResponse.json({ token: fieldToken, userId, name: fullName })

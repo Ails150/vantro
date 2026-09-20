@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server"
+import { maybeAutoAssignSoleWorker } from "@/lib/auto-assign"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // True if a Postgres/PostgREST error is about a given column not existing.
@@ -65,6 +66,10 @@ export async function POST(request: Request) {
       { status: 400 }
     )
   }
+  // One job, one worker, nobody linked: link them. An unassigned worker sees
+  // an empty app and is told nothing about why.
+  await maybeAutoAssignSoleWorker(service, u.company_id)
+
   return NextResponse.json({ id: data?.id })
 }
 

@@ -17,6 +17,7 @@ import RamsTab from "@/components/admin/RamsTab"
 import IncidentsTab from "@/components/admin/IncidentsTab"
 import RetentionTab from "@/components/admin/RetentionTab"
 import VariationsTab from "@/components/admin/VariationsTab"
+import VerticalPrompt from "@/components/admin/VerticalPrompt"
 import JobRetentionCard from "@/components/admin/JobRetentionCard"
 import TeamRateField from "@/components/admin/TeamRateField"
 import WorkerDataRights from "@/components/admin/WorkerDataRights"
@@ -86,6 +87,11 @@ interface Props {
   support: SupportContacts
   /** Server render timestamp. Every relative time below is measured from it. */
   serverNow: number
+  /**
+   * How many working-hours patterns exist. Setup used to refuse to finish
+   * without one; Today asks for them instead, which needs the count.
+   */
+  schedulesCount?: number
 }
 
 /**
@@ -94,7 +100,7 @@ interface Props {
  */
 const NEW_GATED_TABS = new Set(["retention", "variations"])
 
-export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid, support, serverNow }: Props) {
+export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid, support, serverNow, schedulesCount = 0 }: Props) {
   // One clock for the whole dashboard. It reads `serverNow` on the first
   // render -- matching the server HTML exactly -- then switches to the real
   // clock after hydration and ticks once a minute.
@@ -274,6 +280,10 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const [openIncidents, setOpenIncidents] = useState<any[]>([])
   const [retentionJobs, setRetentionJobs] = useState<any[]>([])
   const [captured, setCaptured] = useState<{ pence: number; sentence: string } | null>(null)
+  // "What does your team do?" used to be step one of setup. It is asked here
+  // instead, on the first screen whose wording depends on the answer, and only
+  // when nobody has actually answered it -- the column always has a value.
+  const [verticalAnswered, setVerticalAnswered] = useState<boolean>(!!company?.vertical_set_at)
 
   // Open incidents, for the Today pin. Loaded here rather than inside the tab
   // because the whole point is that they are visible without opening the tab:
@@ -649,6 +659,24 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         sub: "",
         tab: "jobs",
         severity: "medium",
+      },
+      // The two steps that used to lock the setup wizard. They are real work
+      // and they matter later; they are not a reason to stand between somebody
+      // and their first job, so they live here as setup tasks instead.
+      jobAssignments.length === 0 && jobs.some((j: any) => j.status === "active") &&
+        teamMembers.some((m: any) => isFieldOrSupervisor(m.role) && m.is_active !== false) && {
+        key: "assignments",
+        label: "Nobody is assigned to a job yet",
+        sub: "A worker with no assignment sees an empty app",
+        tab: "jobs",
+        severity: "medium",
+      },
+      schedulesCount === 0 && teamMembers.some((m: any) => isFieldOrSupervisor(m.role) && m.is_active !== false) && {
+        key: "hours",
+        label: "No working hours set",
+        sub: "Setup task — needed for lateness and payroll, not for capture",
+        tab: "schedule",
+        severity: "low",
       },
       unspecifiedJobs.length > 0 && {
         key: "trades",
@@ -1485,6 +1513,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
 
         {activeTab === "jobs" && (
           <PageTransition>
+            {!verticalAnswered && (
+              <VerticalPrompt current={company?.vertical} onSaved={() => setVerticalAnswered(true)} />
+            )}
             <PageHeader
               title="Jobs"
               description="Every site on the books, who is on it, and what is missing."

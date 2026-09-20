@@ -63,6 +63,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     jobAssignmentsResult,
     checklistTemplatesResult,
     diaryEntriesResult,
+    schedulesResult,
   ] = await Promise.all([
     // Read the company with the service client, scoped to ctx.companyId.
     // There is no SELECT policy on public.companies for the authenticated
@@ -125,6 +126,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       .eq('company_id', companyId)
       .order('created_at', { ascending: false })
       .limit(200),
+    // Whether anybody has working hours. Setup no longer demands them, so the
+    // dashboard asks for them instead -- as a line on Today, not a locked door.
+    service.from('user_shifts').select('id', { count: 'exact', head: true }).eq('company_id', companyId)
   ])
 
   const company = companyResult.data
@@ -178,6 +182,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         // the HTML it is hydrating. See components/ui/useNow.
         serverNow={Date.now()}
         defaultTab={params.tab || "overview"}
+        schedulesCount={schedulesResult.count || 0}
       />
     </>
   )

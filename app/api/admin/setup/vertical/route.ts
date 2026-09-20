@@ -35,7 +35,10 @@ export async function POST(request: Request) {
 
   const { error } = await service
     .from("companies")
-    .update({ vertical: body.vertical })
+    // vertical_set_at is what separates an answer from the default. The column
+    // itself is NOT NULL with a default of 'install', so its value alone could
+    // never say whether anybody had been asked.
+    .update({ vertical: body.vertical, vertical_set_at: new Date().toISOString() })
     .eq("id", admin.company_id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

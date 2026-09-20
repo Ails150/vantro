@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 import { escapeLikePattern } from '@/lib/sql-escape'
-import { canHoldPin } from '@/lib/roles'
+import { mayHoldPin } from '@/lib/roles'
 
 const INVITE_EXPIRED = 'Your invite link has expired. Please ask your manager to resend your invite.'
 
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     // Token path (e.g. a reset/invite link that carries a token).
     const { data: user } = await service
       .from('users')
-      .select('id, role, pin_reset_expires')
+      .select('id, role, works_on_site, pin_reset_expires')
       .eq('pin_reset_token', token)
       .single()
     if (!user || !user.pin_reset_expires || new Date(user.pin_reset_expires) < new Date()) {
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     // The same allowlist as the email path below. It was missing here, so a
     // token issued for an office account would have set a PIN on it -- the
     // hole the email path was hardened against, reachable one route over.
-    if (!canHoldPin(user.role)) {
+    if (!mayHoldPin(user)) {
       return NextResponse.json({ error: INVITE_EXPIRED }, { status: 401 })
     }
     userId = user.id
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     // has been set yet, so it can't be used to overwrite an existing PIN.
     const { data: user } = await service
       .from('users')
-      .select('id, pin_hash, role')
+      .select('id, pin_hash, role, works_on_site')
       .ilike('email', escapeLikePattern(String(email).trim()))
       .maybeSingle()
 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
     // so every worker added through the setup wizard's team step, the CSV
     // import or /api/onboarding was refused a PIN and could not log in. The
     // control was right and its vocabulary was a release out of date.
-    if (user && !canHoldPin(user.role)) {
+    if (user && !mayHoldPin(user)) {
       return NextResponse.json({ error: SETUP_REFUSED }, { status: 401 })
     }
 

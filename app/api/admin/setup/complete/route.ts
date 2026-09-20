@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
-import { FIELD_AND_FOREMAN } from '@/lib/roles'
 
 export async function POST() {
   const supabase = await createClient()
@@ -18,17 +17,26 @@ export async function POST() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  const [jobs, team, assignments, schedules] = await Promise.all([
-    service.from("jobs").select("id", { count: "exact", head: true }).eq("company_id", u.company_id),
-    service.from("users").select("id", { count: "exact", head: true }).eq("company_id", u.company_id).in("role", FIELD_AND_FOREMAN),
-    service.from("job_assignments").select("id", { count: "exact", head: true }).eq("company_id", u.company_id),
-    service.from("user_shifts").select("id", { count: "exact", head: true }).eq("company_id", u.company_id),
-  ])
+  // ONE JOB. That is the whole requirement to leave setup.
+  //
+  // This used to demand a job AND a worker AND an assignment AND a working-hours
+  // pattern, and refused to set onboarding_completed_at until all four existed
+  // -- while app/admin/page.tsx bounced every visit to /admin back here until
+  // it was set. A subcontractor who wanted to photograph one job had to staff a
+  // rota first. Working hours decide nothing about a capture; they size a
+  // payroll week that a solo trader may never run.
+  //
+  // What is missing does not vanish: the dashboard asks for assignments and
+  // hours as prompts on Today, where they can be answered when they matter
+  // and ignored when they do not. A prompt costs a line; a locked door costs
+  // the customer.
+  const jobs = await service
+    .from("jobs").select("id", { count: "exact", head: true }).eq("company_id", u.company_id)
 
-  if (!jobs.count || !team.count || !assignments.count || !schedules.count) {
+  if (!jobs.count) {
     return NextResponse.json({
-      error: "Setup not complete",
-      jobs: jobs.count, team: team.count, assignments: assignments.count, schedules: schedules.count,
+      error: "Add a job before finishing setup",
+      jobs: jobs.count ?? 0,
     }, { status: 400 })
   }
 

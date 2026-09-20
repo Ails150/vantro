@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import crypto from 'crypto'
 import { escapeLikePattern } from '@/lib/sql-escape'
-import { canHoldPin } from '@/lib/roles'
+import { mayHoldPin } from '@/lib/roles'
 
 export async function POST(request: Request) {
   const { email } = await request.json()
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   }
 
   const service = await createServiceClient()
-  const { data: user } = await service.from('users').select('id, name, email, role').ilike('email', escapeLikePattern(email.trim())).single()
+  const { data: user } = await service.from('users').select('id, name, email, role, works_on_site').ilike('email', escapeLikePattern(email.trim())).single()
   if (!user) return NextResponse.json({ success: true }) // silent fail for security
 
   // THE SAME ALLOWLIST setup-pin ENFORCES, because this route reached the same
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   // account oracle the rest of the PIN paths were hardened to close: ask it
   // about an address and it would tell you whether that person runs the
   // company. Nothing is written and no email goes.
-  if (!canHoldPin(user.role)) {
+  if (!mayHoldPin(user)) {
     console.warn('[reset-pin] refused for a non-field role')
     return NextResponse.json({ success: true })
   }
