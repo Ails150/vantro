@@ -262,8 +262,11 @@ export async function fetchAuditData(
   }
 
   // Variations: fetched after defects so we have diary in scope for evidence linking
+  // kind, number and the signature come with it: a variation the main
+  // contractor has signed is the single most useful row in this pack, and a
+  // register that cannot say so is worth less than the paper it replaces.
   let variationsQ = service.from("variations")
-    .select("id, created_at, status, ai_detected, ai_confidence, description, estimated_value, approved_value, client_requestor, raised_by, diary_entry_id, approved_at, invoiced_at, notes, users!variations_raised_by_fkey(id, name)")
+    .select("id, created_at, status, kind, number, ai_detected, ai_confidence, description, estimated_value, approved_value, labour_hours, materials, client_requestor, raised_by, diary_entry_id, approved_at, sent_at, sent_to_email, signed_at, declined_at, decline_reason, invoiced_at, notes, users!variations_raised_by_fkey(id, name), variation_signatures(decision, signer_name, signer_position, decided_at, agreed_pence, document_sha256, decline_reason)")
     .eq("job_id", jobId).order("created_at", { ascending: true })
   if (from) variationsQ = variationsQ.gte("created_at", from)
   if (to) variationsQ = variationsQ.lte("created_at", to + "T23:59:59Z")
@@ -277,8 +280,13 @@ export async function fetchAuditData(
   }
   const variations: AnyRow[] = []
   for (const v of variationsRaw || []) {
+    // At most one signature per variation; a decline may be followed by a
+    // re-priced resend, so take the most recent decision.
+    const decisions = Array.isArray(v.variation_signatures) ? [...v.variation_signatures] : []
+    decisions.sort((a: any, b: any) => String(b.decided_at).localeCompare(String(a.decided_at)))
     variations.push({
       ...v,
+      signature: decisions.find((d: any) => d.decision === "signed") || decisions[0] || null,
       source_diary: v.diary_entry_id ? diaryById[v.diary_entry_id] || null : null,
     })
   }

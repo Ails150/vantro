@@ -472,11 +472,17 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     if (isNaN(num)) return '—'
     return '£' + num.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
   }
+  // The vocabulary the workflow actually uses. Before this, 'sent', 'signed'
+  // and 'declined' all fell through to "Pending" -- a signed variation, the
+  // strongest thing in the pack, was printed as if nobody had answered.
   const variationStatusChip = (status: string) => {
-    if (status === 'approved') return '<span class="chip chip-ok">Approved</span>'
-    if (status === 'invoiced') return '<span class="chip chip-ok">Invoiced</span>'
+    if (status === 'signed') return '<span class="chip chip-ok">Signed by main contractor</span>'
+    if (status === 'invoiced') return '<span class="chip chip-ok">Signed &middot; on payment application</span>'
+    if (status === 'approved') return '<span class="chip">Priced, not yet sent</span>'
+    if (status === 'sent') return '<span class="chip chip-warn">Awaiting signature</span>'
+    if (status === 'declined') return '<span class="chip chip-bad">Declined by main contractor</span>'
     if (status === 'rejected') return '<span class="chip chip-bad">Rejected</span>'
-    return '<span class="chip chip-warn">Pending</span>'
+    return '<span class="chip chip-warn">Not yet priced</span>'
   }
   const aiConfidenceChip = (conf: string | null) => {
     if (!conf) return ''
@@ -484,7 +490,12 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     return `<span class="chip ${cls}">AI ${escapeHtml(conf)} confidence</span>`
   }
   const renderVariationCard = (v: any, idx: number) => {
-    const ref = 'VAR-' + String(idx + 1).padStart(3, '0')
+    // The reference the site and the main contractor both use, not a number
+    // invented from this report's ordering -- two reports over overlapping
+    // periods used to give the same variation different references.
+    const ref = Number.isInteger(v.number)
+      ? (v.kind === 'daywork' ? 'DW-' : 'VO-') + String(v.number).padStart(3, '0')
+      : 'VAR-' + String(idx + 1).padStart(3, '0')
     const time = v.created_at
       ? formatIn(v.created_at, { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
       : ''
@@ -499,6 +510,32 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
       : v.estimated_value
       ? `Estimated value: ${fmtMoney(v.estimated_value)}`
       : 'Value not set'
+    const labourLine = [
+      v.labour_hours != null ? `${Number(v.labour_hours)} hours recorded on site` : null,
+      v.materials ? `Materials: ${escapeHtml(v.materials)}` : null,
+    ].filter(Boolean).map((x: any) => ` &middot; ${x}`).join('')
+
+    // What the other side agreed to, and the hash of exactly what they were
+    // shown. This is the part a quantity surveyor argues with, so it carries
+    // the name, the time, the figure and the fingerprint.
+    const sig = v.signature
+    const signatureBlock = !sig
+      ? (v.sent_at
+          ? `<div class="card-body muted">Sent for signature ${escapeHtml(fmtDateTime(v.sent_at))}${v.sent_to_email ? ' to ' + escapeHtml(v.sent_to_email) : ''} &middot; no answer yet</div>`
+          : '')
+      : sig.decision === 'signed'
+        ? `<div class="ai-box">
+          <div class="ai-label">Signed by the main contractor</div>
+          <div><strong>${escapeHtml(sig.signer_name || 'Unknown')}</strong>${sig.signer_position ? ' &middot; ' + escapeHtml(sig.signer_position) : ''}</div>
+          <div class="muted">${escapeHtml(fmtDateTime(sig.decided_at))}${sig.agreed_pence != null ? ' &middot; agreed ' + fmtMoney(Number(sig.agreed_pence) / 100) : ''}</div>
+          ${sig.document_sha256 ? `<div class="muted" style="font-family:ui-monospace,Menlo,monospace;font-size:10px;word-break:break-all;">Signed document SHA-256 ${escapeHtml(sig.document_sha256)}</div>` : ''}
+        </div>`
+        : `<div class="ai-box">
+          <div class="ai-label">Declined by the main contractor</div>
+          <div><strong>${escapeHtml(sig.signer_name || 'Unknown')}</strong>${sig.signer_position ? ' &middot; ' + escapeHtml(sig.signer_position) : ''}</div>
+          <div class="muted">${escapeHtml(fmtDateTime(sig.decided_at))}</div>
+          ${sig.decline_reason ? `<div>${escapeHtml(sig.decline_reason)}</div>` : ''}
+        </div>`
     return `
       <div class="card ${v.status === 'rejected' ? 'card-bad' : v.status === 'pending' ? 'card-warn' : ''}">
         <div class="card-head">
@@ -512,7 +549,8 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
           </div>
         </div>
         <div class="card-body"><strong>${escapeHtml(v.description || '(no description)')}</strong></div>
-        <div class="card-body muted">${valueLine}</div>
+        <div class="card-body muted">${valueLine}${labourLine}</div>
+        ${signatureBlock}
         ${sourceText || sourcePhotos.length > 0 || sourceVideo ? `
         <div class="ai-box">
           <div class="ai-label">Source evidence (Diary entry at time of request)</div>
@@ -524,9 +562,16 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
       </div>`
   }
   const variationsList = (variations || []) as any[]
-  const variationsApproved = variationsList.filter((v: any) => v.status === 'approved' || v.status === 'invoiced').length
+  const variationsSigned = variationsList.filter((v: any) => v.status === 'signed' || v.status === 'invoiced').length
+  const variationsAwaiting = variationsList.filter((v: any) => v.status === 'approved' || v.status === 'sent').length
   const variationsPending = variationsList.filter((v: any) => v.status === 'pending').length
-  const variationsRejected = variationsList.filter((v: any) => v.status === 'rejected').length
+  const variationsRejected = variationsList.filter((v: any) => v.status === 'rejected' || v.status === 'declined').length
+  // Signed value is what the other side agreed, not what we asked for.
+  const variationsSignedValue = variationsList.reduce(
+    (sum: number, v: any) =>
+      sum + (v.signature?.decision === 'signed' && v.signature.agreed_pence != null ? Number(v.signature.agreed_pence) / 100 : 0),
+    0,
+  )
   const variationsTotalEstimated = variationsList.reduce((sum: number, v: any) => sum + (Number(v.estimated_value) || 0), 0)
   const variationsTotalApproved = variationsList.reduce((sum: number, v: any) => sum + (Number(v.approved_value) || 0), 0)
   const variationsSummary = variationsList.length === 0
@@ -535,8 +580,8 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
       <div class="card">
         <div class="card-body">
           <strong>${variationsList.length} variation${variationsList.length === 1 ? '' : 's'} identified.</strong>
-          ${variationsApproved} approved &middot; ${variationsPending} pending &middot; ${variationsRejected} rejected.
-          <br>Total estimated value: <strong>${fmtMoney(variationsTotalEstimated)}</strong>${variationsTotalApproved ? ` &middot; Approved value: <strong>${fmtMoney(variationsTotalApproved)}</strong>` : ''}
+          ${variationsSigned} signed by the main contractor &middot; ${variationsAwaiting} priced, awaiting signature &middot; ${variationsPending} not yet priced &middot; ${variationsRejected} rejected or declined.
+          <br>Total estimated value: <strong>${fmtMoney(variationsTotalEstimated)}</strong>${variationsTotalApproved ? ` &middot; Approved value: <strong>${fmtMoney(variationsTotalApproved)}</strong>` : ''}${variationsSignedValue ? ` &middot; Signed value: <strong>${fmtMoney(variationsSignedValue)}</strong>` : ''}
         </div>
       </div>`
   const variationCards = variationsList.length === 0
