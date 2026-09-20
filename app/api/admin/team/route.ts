@@ -2,6 +2,7 @@
 import { createServiceClient } from "@/lib/supabase/server"
 import { getCallerContext } from "@/lib/company-context"
 import { FIELD_ROLE, FIELD_ROLES, normaliseRole } from '@/lib/roles'
+import { getInitials } from '@/lib/provisioning'
 import { parseRate } from "@/lib/pay"
 
 // Accepts the legacy word on input for one release, stores the new one.
@@ -47,10 +48,15 @@ export async function POST(request: Request) {
   const { data: existing } = await service.from("users").select("id").eq("email", email).maybeSingle()
   if (existing) return NextResponse.json({ error: "That email is already registered" }, { status: 400 })
 
+  // users.initials is NOT NULL and nothing here was setting it, so every add
+  // through this route failed with a constraint violation the caller saw as
+  // "Could not add team member". The dashboard's own form computes initials in
+  // the browser, which is why it worked and this did not. Found by B13.
   const { data: inserted, error } = await service.from("users").insert({
     company_id: u.company_id,
     email,
     name,
+    initials: getInitials(name),
     role: storedRole,
     is_active: true,
   }).select().single()
