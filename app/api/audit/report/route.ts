@@ -178,8 +178,12 @@ function buildTemplatedNarrative(data: any): string {
   const photoCount = diary.reduce((n: number, d: any) => n + (d.photo_urls?.length || 0), 0)
     + qa.filter((q: any) => q.photo_url).length
     + defects.filter((d: any) => d.photo_url).length
-  const qaPass = qa.filter((q: any) => q.state === "approved" || q.value === "pass").length
-  const qaFail = qa.filter((q: any) => q.state === "rejected" || q.value === "fail").length
+  // A pass/fail checklist item is submitted with state 'pass' or 'fail'; an
+  // item that goes through office approval ends 'approved' or 'rejected'.
+  // Counting only the approval words scored every passed item as a failure --
+  // a job whose only check passed printed "QA compliance 0%" in red.
+  const qaPass = qa.filter((q: any) => q.state === "approved" || q.state === "pass" || q.value === "pass").length
+  const qaFail = qa.filter((q: any) => q.state === "rejected" || q.state === "fail" || q.value === "fail").length
   const qaPending = qa.length - qaPass - qaFail
   const openDefects = defects.filter((d: any) => d.status === "open").length
   const resolvedDefects = defects.filter((d: any) => d.status === "resolved").length
@@ -204,8 +208,8 @@ function buildTemplatedNarrative(data: any): string {
   if (qa.length === 0) qaParts.push("No quality checks were submitted in this period")
   else {
     const bits: string[] = []
-    if (qaPass > 0) bits.push(`${qaPass} approved`)
-    if (qaFail > 0) bits.push(`${qaFail} rejected`)
+    if (qaPass > 0) bits.push(`${qaPass} passed`)
+    if (qaFail > 0) bits.push(`${qaFail} failed`)
     if (qaPending > 0) bits.push(`${qaPending} pending`)
     qaParts.push(`${qa.length} quality check${qa.length === 1 ? "" : "s"} submitted (${bits.join(", ")})`)
   }
@@ -392,8 +396,8 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   }
   const photoCount = diary.filter(isRealDiaryEntry).reduce((n: number, d: any) => n + (d.photo_urls?.length || 0), 0)
     + qa.filter((q: any) => q.photo_url).length + defects.filter((d: any) => d.photo_url).length
-  const qaPass = qa.filter((q: any) => q.state === "approved" || q.value === "pass").length
-  const qaFail = qa.filter((q: any) => q.state === "rejected" || q.value === "fail").length
+  const qaPass = qa.filter((q: any) => q.state === "approved" || q.state === "pass" || q.value === "pass").length
+  const qaFail = qa.filter((q: any) => q.state === "rejected" || q.state === "fail" || q.value === "fail").length
   const compliance = qa.length > 0 ? Math.round((qaPass / qa.length) * 100) : 0
   const openDefects = defects.filter((d: any) => d.status === "open").length
   const blockers = diary.filter((d: any) => d.ai_alert_type === "blocker").length
@@ -423,7 +427,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   }).join("")
 
   const qaCards = qa.map((q: any) => {
-    const stateClass = q.state === "approved" ? "ok" : q.state === "rejected" ? "bad" : "neutral"
+    const stateClass = q.state === "approved" || q.state === "pass" ? "ok" : q.state === "rejected" || q.state === "fail" ? "bad" : "neutral"
     const itemLabel = q.checklist_items?.label || q.template_id || "Quality check"
     return `
       <div class="card">
