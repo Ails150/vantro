@@ -42,6 +42,31 @@ export function normaliseRole(role?: string | null): string {
   return r
 }
 
+/**
+ * Roles that sign in with a PIN and a field token, as an ALLOWLIST.
+ *
+ * This is a security control, not a convenience: setup-pin and the reset
+ * routes use it to refuse an office account a PIN. An allowlist because the
+ * failure mode of a denylist here is silent -- a role added later would be
+ * able to hold a PIN because nobody remembered to exclude it.
+ *
+ * It was written out by hand as ['installer', 'subcontractor'] inside
+ * setup-pin, which is how the lockout happened: /api/admin/team, the CSV
+ * import and /api/onboarding all store the new value 'field', and a worker
+ * added any of those ways could not set a PIN and so could not log in at all.
+ *
+ * foreman is here because the product sells it that way -- the role picker
+ * says "Supervisor - PIN app + alert emails". A foreman also holds a
+ * dashboard session, and that is the deliberate part: a supervisor is a
+ * person who is on site and in the office, and refusing them the app would
+ * make the role meaningless.
+ */
+export const PIN_ROLES: string[] = FIELD_FOREMAN_SUBBIE
+
+export function canHoldPin(role?: string | null): boolean {
+  return PIN_ROLES.includes(String(role || ''))
+}
+
 /** visit_assignments.role: what a person is on a visit, not their account role. */
 export const VISIT_ROLE_DEFAULT = 'operative'
 export const LEGACY_VISIT_ROLE = 'installer'

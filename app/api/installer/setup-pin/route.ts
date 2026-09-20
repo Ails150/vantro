@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 import bcrypt from 'bcryptjs'
 import { escapeLikePattern } from '@/lib/sql-escape'
+import { canHoldPin } from '@/lib/roles'
 
 const INVITE_EXPIRED = 'Your invite link has expired. Please ask your manager to resend your invite.'
 
@@ -38,10 +39,16 @@ export async function POST(request: Request) {
     // Token path (e.g. a reset/invite link that carries a token).
     const { data: user } = await service
       .from('users')
-      .select('id, pin_reset_expires')
+      .select('id, role, pin_reset_expires')
       .eq('pin_reset_token', token)
       .single()
     if (!user || !user.pin_reset_expires || new Date(user.pin_reset_expires) < new Date()) {
+      return NextResponse.json({ error: INVITE_EXPIRED }, { status: 401 })
+    }
+    // The same allowlist as the email path below. It was missing here, so a
+    // token issued for an office account would have set a PIN on it -- the
+    // hole the email path was hardened against, reachable one route over.
+    if (!canHoldPin(user.role)) {
       return NextResponse.json({ error: INVITE_EXPIRED }, { status: 401 })
     }
     userId = user.id
@@ -73,8 +80,13 @@ export async function POST(request: Request) {
     // flow — the invite email says "enter your email and choose a PIN" — and
     // closing it means issuing a token per invite. Worth doing; bigger than
     // this commit.
-    const FIELD_ROLES = ['installer', 'subcontractor']
-    if (user && !FIELD_ROLES.includes(String(user.role))) {
+    //
+    // THE LIST LIVES IN lib/roles.ts NOW. It was ['installer', 'subcontractor']
+    // written out here, and the stored value for a new worker is 'field' --
+    // so every worker added through the setup wizard's team step, the CSV
+    // import or /api/onboarding was refused a PIN and could not log in. The
+    // control was right and its vocabulary was a release out of date.
+    if (user && !canHoldPin(user.role)) {
       return NextResponse.json({ error: SETUP_REFUSED }, { status: 401 })
     }
 

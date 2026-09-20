@@ -247,7 +247,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
   const editLatLngRef = useRef<{ lat: any; lng: any }>({ lat: null, lng: null })
   const [memberName, setMemberName] = useState("")
   const [memberEmail, setMemberEmail] = useState("")
-  const [memberRole, setMemberRole] = useState("installer")
+  const [memberRole, setMemberRole] = useState("field")
   const [editingScheduleId, setEditingScheduleId] = useState<string|null>(null)
   const [scheduleSignIn, setScheduleSignIn] = useState("08:00")
   const [scheduleSignOut, setScheduleSignOut] = useState("17:00")
@@ -2014,7 +2014,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                 <div>
                   <label className="block text-sm font-medium text-ink-muted mb-1">Role</label>
                   <select value={memberRole} onChange={e => setMemberRole(e.target.value)} className={field}>
-                    <option value="installer">Installer - PIN app access only</option>
+                    <option value="field">Installer - PIN app access only</option>
                     <option value="foreman">Supervisor - PIN app + alert emails</option>
                     <option value="subcontractor">Subcontractor - PIN app, sees only their assigned jobs</option>
                     {userData?.role === "superadmin" && (<option value="admin">Admin - full dashboard access (no PIN needed)</option>)}
