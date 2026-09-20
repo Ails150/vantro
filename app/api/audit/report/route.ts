@@ -334,6 +334,20 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   // not computed -- that was the failure of the old chain-of-custody section.
   const cov = integrity?.coverage
   const captured = cov ? cov.created + cov.signedOut : 0
+  // The strip at the very top of page one. Evidence integrity is the whole
+  // argument this document makes, and it used to be buried on page two under
+  // the attendance table. A reader who takes one thing from the first screen
+  // should take this.
+  const verifyBanner = !integrity || integrity.error
+    ? `<div class="verify-strip verify-strip-warn">
+      <strong>This copy is not registered.</strong>
+      <span>${escapeHtml(integrity?.error || "No integrity record was produced for this report.")} The reference below cannot be verified.</span>
+    </div>`
+    : `<div class="verify-strip">
+      <strong>This document is independently verifiable at getvantro.com/verify</strong>
+      <span>Pack reference <code>${escapeHtml(refId)}</code> &middot; ${integrity.evidenceCount} record${integrity.evidenceCount === 1 ? "" : "s"} hashed at capture${integrity.signed ? " &middot; Ed25519 signed" : ""}</span>
+    </div>`
+
   const integrityBlock = !integrity || integrity.error
     ? `<h3>Evidence integrity</h3>
   <p class="muted" style="border:1px solid #c48a00;background:#fff8e6;padding:10px;border-radius:6px">
@@ -400,8 +414,8 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     return `
       <tr>
         <td>${escapeHtml(s.users?.name || "Unknown")}</td>
-        <td>${fmtDateTime(s.signed_in_at)}<br><span class="muted">${s.distance_from_site_metres != null ? s.distance_from_site_metres + "m" : ""}</span></td>
-        <td>${fmtDateTime(s.signed_out_at)}<br><span class="muted">${s.sign_out_distance_metres != null ? s.sign_out_distance_metres + "m" : ""}</span></td>
+        <td>${fmtDateTime(s.signed_in_at)}<br><span class="muted">${s.distance_from_site_metres != null ? "GPS " + s.distance_from_site_metres + "m" : "GPS not recorded"}</span></td>
+        <td>${fmtDateTime(s.signed_out_at)}<br><span class="muted">${s.sign_out_distance_metres != null ? "GPS " + s.sign_out_distance_metres + "m" : s.signed_out_at ? "GPS not recorded" : ""}</span></td>
         <td class="num">${s.hours_worked ? Number(s.hours_worked).toFixed(1) + "h" : "—"}</td>
         <td>${flags.join(" ") || "—"}</td>
         <td>${s.flag_reason ? `<span class="muted">${escapeHtml(s.flag_reason)}</span>` : ""}</td>
@@ -673,7 +687,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
       </ul>
     </div>`
 
-  const gateUnrecordedBlock = gateUnrecorded === 0
+  const gateUnrecordedBlock = gateUnrecorded === 0 || !rams.current
     ? ""
     : `<p class="muted">${gateUnrecorded} shift${gateUnrecorded === 1 ? "" : "s"} in this period predate RAMS checking and carry no record either way.</p>`
 
@@ -703,6 +717,34 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
         `<li>Version ${escapeHtml(String(v.version))} &mdash; ${escapeHtml(fmtDateTime(v.created_at))}${v.superseded_at ? ` (superseded ${escapeHtml(fmtDateTime(v.superseded_at))})` : " <strong>(in force)</strong>"}</li>`
       ).join("")}
     </ul>` : ""}`
+
+  // What this job actually holds. A section with nothing in it becomes one line
+  // in the block below rather than a page of zeros -- five empty pages of red
+  // and grey zeros read as a failed audit, which is the opposite of the truth
+  // when the job simply had no incidents and needed no method statement.
+  const hasIncidents = incidents.length > 0
+  const hasRams = !!rams.current || gateSkipped.length > 0
+  const hasToolbox = toolboxTalks.length > 0
+  const hasQa = qa.length > 0
+  const hasDefects = defects.length > 0
+
+  const nothingToReport: Array<[string, string]> = []
+  if (!hasIncidents) nothingToReport.push(["Incidents", "None recorded"])
+  if (!hasRams) nothingToReport.push(["Risk assessment and method statement", "Not required on this job"])
+  if (!hasToolbox) nothingToReport.push(["Safety briefings (toolbox talks)", "Not required on this job"])
+  if (!hasQa) nothingToReport.push(["Quality compliance", "None recorded"])
+  if (!hasDefects) nothingToReport.push(["Defects", "None recorded"])
+
+  const nothingBlock = nothingToReport.length === 0
+    ? ""
+    : `
+  <h2>Nothing to report</h2>
+  <p class="muted">These sections hold no records for this job in this period. Nothing here is outstanding or overdue.</p>
+  <div class="nothing">
+    ${nothingToReport.map(([what, state]) =>
+      `<div class="nothing-row"><span class="what">${escapeHtml(what)}</span><span class="state">${escapeHtml(state)}</span></div>`
+    ).join("")}
+  </div>`
 
   const toolboxCards = toolboxTalks.length === 0
     ? `<p class="muted">No toolbox talks were recorded on this job in this period.</p>`
@@ -770,6 +812,22 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   .kpi-num.bad { color: var(--bad); }
   .kpi-num.warn { color: var(--warn); }
   .kpi-num.ok { color: var(--ok); }
+  /* A figure that does not apply. Quieter and smaller than a real number, so a
+     glance does not read it as a score of zero. */
+  .kpi-num.na { color: var(--muted); font-size: 20px; font-weight: 600; }
+  .th-sub { display: block; font-weight: 400; font-size: 10px; color: var(--muted); letter-spacing: 0; text-transform: none; }
+  /* The verification strip at the top of page one. */
+  .verify-strip { border: 1px solid var(--ok); background: #f2fbf6; border-radius: 8px; padding: 12px 14px; margin: 0 0 18px; }
+  .verify-strip strong { display: block; font-size: 14px; color: var(--ink); }
+  .verify-strip span { display: block; font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .verify-strip code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--ink); }
+  .verify-strip-warn { border-color: #c48a00; background: #fff8e6; }
+  /* Sections with nothing in them: one line each, not a page each. */
+  .nothing { border: 1px solid var(--line); border-radius: 8px; padding: 4px 14px; }
+  .nothing-row { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .nothing-row:last-child { border-bottom: 0; }
+  .nothing-row .what { color: var(--ink); }
+  .nothing-row .state { color: var(--muted); }
   .kpi-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
     margin-top: 4px; }
   .narrative { background: var(--soft); border-left: 3px solid var(--teal); padding: 16px 20px;
@@ -882,6 +940,8 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     <div class="ref">${refId}</div>
   </div>
 
+  ${verifyBanner}
+
   <h1>${escapeHtml(job.name)}</h1>
   <p class="muted">${escapeHtml(job.address || "")}</p>
   ${job.contractor ? `<p class="muted">Contractor: ${escapeHtml(job.contractor)}</p>` : ""}
@@ -902,7 +962,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-num">${signins.length}</div><div class="kpi-label">Sign-ins</div></div>
     <div class="kpi"><div class="kpi-num">${totalHours.toFixed(1)}h</div><div class="kpi-label">Total hours</div></div>
-    <div class="kpi"><div class="kpi-num ${qa.length === 0 ? "" : compliance >= 80 ? "ok" : compliance >= 50 ? "warn" : "bad"}">${qa.length === 0 ? "—" : compliance + "%"}</div><div class="kpi-label">QA compliance</div></div>
+    <div class="kpi"><div class="kpi-num ${qa.length === 0 ? "na" : compliance >= 80 ? "ok" : compliance >= 50 ? "warn" : "bad"}">${qa.length === 0 ? "n/a" : compliance + "%"}</div><div class="kpi-label">QA compliance</div></div>
     <div class="kpi"><div class="kpi-num ${openDefects > 0 ? "bad" : "ok"}">${openDefects}</div><div class="kpi-label">Open defects</div></div>
     <div class="kpi"><div class="kpi-num ${blockers > 0 ? "bad" : ""}">${blockers}</div><div class="kpi-label">Blockers</div></div>
     <div class="kpi"><div class="kpi-num">${diaryShownCount}</div><div class="kpi-label">Diary entries</div></div>
@@ -919,10 +979,10 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
 <!-- PAGE 2: Attendance -->
 <section class="page">
   <h2>Attendance &amp; GPS sign-ins</h2>
-  <p class="muted">Every recorded shift with location proof, hours, and any system flags.</p>
+  <p class="muted">Every recorded shift with location proof, hours, and any system flags. The figure under each time is how far the phone was from the site address at that moment &mdash; "GPS 6m" means the sign-in was taken six metres from the address.</p>
   ${signins.length === 0 ? `<p class="empty">No sign-ins recorded in this period.</p>` : `
   <table>
-    <thead><tr><th>Installer</th><th>Signed in</th><th>Signed out</th><th class="num">Hours</th><th>Flags</th><th>Notes</th></tr></thead>
+    <thead><tr><th>Installer</th><th>Signed in <span class="th-sub">time &middot; GPS distance from site</span></th><th>Signed out <span class="th-sub">time &middot; GPS distance from site</span></th><th class="num">Hours</th><th>Flags</th><th>Notes</th></tr></thead>
     <tbody>${attendanceRows}</tbody>
   </table>`}
   <div class="footer">
@@ -932,7 +992,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
 </section>
 
 <!-- PAGE 3a00: Incidents -->
-<section class="page">
+${hasIncidents ? `<section class="page">
   <h2>Incidents</h2>
   <p class="muted">Near misses, injuries and hazards reported from site, with what was done about each. A near miss reported and closed is a safety system working; one still open at the end of the period is not.</p>
   <div class="kpi-row">
@@ -946,17 +1006,17 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     <span>Vantro &middot; getvantro.com</span>
     <span>${refId}</span>
   </div>
-</section>
+</section>` : ""}
 
 <!-- PAGE 3a0: RAMS -->
-<section class="page">
+${hasRams ? `<section class="page">
   <h2>Risk assessment and method statement</h2>
   <p class="muted">The method statement in force for this job, and every member of the assigned crew who has signed the version currently in force. Sign-in is blocked for anyone who has not.</p>
   <div class="kpi-row">
-    <div class="kpi"><div class="kpi-num ${rams.current ? "ok" : "bad"}">${rams.current ? "v" + escapeHtml(String(rams.current.version)) : "&mdash;"}</div><div class="kpi-label">Version in force</div></div>
+    <div class="kpi"><div class="kpi-num ${rams.current ? "ok" : "na"}">${rams.current ? "v" + escapeHtml(String(rams.current.version)) : "n/a"}</div><div class="kpi-label">Version in force</div></div>
     <div class="kpi"><div class="kpi-num">${ramsSignedCount}</div><div class="kpi-label">Signed</div></div>
     <div class="kpi"><div class="kpi-num ${ramsUnsignedCount === 0 ? "ok" : "bad"}">${ramsUnsignedCount}</div><div class="kpi-label">Not signed</div></div>
-    <div class="kpi"><div class="kpi-num ${ramsCompliance === null ? "" : ramsCompliance >= 100 ? "ok" : ramsCompliance >= 80 ? "warn" : "bad"}">${ramsCompliance === null ? "&mdash;" : ramsCompliance + "%"}</div><div class="kpi-label">RAMS compliance</div></div>
+    <div class="kpi"><div class="kpi-num ${ramsCompliance === null ? "na" : ramsCompliance >= 100 ? "ok" : ramsCompliance >= 80 ? "warn" : "bad"}">${ramsCompliance === null ? "n/a" : ramsCompliance + "%"}</div><div class="kpi-label">RAMS compliance</div></div>
     <div class="kpi"><div class="kpi-num ${gateSkipped.length === 0 ? "ok" : "bad"}">${gateSkipped.length}</div><div class="kpi-label">Started unchecked</div></div>
   </div>
   ${gateSkippedBlock}
@@ -966,27 +1026,27 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     <span>Vantro &middot; getvantro.com</span>
     <span>${refId}</span>
   </div>
-</section>
+</section>` : ""}
 
 <!-- PAGE 3a: Safety briefings -->
-<section class="page">
+${hasToolbox ? `<section class="page">
   <h2>Safety briefings</h2>
   <p class="muted">Toolbox talks delivered on this job, and every person who signed for one. A name listed as not signed was assigned to the job and has no signature on record.</p>
   <div class="kpi-row">
     <div class="kpi"><div class="kpi-num">${toolboxTalks.length}</div><div class="kpi-label">Talks delivered</div></div>
     <div class="kpi"><div class="kpi-num">${toolboxSigned}</div><div class="kpi-label">Signatures</div></div>
     <div class="kpi"><div class="kpi-num ${toolboxUnsigned === 0 ? "ok" : "bad"}">${toolboxUnsigned}</div><div class="kpi-label">Not signed</div></div>
-    <div class="kpi"><div class="kpi-num ${toolboxCompliance >= 100 ? "ok" : toolboxCompliance >= 80 ? "warn" : "bad"}">${toolboxTalks.length === 0 ? "&mdash;" : toolboxCompliance + "%"}</div><div class="kpi-label">Briefing compliance</div></div>
+    <div class="kpi"><div class="kpi-num ${toolboxTalks.length === 0 ? "na" : toolboxCompliance >= 100 ? "ok" : toolboxCompliance >= 80 ? "warn" : "bad"}">${toolboxTalks.length === 0 ? "n/a" : toolboxCompliance + "%"}</div><div class="kpi-label">Briefing compliance</div></div>
   </div>
   ${toolboxCards}
   <div class="footer">
     <span>Vantro &middot; getvantro.com</span>
     <span>${refId}</span>
   </div>
-</section>
+</section>` : ""}
 
 <!-- PAGE 3: Quality compliance -->
-<section class="page">
+${hasQa ? `<section class="page">
   <h2>Quality compliance</h2>
   <p class="muted">Pass/fail on every checklist item with photo evidence and AI summaries where available.</p>
   ${qaCards}
@@ -994,7 +1054,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     <span>Vantro · getvantro.com</span>
     <span>${refId}</span>
   </div>
-</section>
+</section>` : ""}
 
 <!-- PAGE 4: Site diary -->
 <section class="page">
@@ -1014,7 +1074,7 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
 </section>
 
 <!-- PAGE 5: Defects -->
-<section class="page">
+${hasDefects ? `<section class="page">
   <h2>Defects</h2>
   <p class="muted">Open and resolved defects with severity, photo evidence, and resolution notes.</p>
   ${defectCards}
@@ -1022,7 +1082,16 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     <span>Vantro · getvantro.com · CNNCTD Ltd (NI695071) · Ref ${refId}</span>
     <span>End of report</span>
   </div>
-</section>
+</section>` : ""}
+
+${nothingBlock ? `
+<section class="page">
+  ${nothingBlock}
+  <div class="footer">
+    <span>Vantro &middot; getvantro.com &middot; CNNCTD Ltd (NI695071) &middot; Ref ${refId}</span>
+    <span>End of report</span>
+  </div>
+</section>` : ""}
 
 ${adminLogSection}
 </body>
