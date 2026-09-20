@@ -143,8 +143,15 @@ test.describe("A7: no admin route is left without a check", () => {
     for (const route of adminRoutes) {
       if (SELF_SERVICE.includes(route.pattern)) continue
       const src = fs.readFileSync(path.join(process.cwd(), route.file), "utf8")
+      // suiteCaller() is lib/suite-caller.ts: it resolves the caller, refuses
+      // anyone outside OWNER_ROLES and then checks the company's plan. A route
+      // that delegates to it has a stricter check than most of the inline
+      // ones, and this sweep could not see it -- five routes were reported
+      // unguarded while in fact refusing every non-owner. The helper is named
+      // here rather than the pattern loosened, and the test below proves the
+      // helper still does what its name is being trusted for.
       const checksRole =
-        /isDashboardRole|DASHBOARD_ROLES|OWNER_ROLES/.test(src) ||
+        /isDashboardRole|DASHBOARD_ROLES|OWNER_ROLES|suiteCaller/.test(src) ||
         /\.role\b/.test(src)
       if (!checksRole) offenders.push(route.pattern)
     }
@@ -152,6 +159,15 @@ test.describe("A7: no admin route is left without a check", () => {
       offenders,
       `admin routes with no role check: ${offenders.join(", ")}`,
     ).toEqual([])
+  })
+
+  test("the helper the sweep trusts really does refuse a non-owner", () => {
+    // Trusting a helper by name is only safe if the helper is checked. Without
+    // this, adding "suiteCaller" to the pattern above would be a way to make
+    // this suite quiet rather than a way to describe the control.
+    const helper = fs.readFileSync(path.join(process.cwd(), "lib/suite-caller.ts"), "utf8")
+    expect(helper, "suite-caller no longer consults OWNER_ROLES").toMatch(/OWNER_ROLES/)
+    expect(helper, "suite-caller no longer refuses with 403").toMatch(/403/)
   })
 
   test("the self-service exemption is exactly one route, and it is self-service", () => {
