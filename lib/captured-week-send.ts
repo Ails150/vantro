@@ -15,6 +15,7 @@ import { loadCaptured } from "./captured"
 import { buildCapturedWeekEmail, isEmptyWeek, type CapturedWeek } from "./captured-week"
 import { summariseWeek } from "./weekly-report"
 import { readResendMessageId } from "./weekly-report-send"
+import { payrollLineForReport } from "./payroll-runs"
 
 export type CapturedWeekCompany = { id: string; name: string }
 
@@ -77,6 +78,8 @@ export async function loadCapturedWeek(
     dayworksRaised: vRows.filter(v => v.kind === "daywork").length,
     hoursLogged: summariseWeek(company.name, weekStart, signins.data || [], null).totalHours,
     uncaptured: { pence: captured.pence },
+    // Suite's one Friday email carries this, so they do not also get the PDF.
+    payrollLine: await payrollLineForReport(service, company.id, weekStart),
   }
 }
 

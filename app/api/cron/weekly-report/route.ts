@@ -1,6 +1,9 @@
 // app/api/cron/weekly-report/route.ts
 //
-// Friday, 5pm, London. A one-page PDF of the week to every free-plan admin.
+// Friday, 5pm, London. A one-page PDF of the week to Free and Payroll admins.
+// Payroll companies also get how long their payroll took. Suite is left out on
+// purpose: it gets one Friday email, lib/captured-week-send.ts, which carries
+// the same payroll line.
 //
 // Free retention is five days, so by the middle of next week this week's rows
 // are gone. The report is what makes that honest: the detail expires, the
@@ -60,7 +63,7 @@ export async function GET(request: Request) {
   const { data: companies, error: listErr } = await service
     .from("companies")
     .select("id, name, plan, last_weekly_report_week")
-    .eq("plan", "free")
+    .in("plan", ["free", "payroll"])
 
   if (listErr) {
     console.error("[weekly-report] could not list companies:", listErr)

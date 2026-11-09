@@ -23,6 +23,8 @@ export type CapturedWeek = {
   hoursLogged: number
   /** From lib/captured.ts: this month, approved, not on an application. */
   uncaptured: Pick<Captured, "pence">
+  /** How long payroll took, from lib/payroll-runs.ts. Null until one is approved. */
+  payrollLine?: string | null
 }
 
 /** Nothing happened and nothing is owed. Not worth an email on a Friday. */
@@ -78,6 +80,7 @@ export function buildCapturedWeekEmail(w: CapturedWeek, appUrl = "https://app.ge
     "",
     ...lines.map(l => `- ${l}`),
     "",
+    ...(w.payrollLine ? [w.payrollLine, ""] : []),
     sentence,
     "",
     `Open Vantro: ${appUrl}/admin?tab=variations`,
@@ -92,6 +95,7 @@ export function buildCapturedWeekEmail(w: CapturedWeek, appUrl = "https://app.ge
   <table role="presentation" style="width:100%;border-collapse:collapse;margin-bottom:20px">
     ${lines.map(l => `<tr><td style="padding:10px 0;border-top:1px solid #E6ECE9;color:#0A1A14;font-size:15px">${esc(l)}</td></tr>`).join("\n    ")}
   </table>
+  ${w.payrollLine ? `<p style="color:#0A1A14;font-size:15px;line-height:1.5;margin:0 0 12px">${esc(w.payrollLine)}</p>` : ""}
   <p style="color:#0A1A14;font-size:15px;line-height:1.5;font-weight:600;margin:0 0 24px">${esc(sentence)}</p>
   <a href="${appUrl}/admin?tab=variations" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700">Open Variations</a>
   <p style="color:#888;font-size:12px;margin-top:24px">Sent on Fridays to admins of ${esc(company)} on the Suite plan.</p>

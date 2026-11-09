@@ -40,6 +40,8 @@ export type WeeklyReportInput = {
   dailyHours: number[]
   /** Per person, already sorted, already trimmed to a sensible length. */
   perPerson: Array<{ name: string; hours: number; shifts: number }>
+  /** Payroll and Suite only: how long the week's payroll took. */
+  payrollLine?: string | null
   retentionDays: number | null
 }
 
@@ -147,6 +149,13 @@ export async function renderWeeklyReportPdf(input: WeeklyReportInput): Promise<U
   y -= 30
 
   // ─── Hours per day ───────────────────────────────────────────────────────
+  if (input.payrollLine) {
+    page.drawText(printable(input.payrollLine), { x: MARGIN, y, size: 11, font: bold, color: ACCENT })
+    y -= 16
+    rule(page, y)
+    y -= 30
+  }
+
   page.drawText("Hours per day", { x: MARGIN, y, size: 12, font: bold, color: INK })
   y -= 22
 

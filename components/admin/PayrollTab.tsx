@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react"
 import { PayrollExpenseRow } from "@/components/admin/PayrollExpenseRow"
 import PayrollBonuses from "@/components/admin/PayrollBonuses"
+import PayrollRunBar from "@/components/admin/PayrollRunBar"
 import { isFieldRole } from '@/lib/roles'
 
 import { formatIn, formatTime } from "@/lib/format-time"
@@ -194,6 +195,10 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
           {loading && <span className={"text-sm " + sub + " ml-auto"}>Loading...</span>}
         </div>
       </div>
+
+      {(mode === "this_week" || mode === "last_week") && (
+        <PayrollRunBar key={mode} week={mode} hasShifts={signins.length > 0} />
+      )}
 
       <div className={card}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">

@@ -16,6 +16,16 @@ const week: CapturedWeek = {
   uncaptured: { pence: 109030 },
 }
 
+test("the payroll line is in Suite's one Friday email, and only when there is one", () => {
+  const line = "Last week's payroll took 22 minutes for 14 workers."
+  const email = buildCapturedWeekEmail({ ...week, payrollLine: line })
+  expect(email.text).toContain(line)
+  expect(email.html).toContain("Last week&#39;s payroll took 22 minutes for 14 workers.")
+  const none = buildCapturedWeekEmail({ ...week, payrollLine: null })
+  expect(none.text).not.toContain("payroll")
+  expect(none.html).not.toContain("payroll")
+})
+
 test("the worked example", () => {
   const email = buildCapturedWeekEmail(week)
   expect(email.subject).toBe("Holts Installations: what you captured this week, 14 Sept to 20 Sept")

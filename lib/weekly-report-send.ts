@@ -14,7 +14,8 @@
 // the only thing the cron and the button legitimately disagree about, and it is
 // an argument rather than a branch on "am I a cron".
 
-import { historyDays, toPlan } from "./plan"
+import { can, historyDays, toPlan } from "./plan"
+import { payrollLineForReport } from "./payroll-runs"
 import { addDays, formatIn, londonMidnight } from "./format-time"
 import { renderWeeklyReportPdf, summariseWeek } from "./weekly-report"
 
@@ -97,10 +98,14 @@ export async function sendWeeklyReport(
     return { status: "skipped", why: "no shifts this week" }
   }
 
-  const summary = summariseWeek(company.name, weekStart, rows, historyDays(toPlan(company.plan)))
+  const retentionDays = historyDays(toPlan(company.plan))
+  const summary = summariseWeek(company.name, weekStart, rows, retentionDays)
+  if (can(toPlan(company.plan), "payrollExport")) {
+    summary.payrollLine = await payrollLineForReport(service, company.id, weekStart)
+  }
   const pdf = await renderWeeklyReportPdf(summary)
 
-  const send = await emailReport(recipients, company.name, weekStart, pdf, summary.totalHours)
+  const send = await emailReport(recipients, company.name, weekStart, pdf, summary.totalHours, retentionDays)
   if (!send.ok) return { status: "failed", why: send.why }
 
   // The id is logged HERE rather than left to each caller, so it is recorded
@@ -149,6 +154,7 @@ async function emailReport(
   weekStart: string,
   pdf: Uint8Array,
   totalHours: number,
+  retentionDays: number | null,
 ): Promise<EmailResult> {
   const key = process.env.RESEND_API_KEY
   if (!key) {
@@ -178,10 +184,10 @@ async function emailReport(
             ${totalHours.toFixed(1)} hours recorded between ${weekLabel}. The full
             breakdown is attached as a PDF.
           </p>
-          <p style="color:#4A6158;line-height:1.6;margin-bottom:24px">
-            Shift records are kept for 5 days on the Free plan, so this summary is
+          ${retentionDays === null ? "" : `<p style="color:#4A6158;line-height:1.6;margin-bottom:24px">
+            Shift records are kept for ${retentionDays} days on the Free plan, so this summary is
             worth keeping &mdash; it outlives the rows behind it.
-          </p>
+          </p>`}
           <a href="https://app.getvantro.com/admin" style="display:inline-block;background:#00C896;color:#07100D;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700">Open Vantro</a>
           <p style="color:#888;font-size:12px;margin-top:24px">You are receiving this because you are an admin on ${companyName}.</p>
         </div>`,
