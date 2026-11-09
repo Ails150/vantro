@@ -12,6 +12,8 @@
  * the API never selected. Everything audit-related goes through here now.
  */
 
+import { schemeFeatureEnabled } from "../schemes/driver"
+
 // Both key names are in use across the codebase: the audit/report path was
 // written against GOOGLE_MAPS_STATIC_KEY, the v2 path against
 // GOOGLE_MAPS_API_KEY. Accept either so a map renders whichever is configured.
@@ -99,6 +101,8 @@ export interface AuditData {
    * talk row alone.
    */
   toolboxTalks: AnyRow[]
+  /** The scheme registration record. One per job at most. */
+  schemeRegistration: AnyRow | null
   /**
    * The RAMS in force for this job, its version history, and who has signed the
    * current version. Signatures are against a version, so "signed" here always
@@ -575,5 +579,19 @@ export async function fetchAuditData(
     adminLog = (logRows || []).filter((r: AnyRow) => !NOISE.test(r.action || ""))
   }
 
-  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, toolboxTalks, rams, incidents, adminLog }
+  // Not filtered by the period: the certificate belongs to the job, and a pack
+  // for an earlier week should not read as if the job was never registered.
+  let schemeRegistration: AnyRow | null = null
+  if (schemeFeatureEnabled(companyId)) {
+    const { data, error: schemeErr } = await service
+      .from("scheme_registrations")
+      .select("id, scheme, environment, certificate_number, member_number, property_address, work_type, windows_count, doors_count, completion_date, registered_at")
+      .eq("company_id", companyId)
+      .eq("job_id", jobId)
+      .maybeSingle()
+    if (schemeErr) console.error("[audit] scheme registration error:", schemeErr.message)
+    schemeRegistration = data || null
+  }
+
+  return { job, company, period: { from, to }, signins, qa, diary, defects, variations, walkthroughs, toolboxTalks, schemeRegistration, rams, incidents, adminLog }
 }

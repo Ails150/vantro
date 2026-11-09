@@ -19,6 +19,8 @@ import RetentionTab from "@/components/admin/RetentionTab"
 import VariationsTab from "@/components/admin/VariationsTab"
 import VerticalPrompt from "@/components/admin/VerticalPrompt"
 import JobRetentionCard from "@/components/admin/JobRetentionCard"
+import JobSchemeCard from "@/components/admin/JobSchemeCard"
+import SchemeAttentionPanel from "@/components/admin/SchemeAttentionPanel"
 import TeamRateField from "@/components/admin/TeamRateField"
 import WorkerDataRights from "@/components/admin/WorkerDataRights"
 import SettingsTab from "@/components/admin/SettingsTab"
@@ -33,7 +35,7 @@ import SitesTab from "./SitesTab"
 import { adminNavGroups, tabBadge, DEFAULT_TAB, type AdminTab, type TabBadgeCounts } from "./nav/tabs"
 import AdminShell from "./AdminShell"
 import DashboardTab from "./tabs/DashboardTab"
-import { canSeeTab, toPlan } from "@/lib/plan"
+import { can, canSeeTab, toPlan } from "@/lib/plan"
 import { retentionLabel, retentionState } from "@/lib/retention-policy"
 import { type SupportContacts } from "@/lib/support"
 import { useNow } from "@/components/ui/useNow"
@@ -92,6 +94,8 @@ interface Props {
    * without one; Today asks for them instead, which needs the count.
    */
   schedulesCount?: number
+  /** Certass and FENSA. Only companies in SCHEME_SIM_COMPANIES see any of it. */
+  schemesEnabled?: boolean
 }
 
 /**
@@ -100,7 +104,7 @@ interface Props {
  */
 const NEW_GATED_TABS = new Set(["retention", "variations"])
 
-export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid, support, serverNow, schedulesCount = 0 }: Props) {
+export default function AdminDashboard({ user, userData, company, jobs, signins, alerts, pendingQA, teamMembers, jobAssignments, checklistTemplates, diaryEntries, resolvedAlerts, defaultTab, trialExpiredAndUnpaid, support, serverNow, schedulesCount = 0, schemesEnabled = false }: Props) {
   // One clock for the whole dashboard. It reads `serverNow` on the first
   // render -- matching the server HTML exactly -- then switches to the real
   // clock after hydration and ticks once a minute.
@@ -1501,6 +1505,8 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
     >
       <div>
 
+        {activeTab === "overview" && schemesEnabled && <SchemeAttentionPanel />}
+
         {activeTab === "overview" && (
           <DashboardTab
             overviewData={overviewData}
@@ -1891,6 +1897,9 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
                               and re-saving the whole job to record a date. */}
                           {canSeeTab(companyPlan, "retention") && (
                             <JobRetentionCard job={j} onSaved={() => router.refresh()} />
+                          )}
+                          {schemesEnabled && can(companyPlan, "schemeRegistration") && (
+                            <JobSchemeCard job={j} onSaved={() => router.refresh()} />
                           )}
                         </div>
                       </div>
@@ -2626,7 +2635,7 @@ export default function AdminDashboard({ user, userData, company, jobs, signins,
         {activeTab === "incidents" && <IncidentsTab />}
         {activeTab === "retention" && <RetentionTab />}
         {activeTab === "variations" && <VariationsTab />}
-        {activeTab === "settings" && <SettingsTab isSuperadmin={viewerIsSuperadmin} />}
+        {activeTab === "settings" && <SettingsTab isSuperadmin={viewerIsSuperadmin} schemesEnabled={schemesEnabled} />}
 
         {activeTab === "support" && <SupportTab />}
 

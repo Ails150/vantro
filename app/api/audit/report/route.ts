@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { can, toPlan } from "@/lib/plan"
+import { schemeFeatureEnabled } from "@/lib/schemes/driver"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
@@ -291,7 +292,7 @@ Write the executive summary now.`
 // ---------------- HTML render ----------------
 
 function renderReport(data: any, narrative: string, narrativeIsAI: boolean, integrity: PackIntegrity | null): string {
-  const { job, company, period, signins, qa, diary, defects, variations = [], toolboxTalks = [], rams = { current: null, versions: [], signatures: [], outstanding: [], crewSize: 0 }, incidents = [] } = data
+  const { job, company, period, signins, qa, diary, defects, variations = [], toolboxTalks = [], rams = { current: null, versions: [], signatures: [], outstanding: [], crewSize: 0 }, incidents = [], schemeRegistration = null } = data
   // Phase 1.2: the reference printed on this report is the one it is registered
   // under, so a reader who quotes it at /verify gets an answer. It used to be
   // built here from the job name and a slice of Date.now() -- never stored,
@@ -755,6 +756,25 @@ function renderReport(data: any, narrative: string, narrativeIsAI: boolean, inte
     ).join("")}
   </div>`
 
+  // A notifiable job with no certificate is the finding, so it is printed
+  // rather than left out. The reason is not: this page can go to a client.
+  const schemeName = (s: string | null) => (s === "fensa" ? "FENSA" : s === "certass" ? "Certass" : "scheme")
+  const schemeSection = job.notifiable !== true || !schemeFeatureEnabled(job.company_id) ? "" : `<section class="page">
+  <h2>Building regulations certificate</h2>
+  ${schemeRegistration ? `
+  ${schemeRegistration.environment === "simulator" ? `<p class="bad"><strong>TEST RECORD. This job has not been registered with any scheme.</strong></p>` : ""}
+  <div class="card">
+    <h3>${escapeHtml(schemeName(schemeRegistration.scheme))} ${escapeHtml(schemeRegistration.certificate_number)}</h3>
+    <div class="muted">Registered ${escapeHtml(fmtDateTime(schemeRegistration.registered_at))} under member ${escapeHtml(schemeRegistration.member_number)}</div>
+    <p>${escapeHtml(schemeRegistration.property_address)}</p>
+    <div class="muted">${escapeHtml(schemeRegistration.work_type)}: ${schemeRegistration.windows_count} windows, ${schemeRegistration.doors_count} doors. Completed ${escapeHtml(schemeRegistration.completion_date)}.</div>
+  </div>` : `<p class="bad"><strong>Notifiable work with no certificate on record.</strong> Registration with ${escapeHtml(schemeName(job.scheme))} has not been completed.</p>`}
+  <div class="footer">
+    <span>Vantro &middot; getvantro.com</span>
+    <span>${refId}</span>
+  </div>
+</section>`
+
   const toolboxCards = toolboxTalks.length === 0
     ? `<p class="muted">No toolbox talks were recorded on this job in this period.</p>`
     : toolboxTalks.map((t: any) => {
@@ -1053,6 +1073,8 @@ ${hasToolbox ? `<section class="page">
     <span>${refId}</span>
   </div>
 </section>` : ""}
+
+${schemeSection}
 
 <!-- PAGE 3: Quality compliance -->
 ${hasQa ? `<section class="page">

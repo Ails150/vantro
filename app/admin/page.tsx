@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { toPlan } from '@/lib/plan'
+import { schemeFeatureEnabled } from '@/lib/schemes/driver'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import AdminDashboard from '@/components/admin/AdminDashboard'
 import SupportBanner from '@/components/support/SupportBanner'
@@ -183,6 +184,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         serverNow={Date.now()}
         defaultTab={params.tab || "overview"}
         schedulesCount={schedulesResult.count || 0}
+        schemesEnabled={schemeFeatureEnabled(companyId)}
       />
     </>
   )

@@ -4,8 +4,9 @@ import { createClient } from "@/lib/supabase/client"
 import { PageTransition, PageHeader, Section } from "@/components/ui/Page"
 import { GEOFENCE_RADIUS_OPTIONS } from "@/lib/geofence"
 import { RETENTION_OPTIONS, retentionLabel, retentionState } from "@/lib/retention-policy"
+import SchemesSection from "@/components/admin/SchemesSection"
 
-export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: boolean }) {
+export default function SettingsTab({ isSuperadmin = false, schemesEnabled = false }: { isSuperadmin?: boolean; schemesEnabled?: boolean }) {
   const [gracePeriod, setGracePeriod] = useState(60)
   const [geofenceRadius, setGeofenceRadius] = useState(150)
   const [defaultStart, setDefaultStart] = useState("")
@@ -317,6 +318,8 @@ export default function SettingsTab({ isSuperadmin = false }: { isSuperadmin?: b
       <SecuritySection />
 
       <PayRulesSection />
+
+      {schemesEnabled && <SchemesSection />}
 
       <WeeklyReportSection />
 

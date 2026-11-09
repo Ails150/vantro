@@ -77,6 +77,8 @@ export type Feature =
    * contractor, and carried onto a payment application.
    */
   | "variations"
+  /** Certass and FENSA: register a notifiable job when it is signed off. */
+  | "schemeRegistration"
 
 /** The lowest plan that includes each feature. */
 const MINIMUM: Record<Feature, Plan> = {
@@ -99,6 +101,7 @@ const MINIMUM: Record<Feature, Plan> = {
   subcontractors: "suite",
   retentionTracking: "suite",
   variations: "suite",
+  schemeRegistration: "suite",
 }
 
 /**

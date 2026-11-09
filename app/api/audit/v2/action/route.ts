@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { isDashboardRole } from "@/lib/company-context"
+import { registerOnSignOff } from "@/lib/schemes/on-sign-off"
 
 export async function POST(req: Request) {
   const supabase = await createClient()
@@ -84,6 +86,12 @@ export async function POST(req: Request) {
         const { jobId } = params
         if (!jobId) return NextResponse.json({ error: "Missing jobId" }, { status: 400 })
 
+        // Sign-off can now file a legal notification with a scheme, so it is
+        // limited to the people who can see the button.
+        if (!isDashboardRole(appUser.role)) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+        }
+
         const { data: job } = await service.from("jobs")
           .select("id, company_id")
           .eq("id", jobId)
@@ -98,7 +106,8 @@ export async function POST(req: Request) {
           completed_by: userId,
         }).eq("id", jobId)
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-        return NextResponse.json({ ok: true })
+        const registration = await registerOnSignOff(service, companyId, jobId, userId)
+        return NextResponse.json({ ok: true, registration })
       }
 
       default:

@@ -1,6 +1,8 @@
 ﻿import { NextResponse } from "next/server"
 import { maybeAutoAssignSoleWorker } from "@/lib/auto-assign"
 import { maybeCompleteSetup } from "@/lib/setup-complete"
+import { isSignedOff } from "@/lib/schemes/register"
+import { registerOnSignOff } from "@/lib/schemes/on-sign-off"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 
 // True if a Postgres/PostgREST error is about a given column not existing.
@@ -113,6 +115,10 @@ export async function PUT(request: Request) {
       { error: error.message || "Could not update job", code: error.code, details: error.details, hint: error.hint },
       { status: 400 }
     )
+  }
+  // Editing the status to complete is a sign-off too.
+  if (isSignedOff(update.status)) {
+    await registerOnSignOff(service, u.company_id, jobId, null)
   }
   return NextResponse.json({ success: true })
 }

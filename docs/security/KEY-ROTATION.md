@@ -42,6 +42,11 @@ goes through Resend — `lib/weekly-report-send.ts`, `app/api/signup/initiate`,
 `app/api/invite`, `lib/email-alerts.ts`. If a rotation request names SendGrid,
 it is about a different system.
 
+**`SCHEME_KEY_ENCRYPTION_KEY`** seals the Certass and FENSA API keys customers
+save in Settings. Rotating it makes every saved key unreadable, so each company
+has to paste theirs again. Until they do, registrations fail with that reason
+on Today. Nothing is registered and nothing is lost.
+
 ### Two things worth fixing while you are in there
 
 **`STRIPE_SECRET_KEY` is scoped to Development.** Anyone who runs `vercel env
