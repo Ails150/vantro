@@ -37,6 +37,23 @@ export function payrollLine(run: PayrollRun | null | undefined, label: "This wee
   return `${label}'s payroll took ${plural(run.minutes_taken, "minute")} for ${plural(run.workers_count, "worker")}.`
 }
 
+/** Is any of these dates in an approved week? Takes dates or timestamps. */
+export async function anyWeekLocked(service: any, companyId: string, values: string[]): Promise<boolean> {
+  const weeks = [...new Set(values.map(v => isoWeekStart(v.length === 10 ? londonMidnight(v) : v)))]
+  if (weeks.length === 0) return false
+  const { data, error } = await service
+    .from("payroll_runs")
+    .select("id")
+    .eq("company_id", companyId)
+    .in("week_start", weeks)
+    .not("approved_at", "is", null)
+    .limit(1)
+  if (error) throw new Error(`week lock: ${error.message}`)
+  return (data || []).length > 0
+}
+
+export const WEEK_LOCKED_MESSAGE = "That week is approved. Unlock it on the Payroll tab to change it."
+
 /** Field workers with at least one finished shift in the week. */
 export async function workersInWeek(service: any, companyId: string, weekStart: string): Promise<number> {
   const { data, error } = await service

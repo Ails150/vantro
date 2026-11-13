@@ -54,6 +54,7 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
   const [editSigninTime, setEditSigninTime] = useState("")
   const [editSignoutTime, setEditSignoutTime] = useState("")
   const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
 
   function getRange() {
     if (mode === "this_week") return getWeekRange(0)
@@ -81,13 +82,19 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
 
   async function saveSigninEdit(signinId: string) {
     setEditSaving(true)
-    await fetch("/api/payroll/edit", {
+    setEditError(null)
+    const res = await fetch("/api/payroll/edit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ signinId, signed_in_at: editSigninTime, signed_out_at: editSignoutTime || null })
     })
-    setEditingSignin(null)
     setEditSaving(false)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      setEditError(body.error || `Could not save (${res.status})`)
+      return
+    }
+    setEditingSignin(null)
     fetchPayroll()
   }
 
@@ -303,8 +310,9 @@ export default function PayrollTab({ teamMembers, defaultHourlyRate = null }: Pr
                             </div>
                             <div className="flex gap-2">
                               <button onClick={() => saveSigninEdit(s.id)} disabled={editSaving} className="text-xs bg-teal-400 text-white rounded-lg px-3 py-1 font-medium">{editSaving ? "Saving..." : "Save"}</button>
-                              <button onClick={() => setEditingSignin(null)} className="text-xs bg-gray-100 text-gray-600 rounded-lg px-3 py-1">Cancel</button>
+                              <button onClick={() => { setEditingSignin(null); setEditError(null) }} className="text-xs bg-gray-100 text-gray-600 rounded-lg px-3 py-1">Cancel</button>
                             </div>
+                            {editError && <p className="text-xs text-red-600">{editError}</p>}
                           </div>
                         ) : (
                           <div className="flex justify-between items-center">

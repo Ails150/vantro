@@ -16,6 +16,7 @@ import { NextResponse } from "next/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { getCallerContext } from "@/lib/company-context"
 import { anonymisePatch, pseudonymFor, tablesToDelete, tablesToDetach } from "@/lib/gdpr"
+import { clearSnapshotsForWorker } from "@/lib/payroll-timesheet"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -91,6 +92,22 @@ export async function POST(request: Request) {
     }
   }
 
+  // 2b. The frozen Xero timesheets. An approved week keeps its timesheet as a
+  // CSV holding names and emails, so anonymising the users row alone would
+  // leave this person in every approved week they worked. Cleared here, before
+  // anything irreversible: if it fails the person is NOT reported erased, and
+  // the request can simply be run again.
+  let xeroWeeksCleared = 0
+  try {
+    xeroWeeksCleared = await clearSnapshotsForWorker(service, ctx.companyId, subject.id)
+  } catch (e: any) {
+    console.error("[gdpr] erase: clearing Xero snapshots failed:", e?.message)
+    return NextResponse.json(
+      { error: "Could not erase: their name is still in an approved week's Xero file. Nothing was anonymised; try again.", warnings },
+      { status: 500 },
+    )
+  }
+
   // 3. Remove the Supabase login, if this person had one.
   //
   // Before the users row is patched: the patch nulls auth_user_id, and after it
@@ -142,6 +159,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     pseudonym: pseudonymFor(subject.id),
+    xeroWeeksCleared,
     warnings: warnings.length > 0 ? warnings : undefined,
   })
 }

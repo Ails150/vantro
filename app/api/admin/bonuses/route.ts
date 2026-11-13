@@ -14,6 +14,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { getCallerContext } from "@/lib/company-context"
 import { can, toPlan } from "@/lib/plan"
 import { parseBonusAmount } from "@/lib/pay"
+import { anyWeekLocked, WEEK_LOCKED_MESSAGE } from "@/lib/payroll-runs"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -115,6 +116,10 @@ export async function POST(request: Request) {
 
   const awardedOn = dateOnly(body.awardedOn) ?? todayInLondon()
 
+  if (await anyWeekLocked(service, companyId, [awardedOn])) {
+    return NextResponse.json({ error: WEEK_LOCKED_MESSAGE, code: "WEEK_LOCKED" }, { status: 423 })
+  }
+
   const { data, error } = (await service
     .from("pay_bonuses")
     .insert({
@@ -145,6 +150,12 @@ export async function DELETE(request: Request) {
 
   const id = new URL(request.url).searchParams.get("id")
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 })
+
+  const { data: existing } = (await service
+    .from("pay_bonuses").select("awarded_on").eq("id", id).eq("company_id", companyId).maybeSingle()) as { data: any }
+  if (existing && (await anyWeekLocked(service, companyId, [existing.awarded_on]))) {
+    return NextResponse.json({ error: WEEK_LOCKED_MESSAGE, code: "WEEK_LOCKED" }, { status: 423 })
+  }
 
   // Scoped by company: the id comes from the client.
   const { error } = await service

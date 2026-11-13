@@ -159,16 +159,17 @@ export default function PayrollExportModal({ open, onClose, onExported }: Props)
             <strong>Important:</strong> Exporting locks all timesheets in this date range. Once locked, sign-in/out times cannot be edited.
           </div>
 
-          {/* Xero. Above the locking export because it is the safe one: it
-              can be run as often as you like and re-running a week updates
-              that week's timesheet rather than issuing a second. */}
+          {/* Xero. Serves the timesheet frozen when the week was approved, and
+              re-running it updates that week's record rather than issuing a
+              second. */}
           <div className="border border-gray-200 rounded-lg px-4 py-3 mb-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-gray-900">Xero timesheet</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  The payroll week containing the From date. Re-exporting a week updates
-                  that timesheet, it never creates a second one, and nothing is locked.
+                  The payroll week containing the From date, exactly as it was approved.
+                  The week must be approved on the Payroll tab first. Exporting again
+                  updates that timesheet, it never creates a second one.
                 </p>
               </div>
               <button

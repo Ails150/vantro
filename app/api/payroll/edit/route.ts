@@ -62,6 +62,9 @@ export async function POST(request: Request) {
     })
     .eq("id", signinId)
 
+  if (updErr?.code === "VT423") {
+    return NextResponse.json({ error: updErr.message, code: "WEEK_LOCKED" }, { status: 423 })
+  }
   if (updErr) {
     return NextResponse.json({ error: "Could not update signin", detail: updErr.message }, { status: 500 })
   }
