@@ -143,10 +143,12 @@ export const SUBJECT_TABLES: SubjectTable[] = [
 
 /** The columns on users itself that carry identity. */
 export const IDENTITY_COLUMNS = [
-  "name", "email", "phone", "initials", "pin_hash", "auth_user_id",
-  "address", "emergency_contact", "emergency_phone", "national_insurance_number",
-  "date_of_birth", "push_token", "avatar_url",
+  "name", "email", "initials", "pin_hash", "auth_user_id", "push_token",
 ] as const
+// Checked against production on 13 Nov 2026. The list used to name phone,
+// address, emergency contacts, NI number, date of birth and avatar_url, none of
+// which exist on users; anonymisePatch wrote phone, and that one missing
+// column made every erasure fail. Add a column here only once it exists.
 
 /**
  * The replacement name.
@@ -176,10 +178,11 @@ export function anonymisePatch(userId: string, actionedBy: string | null) {
   return {
     name: pseudonymFor(userId),
     email: null,
-    phone: null,
     initials: "--",
     pin_hash: null,
     auth_user_id: null,
+    // A device token is a way to reach this person's phone.
+    push_token: null,
     is_active: false,
     anonymised_at: new Date().toISOString(),
     anonymised_by: actionedBy,

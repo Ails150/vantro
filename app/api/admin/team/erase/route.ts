@@ -74,7 +74,45 @@ export async function POST(request: Request) {
 
   const warnings: string[] = []
 
-  // 1. Rows that are purely operational and hold no evidential value.
+  // ORDER MATTERS. Everything that can be retried comes first and nothing
+  // irreversible happens until the identity is gone. This used to delete rows
+  // and the login BEFORE anonymising, and the anonymise step always failed (it
+  // wrote a phone column users does not have), so every erasure ever attempted
+  // half-ran and then reported failure. None had ever succeeded.
+
+  // 1. The frozen Xero timesheets. An approved week keeps its timesheet as a
+  // CSV holding names and emails, so anonymising the users row alone would
+  // leave this person in every approved week they worked. If this fails,
+  // nothing has been changed yet and the request can simply be run again.
+  let xeroWeeksCleared = 0
+  try {
+    xeroWeeksCleared = await clearSnapshotsForWorker(service, ctx.companyId, subject.id)
+  } catch (e: any) {
+    console.error("[gdpr] erase: clearing Xero snapshots failed:", e?.message)
+    return NextResponse.json(
+      { error: "Could not erase: their name is still in an approved week's Xero file. Nothing was changed; try again." },
+      { status: 500 },
+    )
+  }
+
+  // 2. The identity itself. This is the step that matters: if it fails the
+  // person is NOT erased, and nothing after it has run. It also unlinks the
+  // login, whose id was read above and is deleted in step 5.
+  const { error: patchErr } = await service
+    .from("users")
+    .update(anonymisePatch(subject.id, ctx.userId))
+    .eq("id", subject.id)
+    .eq("company_id", ctx.companyId)
+
+  if (patchErr) {
+    console.error("[gdpr] erase: anonymise failed:", patchErr.message)
+    return NextResponse.json(
+      { error: `Could not erase: ${patchErr.message}` },
+      { status: 500 },
+    )
+  }
+
+  // 3. Rows that are purely operational and hold no evidential value.
   for (const t of tablesToDelete()) {
     const { error } = await service.from(t.table).delete().eq(t.column, userId)
     if (error) {
@@ -83,7 +121,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // 2. Rows belonging to somebody else that merely point at this person.
+  // 4. Rows belonging to somebody else that merely point at this person.
   for (const t of tablesToDetach()) {
     const { error } = await service.from(t.table).update({ [t.column]: null }).eq(t.column, userId)
     if (error) {
@@ -92,26 +130,8 @@ export async function POST(request: Request) {
     }
   }
 
-  // 2b. The frozen Xero timesheets. An approved week keeps its timesheet as a
-  // CSV holding names and emails, so anonymising the users row alone would
-  // leave this person in every approved week they worked. Cleared here, before
-  // anything irreversible: if it fails the person is NOT reported erased, and
-  // the request can simply be run again.
-  let xeroWeeksCleared = 0
-  try {
-    xeroWeeksCleared = await clearSnapshotsForWorker(service, ctx.companyId, subject.id)
-  } catch (e: any) {
-    console.error("[gdpr] erase: clearing Xero snapshots failed:", e?.message)
-    return NextResponse.json(
-      { error: "Could not erase: their name is still in an approved week's Xero file. Nothing was anonymised; try again.", warnings },
-      { status: 500 },
-    )
-  }
-
-  // 3. Remove the Supabase login, if this person had one.
-  //
-  // Before the users row is patched: the patch nulls auth_user_id, and after it
-  // there is nothing left to say which auth account to delete.
+  // 5. Remove the Supabase login, if this person had one. After the users row
+  // has let go of it: deleting it first failed while the row still pointed at it.
   if (subject.auth_user_id) {
     const { error } = await service.auth.admin.deleteUser(subject.auth_user_id)
     if (error) {
@@ -120,24 +140,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // 4. The identity itself.
-  const { error: patchErr } = await service
-    .from("users")
-    .update(anonymisePatch(subject.id, ctx.userId))
-    .eq("id", subject.id)
-    .eq("company_id", ctx.companyId)
-
-  if (patchErr) {
-    // This is the step that matters. If it fails the person is NOT erased, and
-    // saying otherwise would be the worst possible outcome of this route.
-    console.error("[gdpr] erase: anonymise failed:", patchErr.message)
-    return NextResponse.json(
-      { error: `Could not erase: ${patchErr.message}`, warnings },
-      { status: 500 },
-    )
-  }
-
-  // 5. The accountability record. subject_label is deliberately null: keeping
+  // 6. The accountability record. subject_label is deliberately null: keeping
   // the name here would defeat the erasure this row exists to record.
   await service.from("data_subject_requests").insert({
     company_id: ctx.companyId,

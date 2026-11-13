@@ -299,6 +299,14 @@ export async function createProbe(
 export async function destroyProbe(probe: Probe | null) {
   if (!probe) return
   const service = serviceClient()
-  await service.from("users").delete().eq("email", probe.email)
+  const { error } = await service.from("users").delete().eq("email", probe.email)
+  if (error) {
+    // A probe that created evidence cannot be deleted: evidence_hashes is
+    // append-only and points at whoever captured the row. Leaving the row is
+    // fine; leaving it able to sign in is not. Unlink, deactivate, drop the PIN.
+    await service.from("users")
+      .update({ auth_user_id: null, is_active: false, pin_hash: null })
+      .eq("email", probe.email)
+  }
   await service.auth.admin.deleteUser(probe.authUserId).catch(() => {})
 }

@@ -129,7 +129,7 @@ test.describe("anonymisePatch", () => {
   test("removes the contact details", () => {
     const patch = anonymisePatch(id, null) as any
     expect(patch.email).toBeNull()
-    expect(patch.phone).toBeNull()
+    expect(patch.push_token).toBeNull()
   })
 
   test("replaces rather than blanks the name", () => {
@@ -147,9 +147,23 @@ test.describe("anonymisePatch", () => {
 
   test("the identity column list covers everything the patch clears", () => {
     const patch = anonymisePatch(id, null) as any
-    for (const col of ["name", "email", "phone", "initials", "pin_hash", "auth_user_id"]) {
+    for (const col of ["name", "email", "initials", "pin_hash", "auth_user_id", "push_token"]) {
       expect(IDENTITY_COLUMNS).toContain(col as any)
       expect(Object.keys(patch)).toContain(col)
+    }
+  })
+
+  test("writes only columns that exist on users", () => {
+    // Every erasure in production failed until 13 Nov 2026 because the patch
+    // wrote phone, which users has never had. These are the users columns the
+    // patch may touch, checked against the live schema; a new key here must be
+    // a real column first.
+    const USERS_COLUMNS = new Set([
+      "name", "email", "initials", "pin_hash", "auth_user_id", "push_token",
+      "is_active", "anonymised_at", "anonymised_by",
+    ])
+    for (const key of Object.keys(anonymisePatch(id, "admin-id"))) {
+      expect(USERS_COLUMNS.has(key), `anonymisePatch writes ${key}, which is not a users column`).toBe(true)
     }
   })
 })
