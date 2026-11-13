@@ -4,6 +4,7 @@ import { maybeCompleteSetup } from "@/lib/setup-complete"
 import { isSignedOff } from "@/lib/schemes/register"
 import { registerOnSignOff } from "@/lib/schemes/on-sign-off"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { ownedId } from "@/lib/ownership"
 
 // True if a Postgres/PostgREST error is about a given column not existing.
 // Lets us gracefully drop a column (e.g. gps_source) when the DB migration that
@@ -40,12 +41,20 @@ export async function POST(request: Request) {
   const name = (b.name || "").trim()
   if (!name) return NextResponse.json({ error: "Name required" }, { status: 400 })
 
+  // A template id from the body must be this company's, or the job would carry
+  // another tenant's checklist to its installers.
+  let checklistTemplateId: string | null = null
+  if (b.checklist_template_id) {
+    checklistTemplateId = await ownedId(service, "checklist_templates", b.checklist_template_id, u.company_id)
+    if (!checklistTemplateId) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
+
   const insert: any = {
     company_id: u.company_id,
     name,
     address: typeof b.address === "string" ? b.address.trim() : "", // jobs.address is NOT NULL; "" for remote
     status: b.status || "active",
-    checklist_template_id: b.checklist_template_id || null,
+    checklist_template_id: checklistTemplateId,
     lat: b.lat ?? null,
     lng: b.lng ?? null,
     gps_source: b.gps_source ?? null,

@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { FIELD_ROLES } from '@/lib/roles'
+import { ownedId } from '@/lib/ownership'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -11,8 +12,13 @@ export async function POST(request: Request) {
   const { data: u } = await service.from("users").select("company_id, role").eq("auth_user_id", user.id).single()
   if (!u || !["admin", "foreman", "superadmin"].includes(u.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
-  const { jobId } = await request.json()
-  if (!jobId) return NextResponse.json({ error: "Missing jobId" }, { status: 400 })
+  const body = await request.json().catch(() => ({}))
+  if (!body?.jobId) return NextResponse.json({ error: "Missing jobId" }, { status: 400 })
+
+  // Ownership first: the inserts below would otherwise put this company's
+  // installers on another company's job.
+  const jobId = await ownedId(service, "jobs", body.jobId, u.company_id)
+  if (!jobId) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   // Get all installers in the company
   const { data: installers } = await service.from("users")
@@ -28,6 +34,7 @@ export async function POST(request: Request) {
   const { data: existing } = await service.from("job_assignments")
     .select("user_id")
     .eq("job_id", jobId)
+    .eq("company_id", u.company_id)
 
   const existingIds = new Set((existing || []).map((e: any) => e.user_id))
 

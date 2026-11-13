@@ -28,9 +28,9 @@ export async function GET(request: Request) {
     }
 
     const [{ data: diary }, { data: signins }, { data: qa }] = await Promise.all([
-      service.from('diary_entries').select('id, entry_text, ai_alert_type, ai_summary, photo_urls, created_at, users(name)').eq('job_id', jobId).order('created_at', { ascending: false }).limit(50),
-      service.from('signins').select('signed_in_at, signed_out_at, users(name)').eq('job_id', jobId).order('signed_in_at', { ascending: false }).limit(50),
-      service.from('checklist_responses').select('created_at, result, checklist_items(label), users(name)').eq('job_id', jobId).order('created_at', { ascending: false }).limit(100)
+      service.from('diary_entries').select('id, entry_text, ai_alert_type, ai_summary, photo_urls, created_at, users(name)').eq('job_id', jobId).eq('company_id', companyId).order('created_at', { ascending: false }).limit(50),
+      service.from('signins').select('signed_in_at, signed_out_at, users(name)').eq('job_id', jobId).eq('company_id', companyId).order('signed_in_at', { ascending: false }).limit(50),
+      service.from('checklist_responses').select('created_at, result, checklist_items(label), users(name)').eq('job_id', jobId).eq('company_id', companyId).order('created_at', { ascending: false }).limit(100)
     ])
 
     const { company_id: _hidden, ...job } = jobRow

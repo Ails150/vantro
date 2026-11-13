@@ -6,6 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { WALKTHROUGH_SYSTEM_PROMPT, buildUserMessage } from "@/lib/ai/walkthrough-prompt"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { parseRecordedAt } from "@/lib/uploads/mime"
+import { ownedId } from "@/lib/ownership"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
 
@@ -304,6 +305,35 @@ export async function POST(request: Request) {
       .single()
     if (!me?.company_id) return NextResponse.json({ error: "No company" }, { status: 400 })
 
+    // The job must be the caller's before anything is written against it.
+    const ownedJobId = await ownedId(service, "jobs", jobId, installer.companyId)
+    if (!ownedJobId || me.company_id !== installer.companyId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+
+    // A Stream uid is a capability: whoever files it gets the video's
+    // transcript and playback attached to their walkthrough. Refuse one that is
+    // already filed under another company. This only stops re-use of a uid
+    // that is already recorded; a full fix needs /api/stream/upload-url to
+    // record which company each uid was issued to, and this check to require
+    // that record.
+    if (typeof streamUid !== "string" || !/^[A-Za-z0-9]{1,64}$/.test(streamUid)) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+    const { data: uidRows, error: uidErr } = await service
+      .from("walkthrough_clips")
+      .select("id, walkthroughs!inner(company_id)")
+      .eq("stream_video_id", streamUid)
+    if (uidErr) {
+      console.error("[upload-clip] stream uid check failed:", uidErr.message)
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
+    const foreign = (uidRows || []).some((r: any) => {
+      const w = Array.isArray(r.walkthroughs) ? r.walkthroughs[0] : r.walkthroughs
+      return w?.company_id !== installer.companyId
+    })
+    if (foreign) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
     // Cap check
     const { data: company } = await service
       .from("companies")
@@ -334,7 +364,7 @@ export async function POST(request: Request) {
       .from("walkthroughs")
       .insert({
         company_id: me.company_id,
-        job_id: jobId,
+        job_id: ownedJobId,
         installer_id: installer.userId,
         recorded_at: recorded.at.toISOString(),
         gps_lat: lat || null,

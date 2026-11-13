@@ -118,6 +118,15 @@ export async function POST(request: Request) {
           ai_audit_enabled: hasAiAudit,
           stripe_ai_audit_subscription_item_id: aiAuditItem?.id || null,
         }
+        // The plan follows the price that is actually being paid for. This is
+        // the only place an upgrade bought through Checkout takes effect: the
+        // upgrade route no longer grants the plan before payment. Only a live
+        // subscription grants it; incomplete or unpaid ones change nothing
+        // here, and cancellation is handled by customer.subscription.deleted.
+        const paidPlan = planForPriceId(aiAuditItem?.price.id)
+        if (paidPlan && (sub.status === 'active' || sub.status === 'trialing')) {
+          updates.plan = paidPlan
+        }
         const target = companyId
           ? service.from('companies').update(updates).eq('id', companyId)
           : service.from('companies').update(updates).eq('stripe_customer_id', customerId)

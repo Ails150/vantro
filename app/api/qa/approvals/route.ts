@@ -1,13 +1,23 @@
 ﻿import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
+import { getCallerContext, isDashboardRole } from '@/lib/company-context'
+import { ownedId } from '@/lib/ownership'
+
+// Approving or rejecting QA is a reviewer's decision on evidence. Dashboard
+// roles only, and only on this company's approvals: the POST used to update any
+// approval by id, for any signed-in user of any company.
+async function reviewer() {
+  const ctx = await getCallerContext()
+  if (!ctx) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  if (!isDashboardRole(ctx.role) || !ctx.companyId) return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  return { companyId: ctx.companyId, userId: ctx.userId, service: await createServiceClient() }
+}
 
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const service = await createServiceClient()
-  const { data: userData } = await service.from('users').select('company_id').eq('auth_user_id', user.id).single()
-  if (!userData) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const c = await reviewer()
+  if ('error' in c) return c.error
+  const { service } = c
+  const userData = { company_id: c.companyId }
 
   const { data: approvals } = await service
     .from('qa_approvals')
@@ -22,12 +32,14 @@ export async function GET() {
       .select('*, checklist_items(label, item_type, hold_point)')
       .eq('job_id', approval.job_id)
       .eq('user_id', approval.user_id)
+      .eq('company_id', userData.company_id)
     if (subErr) {
       ;({ data: submissions } = await service
         .from('qa_submissions')
         .select('*, checklist_items(label, item_type)')
         .eq('job_id', approval.job_id)
-        .eq('user_id', approval.user_id))
+        .eq('user_id', approval.user_id)
+        .eq('company_id', userData.company_id))
     }
 
     let photoUrls: Record<string, string> = {}
@@ -44,25 +56,30 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const service = await createServiceClient()
-  const { data: userData } = await service.from('users').select('company_id, id').eq('auth_user_id', user.id).single()
-  if (!userData) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const c = await reviewer()
+  if ('error' in c) return c.error
+  const { service } = c
+  const userData = { company_id: c.companyId, id: c.userId }
 
-  const { approvalId, action, note } = await request.json()
+  const body = await request.json().catch(() => ({}))
+  const { action, note } = body || {}
+  if (action !== 'approved' && action !== 'rejected') {
+    return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
+  }
+  const approvalId = await ownedId(service, 'qa_approvals', body?.approvalId, userData.company_id)
+  if (!approvalId) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Hold-point gate: can't approve until every submitted hold-point item has RFL sign-off.
   if (action === 'approved') {
     try {
-      const { data: appr } = await service.from('qa_approvals').select('job_id, user_id').eq('id', approvalId).single()
+      const { data: appr } = await service.from('qa_approvals').select('job_id, user_id').eq('id', approvalId).eq('company_id', userData.company_id).single()
       if (appr) {
         const { data: subs, error: sErr } = await service
           .from('qa_submissions')
           .select('rfl_initials, checklist_items(hold_point, label)')
           .eq('job_id', appr.job_id)
           .eq('user_id', appr.user_id)
+          .eq('company_id', userData.company_id)
         if (!sErr) {
           const pending = (subs || []).filter((s: any) => s.checklist_items?.hold_point === true && !(s.rfl_initials && String(s.rfl_initials).trim()))
           if (pending.length) {
@@ -81,7 +98,7 @@ export async function POST(request: Request) {
     rejection_note: note || null,
     reviewed_at: new Date().toISOString(),
     reviewed_by: userData.id
-  }).eq('id', approvalId)
+  }).eq('id', approvalId).eq('company_id', userData.company_id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json({ success: true })

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { FIELD_AND_FOREMAN } from '@/lib/roles'
+import { allOwned, isUuid } from '@/lib/ownership'
 
 // GET: returns jobs[], installers[], and assignments matrix (job_id, user_id pairs)
 export async function GET() {
@@ -54,6 +55,20 @@ export async function POST(request: Request) {
 
   const add = Array.isArray(body.add) ? body.add : []
   const remove = Array.isArray(body.remove) ? body.remove : []
+
+  // Every job and user in add[] must belong to the caller's company: the
+  // service role would otherwise attach another tenant's job or user.
+  // remove[] is scoped by company_id on the delete; only its shape is checked.
+  if (!remove.every((r: any) => isUuid(r?.job_id) && isUuid(r?.user_id))) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 })
+  }
+  if (add.length > 0) {
+    const [jobsOk, usersOk] = await Promise.all([
+      allOwned(service, "jobs", add.map((a: any) => a?.job_id), u.company_id),
+      allOwned(service, "users", add.map((a: any) => a?.user_id), u.company_id),
+    ])
+    if (!jobsOk || !usersOk) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
 
   let added = 0
   let removed = 0

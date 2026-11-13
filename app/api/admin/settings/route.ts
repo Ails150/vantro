@@ -9,6 +9,7 @@ import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { parseRate } from "@/lib/pay"
 import { isValidRetentionDays } from "@/lib/retention-policy"
+import { OWNER_ROLES } from "@/lib/company-context"
 
 const FIELDS = [
   "id",
@@ -79,6 +80,22 @@ export async function POST(request: Request) {
   const body = await request.json()
   const updates: Record<string, any> = {}
 
+  // What every worker is paid, and whether sick days approve themselves, are
+  // the owner's decisions; a foreman keeps the operational settings. The
+  // settings page sends every field on save, so a foreman is refused only when
+  // one of these would actually change -- otherwise it is left out of the write.
+  const isOwner = (OWNER_ROLES as readonly string[]).includes(u.role)
+  let ownerOnly: { default_hourly_rate: any; sick_auto_approve: any } | null = null
+  if (!isOwner && (body.default_hourly_rate !== undefined || body.sick_auto_approve !== undefined)) {
+    const { data: current } = await service
+      .from("companies").select("default_hourly_rate, sick_auto_approve").eq("id", u.company_id).single()
+    ownerOnly = (current as any) || { default_hourly_rate: null, sick_auto_approve: null }
+  }
+  const ownerRefusal = () => NextResponse.json(
+    { error: "Only an administrator can change the default pay rate or sick-day auto-approval" },
+    { status: 403 },
+  )
+
   if (body.default_schedule !== undefined) {
     if (
       typeof body.default_schedule !== "object" ||
@@ -140,12 +157,24 @@ export async function POST(request: Request) {
   if (body.default_hourly_rate !== undefined) {
     const parsed = parseRate(body.default_hourly_rate)
     if (!parsed.ok) return NextResponse.json({ error: parsed.why }, { status: 400 })
-    updates.default_hourly_rate = parsed.rate
+    if (ownerOnly) {
+      const was = ownerOnly.default_hourly_rate == null ? null : Number(ownerOnly.default_hourly_rate)
+      const next = parsed.rate == null ? null : Number(parsed.rate)
+      if (was !== next) return ownerRefusal()
+    } else {
+      updates.default_hourly_rate = parsed.rate
+    }
   }
   if (body.background_gps_enabled !== undefined)
     updates.background_gps_enabled = body.background_gps_enabled
-  if (body.sick_auto_approve !== undefined)
-    updates.sick_auto_approve = body.sick_auto_approve
+  if (body.sick_auto_approve !== undefined) {
+    if (ownerOnly) {
+      // Unset reads as off, which is what the page shows and sends back.
+      if (!!body.sick_auto_approve !== !!ownerOnly.sick_auto_approve) return ownerRefusal()
+    } else {
+      updates.sick_auto_approve = body.sick_auto_approve
+    }
+  }
 
   // Global default shift times (HH:MM); blank/null clears them.
   for (const key of ["default_start_time", "default_sign_out_time"] as const) {

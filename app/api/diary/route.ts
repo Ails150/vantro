@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { verifyActiveFieldToken } from "@/lib/auth"
 import { sendDiaryAlertEmail } from "@/lib/email-alerts"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { ownedId } from "@/lib/ownership"
 
 
 const createServiceClient = () => {
@@ -55,12 +56,17 @@ export async function POST(request: Request) {
 
     const service = createServiceClient()
 
+    // The job must be the caller's before anything uses it: the insert, the
+    // alert, the job-name lookup and the push all run on the service role.
+    const ownedJobId = await ownedId(service, "jobs", jobId, payload.companyId)
+    if (!ownedJobId) return NextResponse.json({ error: "Not found" }, { status: 404 })
+
     const { data: diary, error: diaryError } = await service
       .from("diary_entries")
       .insert({
         user_id: payload.userId,
         company_id: payload.companyId,
-        job_id: jobId,
+        job_id: ownedJobId,
         entry_text: entryText || '',
         photo_urls: photoUrls || [],
         video_url: videoUrl || null,
@@ -101,13 +107,14 @@ export async function POST(request: Request) {
         ai_variation_detected: aiVariationDetected
       })
       .eq("id", diary.id)
+      .eq("company_id", payload.companyId)
 
     if (finalSeverity === "blocker" || finalSeverity === "issue") {
       const { error: alertError } = await service
         .from("alerts")
         .insert({
           company_id: payload.companyId,
-          job_id: jobId,
+          job_id: ownedJobId,
           user_id: payload.userId,
           alert_type: finalSeverity,
           message: (entryText && entryText.trim()) ? entryText.trim().slice(0, 200) : (aiSummary || "Diary entry"),
@@ -127,7 +134,7 @@ export async function POST(request: Request) {
           .single()
         await sendDiaryAlertEmail({
           companyId: payload.companyId,
-          jobId,
+          jobId: ownedJobId,
           alertType: finalSeverity as "blocker" | "issue",
           summary: entryText?.trim() || aiSummary || "Diary entry",
           loggedBy: loggerRow?.name || "Installer",
@@ -143,7 +150,7 @@ export async function POST(request: Request) {
         console.log("[diary] Alert created:", finalSeverity, "for diary", diary.id)
         // Push admin/foreman for new blocker or issue alerts
         try {
-          const { data: jobInfo } = await service.from("jobs").select("name").eq("id", jobId).single()
+          const { data: jobInfo } = await service.from("jobs").select("name").eq("id", ownedJobId).eq("company_id", payload.companyId).single()
           const { data: installerInfo } = await service.from("users").select("name").eq("id", payload.userId).single()
           const { data: admins } = await service.from("users")
             .select("push_token")
@@ -159,7 +166,7 @@ export async function POST(request: Request) {
                 sound: "default",
                 title: finalSeverity === "blocker" ? "BLOCKER reported" : "Site issue reported",
                 body: (installerInfo?.name || "Installer") + " at " + (jobInfo?.name || "site") + ": " + (aiSummary || "").slice(0, 100),
-                data: { type: "diary_alert", diaryId: diary.id, jobId, severity: finalSeverity },
+                data: { type: "diary_alert", diaryId: diary.id, jobId: ownedJobId, severity: finalSeverity },
                 channelId: "vantro",
               }))),
             }).catch(() => {})

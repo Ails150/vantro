@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getCallerContext, isDashboardRole } from "@/lib/company-context"
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const ctx = await getCallerContext()
+  if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  // The company-wide walkthrough list (transcripts, AI flags, every installer).
+  if (!isDashboardRole(ctx.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  if (!ctx.companyId) return NextResponse.json({ error: "No company selected" }, { status: 400 })
 
   const service = await createServiceClient()
-  const { data: u } = await service
-    .from("users")
-    .select("company_id, role")
-    .eq("auth_user_id", user.id)
-    .single()
-  if (!u) return NextResponse.json({ error: "User not found" }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
   const filter = searchParams.get("filter") || "all"
@@ -31,7 +28,7 @@ export async function GET(req: NextRequest) {
       approver:users!approved_by(id, name),
       clips:walkthrough_clips(id, sequence_number, duration_seconds, transcript, stream_video_id)
     `)
-    .eq("company_id", u.company_id)
+    .eq("company_id", ctx.companyId)
     .order("recorded_at", { ascending: false })
 
   if (status !== "all") {

@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { VISIT_ROLE_DEFAULT } from '@/lib/roles'
+import { ownedId } from '@/lib/ownership'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -23,10 +24,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   const body = await request.json()
-  const { job_id, user_id, date, role: assignmentRole } = body
+  const { date, role: assignmentRole } = body
 
-  if (!job_id || !user_id || !date)
+  if (!body.job_id || !body.user_id || !date)
     return NextResponse.json({ error: "job_id, user_id, date required" }, { status: 400 })
+
+  // Both ids must be this company's before anything is looked up or created:
+  // the service role would otherwise schedule a visit on another tenant's job
+  // or put another tenant's installer on this one.
+  const [job_id, user_id] = await Promise.all([
+    ownedId(service, "jobs", body.job_id, admin.company_id),
+    ownedId(service, "users", body.user_id, admin.company_id),
+  ])
+  if (!job_id || !user_id) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   // Find an existing visit for this job overlapping this date
   const dayStart = `${date}T00:00:00`

@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server"
-import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
+import { getCallerContext, OWNER_ROLES } from "@/lib/company-context"
 import crypto from "crypto"
 import { assertJobBelongsToCaller } from "@/lib/tenant"
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const ctx = await getCallerContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Granting an outsider a portal onto a job is an owner decision.
+  if (!(OWNER_ROLES as readonly string[]).includes(ctx.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  if (!ctx.companyId) return NextResponse.json({ error: 'No company selected' }, { status: 400 })
 
   const service = await createServiceClient()
-  const { data: u } = await service.from('users').select('company_id').eq('auth_user_id', user.id).single()
-  if (!u) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const u = { company_id: ctx.companyId }
 
   const { name, email, jobId } = await request.json()
   if (!name || !email || !jobId) return NextResponse.json({ error: 'Missing fields' }, { status: 400 })

@@ -100,6 +100,7 @@ export async function GET(request: Request) {
         const { data: items } = await service
           .from("checklist_items")
           .select("id")
+          .eq("company_id", companyId)
           .eq("template_id", job.checklist_template_id)
         checklistTotal = (items || []).length
         // Count signed-off items via checklist_run_items if it exists

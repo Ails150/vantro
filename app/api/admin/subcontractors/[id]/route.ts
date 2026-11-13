@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { OWNER_ROLES } from "@/lib/company-context"
 
 const RATE_TYPES = new Set(["hourly", "daily", "weekly", "monthly", "per_job"])
 
@@ -16,6 +17,12 @@ async function getCallingAdmin() {
   if (!row) return null
   if (!["admin", "foreman", "superadmin"].includes(row.role)) return null
   return row
+}
+
+// Rates, insurance and deactivation are commercial decisions: owners only.
+// A foreman can still read a subcontractor (GET).
+function isOwner(role: string) {
+  return (OWNER_ROLES as readonly string[]).includes(role)
 }
 
 interface Params {
@@ -58,6 +65,7 @@ export async function GET(_: Request, { params }: Params) {
 export async function PATCH(request: Request, { params }: Params) {
   const admin = await getCallingAdmin()
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!isOwner(admin.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   const { id } = await params
 
   const body = await request.json().catch(() => ({}))
@@ -128,6 +136,7 @@ export async function PATCH(request: Request, { params }: Params) {
 export async function DELETE(_: Request, { params }: Params) {
   const admin = await getCallingAdmin()
   if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  if (!isOwner(admin.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   const { id } = await params
 
   const service = await createServiceClient()

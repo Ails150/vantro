@@ -10,6 +10,8 @@
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { ownedId } from "@/lib/ownership"
+import { isCompanyKey } from "@/lib/upload-key"
 
 const MANAGER_ROLES = ["admin", "foreman", "superadmin"]
 
@@ -153,6 +155,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "A talk cannot be delivered in the future" }, { status: 400 })
   }
 
+  // The deliverer is recorded on a safety record: it must be one of this
+  // company's people, not an id from another tenant.
+  let deliveredBy: string = me.id
+  if (body.deliveredBy) {
+    const owned = await ownedId(service, "users", body.deliveredBy, me.company_id)
+    if (!owned) return NextResponse.json({ error: "Not found" }, { status: 404 })
+    deliveredBy = owned
+  }
+
+  // A stored path is later read back as this company's file, so only keys this
+  // company could have been issued (lib/upload-key.ts, or the RAMS route's
+  // rams/<company>/ prefix) are kept. The URL is derived from the path rather
+  // than taken from the client, so it cannot point anywhere else.
+  const rawPath = typeof body.documentPath === "string" ? body.documentPath : ""
+  const documentPath =
+    isCompanyKey(rawPath, me.company_id) ||
+    (rawPath.startsWith(`rams/${me.company_id}/`) && !rawPath.split("/").includes(".."))
+      ? rawPath
+      : null
+  const publicBase = (process.env.CLOUDFLARE_R2_PUBLIC_URL || "").replace(/\/$/, "")
+  const documentUrl = documentPath && publicBase ? `${publicBase}/${documentPath}` : null
+
   const { data: talk, error } = await service
     .from("toolbox_talks")
     .insert({
@@ -160,10 +184,10 @@ export async function POST(request: Request) {
       job_id: jobId,
       title,
       notes,
-      document_url: body.documentUrl || null,
-      document_path: body.documentPath || null,
-      document_sha256: body.documentSha256 || null,
-      delivered_by: body.deliveredBy || me.id,
+      document_url: documentUrl,
+      document_path: documentPath,
+      document_sha256: documentPath ? body.documentSha256 || null : null,
+      delivered_by: deliveredBy,
       delivered_at: deliveredAt.toISOString(),
       created_by: me.id,
     })

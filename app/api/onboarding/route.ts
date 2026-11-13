@@ -1,6 +1,14 @@
 ﻿import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
 import { FIELD_ROLE, normaliseRole } from '@/lib/roles'
+import { OWNER_ROLES } from '@/lib/company-context'
+
+// Roles the team step may create. It used to accept anything but superadmin,
+// so any signed-in user could add an admin -- or a 'support' row, the platform
+// role that switches between companies. Admins are added from Team settings by
+// an owner, never here.
+const ONBOARDING_ROLES = new Set(['field', 'installer', 'foreman', 'subcontractor'])
+const isOwner = (role: unknown) => (OWNER_ROLES as readonly string[]).includes(String(role))
 
 /**
  * POST /api/onboarding
@@ -61,7 +69,7 @@ export async function POST(request: Request) {
     // Idempotent: if user already has a company, return it
     const { data: existingUser } = await service
       .from('users')
-      .select('company_id')
+      .select('company_id, role')
       .eq('auth_user_id', user.id)
       .maybeSingle()
 
@@ -126,7 +134,7 @@ export async function POST(request: Request) {
 
     const { data: userData, error: lookupErr } = await service
       .from('users')
-      .select('company_id')
+      .select('company_id, role')
       .eq('auth_user_id', user.id)
       .maybeSingle()
 
@@ -145,6 +153,10 @@ export async function POST(request: Request) {
       }, { status: 412 })
     }
 
+    if (!isOwner((userData as any).role)) {
+      return NextResponse.json({ error: 'Only an admin can add the team.' }, { status: 403 })
+    }
+
     if (!installers?.length) {
       return NextResponse.json({ error: 'Add at least one team member' }, { status: 400 })
     }
@@ -157,8 +169,8 @@ export async function POST(request: Request) {
     // Defence in depth: never allow superadmin to be assigned via this step.
     // Only the company creator gets superadmin (set in STEP 1).
     const insertData = valid.map(inst => {
-      const requestedRole = (inst.role || FIELD_ROLE).trim()
-      const safeRole = normaliseRole(requestedRole === 'superadmin' ? FIELD_ROLE : requestedRole)
+      const requestedRole = normaliseRole(String(inst.role || FIELD_ROLE).trim())
+      const safeRole = ONBOARDING_ROLES.has(requestedRole) ? requestedRole : FIELD_ROLE
       return {
         company_id: userData.company_id,
         email: inst.email.trim().toLowerCase(),
@@ -195,7 +207,7 @@ export async function POST(request: Request) {
 
     const { data: userData } = await service
       .from('users')
-      .select('company_id')
+      .select('company_id, role')
       .eq('auth_user_id', user.id)
       .maybeSingle()
 
@@ -204,6 +216,10 @@ export async function POST(request: Request) {
         error: 'Please complete the Company step first',
         code: 'PRECONDITION_FAILED',
       }, { status: 412 })
+    }
+
+    if (!isOwner((userData as any).role)) {
+      return NextResponse.json({ error: 'Only an admin can add jobs.' }, { status: 403 })
     }
 
     if (!jobs?.length) {

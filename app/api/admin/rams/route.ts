@@ -13,6 +13,7 @@ import { NextResponse } from "next/server"
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
 import { recordFileHash, sha256Hex } from "@/lib/evidence"
+import { ownedId } from "@/lib/ownership"
 
 const MANAGER_ROLES = ["admin", "foreman", "superadmin"]
 const MAX_BYTES = 20 * 1024 * 1024
@@ -36,8 +37,13 @@ export async function GET(request: Request) {
   if ("error" in c) return c.error
   const { me, service } = c
 
-  const jobId = new URL(request.url).searchParams.get("jobId")
-  if (!jobId) return NextResponse.json({ error: "jobId is required" }, { status: 400 })
+  const requested = new URL(request.url).searchParams.get("jobId")
+  if (!requested) return NextResponse.json({ error: "jobId is required" }, { status: 400 })
+
+  // Ownership first: the crew read below is keyed on the job id alone, so it
+  // would list another company's installers.
+  const jobId = await ownedId(service, "jobs", requested, me.company_id)
+  if (!jobId) return NextResponse.json({ error: "Not found" }, { status: 404 })
 
   // Typed as any: supabase-js cannot infer the shape of an aliased embed
   // (uploaded_by_user:users!fk) and falls back to an error type, which then

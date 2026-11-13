@@ -58,10 +58,13 @@ export async function GET(request: Request) {
       .from('jobs')
       .select('*')
       .in('id', Array.from(accessJobIds))
+      .eq('company_id', installer.companyId)
       .eq('status', 'active')
     jobs = accessibleJobs || []
   }
 
+  // Keyed on job ids from the company-scoped read above, so only this
+  // company's jobs' checklists can come back.
   let checklistsByJob: Record<string, any[]> = {}
   if (jobs.length) {
     const jobIds = jobs.map((j: any) => j.id)

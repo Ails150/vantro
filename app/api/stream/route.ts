@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { verifyActiveFieldToken } from "@/lib/auth"
 import { getClientIp, rateLimit, rateLimitedResponse } from "@/lib/rate-limit"
 import { bearerToken, tokenBucketId } from "@/lib/installer-rate-limit"
+import { getCallerContext } from "@/lib/company-context"
+import { createServiceClient } from "@/lib/supabase/server"
 
 const CF_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
 const CF_STREAM_TOKEN = process.env.CLOUDFLARE_STREAM_TOKEN
@@ -68,10 +70,36 @@ export async function POST(request: Request) {
   }
 }
 
+// Video metadata from Cloudflare, by uid. Was entirely unauthenticated: anyone
+// with a uid got the account's record for it, including signed playback and
+// download details. Now a caller (field token or dashboard session) gets it
+// only for a uid filed in one of their own company's walkthrough clips.
 export async function GET(request: Request) {
+  const notFound = () => NextResponse.json({ error: "Not found" }, { status: 404 })
+
+  let companyId: string | null = null
+  if (request.headers.get("authorization")?.startsWith("Bearer ")) {
+    companyId = (await verifyActiveFieldToken(request))?.companyId ?? null
+  } else {
+    companyId = (await getCallerContext())?.companyId ?? null
+  }
+  if (!companyId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
   const { searchParams } = new URL(request.url)
   const uid = searchParams.get("uid")
   if (!uid) return NextResponse.json({ error: "No uid" }, { status: 400 })
+  if (!/^[A-Za-z0-9]{1,64}$/.test(uid)) return notFound()
+
+  const service = await createServiceClient()
+  const { data: clip, error } = await service
+    .from("walkthrough_clips")
+    .select("id, walkthroughs!inner(company_id)")
+    .eq("stream_video_id", uid)
+    .eq("walkthroughs.company_id", companyId)
+    .limit(1)
+    .maybeSingle()
+  const w: any = clip ? (Array.isArray((clip as any).walkthroughs) ? (clip as any).walkthroughs[0] : (clip as any).walkthroughs) : null
+  if (error || !clip || w?.company_id !== companyId) return notFound()
 
   const res = await fetch(
     `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/stream/${uid}`,

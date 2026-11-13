@@ -32,6 +32,12 @@ export async function POST(req: NextRequest) {
     }
 
     const service = await createServiceClient()
+    const companyId = _installer.companyId
+
+    // Scoped to the caller's company BEFORE anything else: this route sends the
+    // transcript to Gemini and writes the result back, so an unscoped id let
+    // one company read (via the AI summary) and overwrite another's walkthrough.
+    // Must stay ahead of every external call.
 
     const { data: walkthrough, error: fetchErr } = await service
       .from("walkthroughs")
@@ -42,10 +48,11 @@ export async function POST(req: NextRequest) {
         clips:walkthrough_clips(sequence_number, duration_seconds, transcript)
       `)
       .eq("id", walkthroughId)
-      .single()
+      .eq("company_id", companyId)
+      .maybeSingle()
 
-    if (fetchErr || !walkthrough) {
-      return NextResponse.json({ error: "Walkthrough not found", detail: fetchErr?.message }, { status: 404 })
+    if (fetchErr || !walkthrough || walkthrough.company_id !== companyId) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
     const sortedClips = (walkthrough.clips || [])
@@ -107,6 +114,7 @@ export async function POST(req: NextRequest) {
         ai_flags: parsed.flags ?? [],
       })
       .eq("id", walkthroughId)
+      .eq("company_id", companyId)
 
     if (updateErr) {
       console.error("[walkthrough/process] Update failed:", updateErr.message)
@@ -114,7 +122,7 @@ export async function POST(req: NextRequest) {
     }
 
     await service.rpc("increment_voice_capture_count", {
-      p_company_id: walkthrough.company_id,
+      p_company_id: companyId,
     })
 
     return NextResponse.json({

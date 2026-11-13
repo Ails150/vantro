@@ -2,6 +2,20 @@ import { verifyActiveFieldToken } from '@/lib/auth'
 import { sendDiaryAlertEmail } from '@/lib/email-alerts'
 import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { ownedId } from '@/lib/ownership'
+import { isCompanyKey } from '@/lib/upload-key'
+
+// A storage path is only stored if it is a key /api/upload would have issued to
+// this company. GET signs these paths with the service role, so an unchecked
+// path was a way to fetch any other company's photographs. A bad path is
+// dropped rather than refused: the phone's offline queue replays old payloads,
+// and a refusal would leave them retrying for ever.
+function companyPath(path: unknown, companyId: string): string | null {
+  if (typeof path !== 'string' || !path) return null
+  if (isCompanyKey(path, companyId)) return path
+  console.warn('[defects] dropped a storage path outside this company')
+  return null
+}
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -57,15 +71,19 @@ export async function POST(request: Request) {
     companyId = u?.company_id
   }
 
-  const body = await request.json()
+  if (!userId || !companyId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const body = await request.json().catch(() => ({}))
   const { action, jobId, description, severity, photoUrl, photoPath, videoUrl, videoPath, defectId, resolutionNote } = body
 
   if (action === 'create') {
+    const ownJobId = await ownedId(service, 'jobs', jobId, companyId)
+    if (!ownJobId) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const { data, error } = await service.from('defects').insert({
-      job_id: jobId, user_id: userId, company_id: companyId,
+      job_id: ownJobId, user_id: userId, company_id: companyId,
       description, severity: severity || 'minor',
-      photo_url: photoUrl || null, photo_path: photoPath || null,
-      video_url: videoUrl || null, video_path: videoPath || null
+      photo_url: photoUrl || null, photo_path: companyPath(photoPath, companyId),
+      video_url: videoUrl || null, video_path: companyPath(videoPath, companyId)
     }).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
@@ -73,14 +91,14 @@ export async function POST(request: Request) {
     const sev = severity || 'minor'
     if (sev === 'critical' || sev === 'major') {
       try {
-        const { data: job } = await service.from('jobs').select('name').eq('id', jobId).single()
+        const { data: job } = await service.from('jobs').select('name').eq('id', ownJobId).single()
         const { data: installer } = await service.from('users').select('name').eq('id', userId).single()
         const alertMessage = (sev === 'critical' ? 'CRITICAL defect' : 'Major defect') + ' at ' + (job?.name || 'site') + ': ' + description.slice(0, 200)
 
         await service.from('alerts').insert({
           company_id: companyId,
           user_id: userId,
-          job_id: jobId,
+          job_id: ownJobId,
           alert_type: sev === 'critical' ? 'blocker' : 'issue',
           message: alertMessage,
           is_read: false,
@@ -101,7 +119,7 @@ export async function POST(request: Request) {
               sound: 'default',
               title: sev === 'critical' ? 'CRITICAL defect logged' : 'Major defect logged',
               body: (installer?.name || 'Installer') + ' at ' + (job?.name || 'site') + ': ' + description.slice(0, 100),
-              data: { type: 'defect_alert', defectId: data.id, jobId },
+              data: { type: 'defect_alert', defectId: data.id, jobId: ownJobId },
               channelId: 'vantro',
             }))),
           }).catch(() => {})
@@ -111,7 +129,7 @@ export async function POST(request: Request) {
         try {
           await sendDiaryAlertEmail({
             companyId,
-            jobId,
+            jobId: ownJobId,
             alertType: sev === 'critical' ? 'blocker' : 'issue',
             summary: description,
             loggedBy: installer?.name || 'Installer',
@@ -130,18 +148,20 @@ export async function POST(request: Request) {
   }
 
   if (action === 'resolve') {
-    const { error } = await service.from('defects').update({
+    const { data: resolved, error } = await service.from('defects').update({
       status: 'resolved', resolution_note: resolutionNote,
       resolved_by: userId, resolved_at: new Date().toISOString()
-    }).eq('id', defectId)
+    }).eq('id', defectId).eq('company_id', companyId).select('id')
+    if (!error && !resolved?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })
   }
 
   if (action === 'reopen') {
-    const { error } = await service.from('defects').update({
+    const { data: reopened, error } = await service.from('defects').update({
       status: 'open', resolution_note: null, resolved_by: null, resolved_at: null
-    }).eq('id', defectId)
+    }).eq('id', defectId).eq('company_id', companyId).select('id')
+    if (!error && !reopened?.length) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ success: true })
   }

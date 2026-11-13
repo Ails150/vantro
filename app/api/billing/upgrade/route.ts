@@ -31,10 +31,15 @@ export async function POST(request: Request) {
 
   const { data: userData } = await service
     .from('users')
-    .select('company_id')
+    .select('company_id, role')
     .eq('auth_user_id', user.id)
     .single()
   if (!userData) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  // Changing the plan spends the company's money. Owners only; support is
+  // excluded on purpose, a platform user should not bill a customer.
+  if (!['admin', 'superadmin'].includes(userData.role)) {
+    return NextResponse.json({ error: 'Only an admin can change the plan.' }, { status: 403 })
+  }
 
   const { data: company } = await service
     .from('companies')
@@ -63,9 +68,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, message: `Upgraded to ${newTier.name}` })
   }
 
-  await service.from('companies').update({
-    plan: newPlan,
-  }).eq('id', company.id)
+  // NO PLAN WRITE HERE. This used to set companies.plan = newPlan before the
+  // checkout session was even created, so posting { newPlan: "suite" } and
+  // closing the Stripe tab gave any signed-in user every paid feature for
+  // nothing. The plan is now set by the webhook, from the price on the paid
+  // subscription (customer.subscription.created / updated).
 
   // checkout_email_fix_v1: Stripe needs customer or customer_email when creating
   // a Checkout session. If no stripe_customer_id yet, fall back to the auth user email.

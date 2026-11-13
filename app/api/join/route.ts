@@ -19,6 +19,7 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { createFieldToken, verifyInviteToken } from "@/lib/auth"
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit"
 import { getInitials } from "@/lib/provisioning"
+import { FIELD_ROLES } from "@/lib/roles"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -76,19 +77,28 @@ export async function POST(request: Request) {
   if (cleanEmail) {
     const { data } = await service
       .from("users")
-      .select("id, company_id, is_active")
+      .select("id, company_id, is_active, role, anonymised_at")
       .eq("company_id", invite.companyId)
       .eq("email", cleanEmail)
       .maybeSingle()
     existing = data
   }
 
+  // Rejoining hands out a 90-day field token for an EXISTING record, on nothing
+  // more than the shared link and an email address. So it is limited to what
+  // the link is for: an active field worker getting back into their own
+  // account. It used to match any member -- an admin's address returned a
+  // field token for the admin -- and it switched deactivated workers back on,
+  // undoing the employer's decision. Both now go to the employer instead.
   let userId: string
   if (existing) {
-    userId = existing.id
-    if (existing.is_active === false) {
-      await service.from("users").update({ is_active: true }).eq("id", userId)
+    if (!FIELD_ROLES.includes(existing.role) || existing.is_active === false || existing.anonymised_at) {
+      return NextResponse.json(
+        { error: "That email is already on this team's account. Ask your employer to send you an invite." },
+        { status: 409 },
+      )
     }
+    userId = existing.id
   } else {
     const { data: created, error } = await service
       .from("users")

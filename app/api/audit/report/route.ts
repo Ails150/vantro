@@ -3,6 +3,7 @@ import { can, toPlan } from "@/lib/plan"
 import { schemeFeatureEnabled } from "@/lib/schemes/driver"
 import Anthropic from "@anthropic-ai/sdk"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { isDashboardRole } from "@/lib/company-context"
 
 import { fetchAuditData } from "@/lib/audit/data"
 import { attendanceCells } from "@/lib/audit/attendance"
@@ -1206,8 +1207,11 @@ export async function GET(request: Request) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    const { data: appUser } = await service.from("users").select("id, company_id").eq("auth_user_id", user.id).single()
+    const { data: appUser } = await service.from("users").select("id, company_id, role").eq("auth_user_id", user.id).single()
     if (!appUser) return NextResponse.json({ error: "User not found" }, { status: 403 })
+    // Session path only. The share-token path above is the client's link and is
+    // unaffected; a signed-in field session does not get the compliance pack.
+    if (!isDashboardRole(appUser.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     companyId = appUser.company_id
     generatedBy = appUser.id || null
   }

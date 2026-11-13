@@ -1,11 +1,35 @@
 import { NextResponse } from 'next/server'
-import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/server'
 import { LIMITS, rateLimit, rateLimitedResponse } from '@/lib/rate-limit'
+import { getCallerContext, OWNER_ROLES } from '@/lib/company-context'
+import { FIELD_ROLE, LEGACY_FIELD_ROLE } from '@/lib/roles'
+
+function escapeHtml(s: unknown): string {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+// Roles an owner may send an invite for. 'admin' is added only for a superadmin
+// caller, matching the role picker in AdminDashboard. A missing role (the
+// "resend invite" button sends none) means a field worker, as it always has.
+const INVITABLE_ROLES = [FIELD_ROLE, LEGACY_FIELD_ROLE, 'foreman', 'subcontractor']
 
 export async function POST(request: Request) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // Owners only. This sends Vantro-branded mail to a caller-chosen address and,
+  // for dashboard roles, mints a Supabase invite link. A field or foreman
+  // session has no business doing either. Callers: AdminDashboard (add member,
+  // CSV import, resend), onboarding, and the subcontractor crew routes, which
+  // forward the admin's cookie server to server.
+  const ctx = await getCallerContext()
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!(OWNER_ROLES as readonly string[]).includes(ctx.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+  const user = { id: ctx.authUserId }
 
   // Limited even though it needs a session.
   //
@@ -20,7 +44,17 @@ export async function POST(request: Request) {
   }
 
   const service = await createServiceClient()
-  const { email, name, role } = await request.json()
+  const body = await request.json().catch(() => null)
+  if (!body || typeof body !== 'object') return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  const email = typeof body.email === 'string' ? body.email.trim() : ''
+  const rawName = typeof body.name === 'string' ? body.name : ''
+  const role = (typeof body.role === 'string' && body.role.trim()) ? body.role.trim().toLowerCase() : FIELD_ROLE
+  if (!email) return NextResponse.json({ error: 'Email required' }, { status: 400 })
+  const allowed = ctx.role === 'superadmin' ? [...INVITABLE_ROLES, 'admin'] : INVITABLE_ROLES
+  if (!allowed.includes(role)) {
+    return NextResponse.json({ error: 'You cannot invite that role' }, { status: 403 })
+  }
+  const name = escapeHtml(rawName)
 
   // Dashboard users (admin + foreman) get the set-password invite flow.
   // Installers get the app-download email instead.

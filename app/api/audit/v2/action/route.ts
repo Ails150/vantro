@@ -12,6 +12,12 @@ export async function POST(req: Request) {
   const { data: appUser } = await service.from("users").select("id, company_id, role").eq("auth_user_id", user.id).single()
   if (!appUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
+  // Every action here is a manager's: approving QA, resolving defects,
+  // snoozing audit flags, signing a job off. None is open to installers.
+  if (!isDashboardRole(appUser.role) || !appUser.company_id) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+
   const userId = appUser.id
   const companyId = appUser.company_id
 
@@ -69,9 +75,17 @@ export async function POST(req: Request) {
         const { flagKey, jobId, until } = params
         if (!flagKey || !jobId) return NextResponse.json({ error: "Missing flagKey or jobId" }, { status: 400 })
 
+        const { data: job } = await service.from("jobs")
+          .select("id, company_id")
+          .eq("id", jobId)
+          .maybeSingle()
+        if (!job || job.company_id !== companyId) {
+          return NextResponse.json({ error: "Not found" }, { status: 404 })
+        }
+
         const { error } = await service.from("audit_pack_snoozes").insert({
           company_id: companyId,
-          job_id: jobId,
+          job_id: job.id,
           flag_key: flagKey,
           snoozed_until: until || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
           snoozed_by: userId,
@@ -86,12 +100,8 @@ export async function POST(req: Request) {
         const { jobId } = params
         if (!jobId) return NextResponse.json({ error: "Missing jobId" }, { status: 400 })
 
-        // Sign-off can now file a legal notification with a scheme, so it is
-        // limited to the people who can see the button.
-        if (!isDashboardRole(appUser.role)) {
-          return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-        }
-
+        // Sign-off can now file a legal notification with a scheme; the role
+        // check at the top limits it to the people who can see the button.
         const { data: job } = await service.from("jobs")
           .select("id, company_id")
           .eq("id", jobId)

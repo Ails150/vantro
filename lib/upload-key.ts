@@ -106,6 +106,32 @@ export function uploadKey(
   ].join("/")
 }
 
+/**
+ * Could this company have been issued this key by uploadKey()?
+ *
+ * For routes that store a client-supplied storage path: without this, a field
+ * token could point its own record at another company's file (keys contain
+ * only ids that are visible in the app) and then read it back through any
+ * signed-URL route that trusts the stored path. Only governs NEW writes; rows
+ * written before uploadKey() existed hold legacy unprefixed keys.
+ *
+ * Strict shape, not just a prefix test, so "u/<company>/../<other>" and
+ * friends cannot pass.
+ */
+export function isCompanyKey(path: unknown, companyId: string | null | undefined): path is string {
+  if (typeof path !== "string" || !companyId) return false
+  const parts = path.split("/")
+  if (parts.length !== 5) return false
+  const [root, company, yyyymm, category, file] = parts
+  return (
+    root === "u" &&
+    company === companyId &&
+    /^\d{6}$/.test(yyyymm) &&
+    /^[a-z][a-z0-9-]{0,23}$/.test(category) &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.[a-z0-9]{1,5}$/i.test(file)
+  )
+}
+
 export type UploadCheck =
   | { ok: true; contentType: string }
   | { ok: false; status: number; error: string }

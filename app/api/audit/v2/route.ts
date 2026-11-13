@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { can, toPlan } from "@/lib/plan"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { isDashboardRole } from "@/lib/company-context"
 import { fetchAuditData } from "@/lib/audit/data"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { checkRateLimit } from "@/lib/rate-limit"
@@ -54,6 +55,9 @@ export async function POST(request: Request) {
   const service = await createServiceClient()
   const { data: appUser } = await service.from("users").select("id, company_id, role").eq("auth_user_id", user.id).single()
   if (!appUser) return NextResponse.json({ error: "User not found" }, { status: 403 })
+  // The internal audit view carries every worker's sign-ins, GPS, diary and the
+  // admin log, and spends AI credit. Dashboard roles only.
+  if (!isDashboardRole(appUser.role)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   const companyId = appUser.company_id
 
   const body = await request.json()

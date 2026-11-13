@@ -9,7 +9,10 @@ export async function POST(request: Request) {
   }
 
   const service = await createServiceClient()
-  const { authUserId, userId } = await request.json()
+  // Only userId is read from the body. It used to take authUserId too, and
+  // deleted that auth account without tying it to the verified target -- so an
+  // admin of any company could delete any login on the platform.
+  const { userId } = await request.json().catch(() => ({}))
 
   if (!userId) {
     return NextResponse.json({ error: "Missing userId" }, { status: 400 })
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
 
   const { data: target, error: targetErr } = await service
     .from("users")
-    .select("id, company_id, is_superadmin")
+    .select("id, company_id, is_superadmin, auth_user_id")
     .eq("id", userId)
     .maybeSingle()
 
@@ -61,9 +64,9 @@ export async function POST(request: Request) {
     )
   }
 
-  await service.from("users").delete().eq("id", userId)
-  if (authUserId) {
-    await service.auth.admin.deleteUser(authUserId)
+  await service.from("users").delete().eq("id", target.id).eq("company_id", caller.company_id)
+  if (target.auth_user_id) {
+    await service.auth.admin.deleteUser(target.auth_user_id)
   }
 
   return NextResponse.json({ success: true })

@@ -7,6 +7,7 @@
 
 import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { ownedId } from "@/lib/ownership"
 
 async function requireAdmin() {
   const supabase = await createClient()
@@ -33,7 +34,14 @@ export async function PATCH(
   const { service, admin } = auth
 
   const body = await request.json()
-  const { user_id, target_date } = body
+  const { target_date } = body
+
+  // A new installer must be one of this company's users, whichever branch runs.
+  let user_id: string | null = null
+  if (body.user_id) {
+    user_id = await ownedId(service, "users", body.user_id, admin.company_id)
+    if (!user_id) return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
 
   // Load the existing assignment + its visit (for job_id)
   const { data: existing } = await service

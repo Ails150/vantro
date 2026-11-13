@@ -171,7 +171,6 @@ export const INTENTIONALLY_PUBLIC: Array<{ prefix: string; why: string }> = [
   { prefix: "/api/auth", why: "the sign-in exchange itself" },
   { prefix: "/api/signup", why: "creating an account, by definition unauthenticated" },
   { prefix: "/api/join", why: "a worker accepting an invite link" },
-  { prefix: "/api/invite", why: "invite acceptance, token in the body" },
   { prefix: "/api/verify", why: "public evidence-pack verification" },
   { prefix: "/api/support/provision", why: "inbound support provisioning, secret in the body" },
   { prefix: "/api/billing/webhook", why: "Stripe calls it; authenticated by signature" },

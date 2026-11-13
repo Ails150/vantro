@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from "next/server"
 import { createClient, createServiceClient } from "@/lib/supabase/server"
+import { OWNER_ROLES } from "@/lib/company-context"
 
 // PATCH /api/admin/company
 // Body: { name, address?, phone?, contact_email? }
@@ -16,7 +17,7 @@ export async function PATCH(request: Request) {
     .select("company_id, role")
     .eq("auth_user_id", user.id)
     .single()
-  if (!admin || !["admin","foreman","superadmin"].includes(admin.role)) {
+  if (!admin || !(OWNER_ROLES as readonly string[]).includes(admin.role)) {
     return NextResponse.json({ error: "Forbidden — admin only" }, { status: 403 })
   }
 
