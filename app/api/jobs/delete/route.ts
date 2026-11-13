@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from 'next/server'
 import { createClient, createServiceClient } from '@/lib/supabase/server'
+import { ownedJobId } from '@/lib/job-ownership'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -9,7 +10,12 @@ export async function POST(request: Request) {
   const { data: userData } = await service.from('users').select('company_id, role').eq('auth_user_id', user.id).single()
   if (!userData || userData.role !== 'admin') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId } = await request.json()
+  const body = await request.json().catch(() => ({}))
+
+  // Ownership first. Every delete below is keyed on this id alone, so this is
+  // the only thing stopping one company deleting another company's records.
+  const jobId = await ownedJobId(service, body?.jobId, userData.company_id)
+  if (!jobId) return NextResponse.json({ error: 'Job not found' }, { status: 404 })
 
   await service.from('job_assignments').delete().eq('job_id', jobId)
   await service.from('signins').delete().eq('job_id', jobId)
