@@ -59,3 +59,23 @@ test("a company A admin cannot delete a company B job's records", async ({ reque
   const { data: job } = await service.from("jobs").select("id").eq("id", jobB).maybeSingle()
   expect(job).not.toBeNull()
 })
+
+// The control. Without it, a route that refused everything would pass above.
+test("the same admin can still delete their own company's job", async ({ request }) => {
+  expect(adminA, "probe admin for tenant A could not be created").not.toBeNull()
+  const service = serviceClient()
+  const { data: own } = await service
+    .from("jobs")
+    .insert({ company_id: TENANT_A.id, name: `[TEST] a8 own ${Date.now()}`, address: "", status: "active", required_trades: [] })
+    .select("id").single()
+  const ownId = (own as any)?.id
+  expect(ownId, "tenant A job could not be created").toBeTruthy()
+
+  const res = await request.post(`${baseUrl()}/api/jobs/delete`, {
+    headers: { Cookie: adminA!.cookie, "Content-Type": "application/json" },
+    data: { jobId: ownId },
+  })
+  expect(res.status(), await res.text()).toBe(200)
+  const { data: gone } = await service.from("jobs").select("id").eq("id", ownId).maybeSingle()
+  expect(gone).toBeNull()
+})
