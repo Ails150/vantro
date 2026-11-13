@@ -16,17 +16,6 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
 
   const { newPlan } = await request.json() as { newPlan: Plan }
-  const buyable = purchasable(newPlan)
-  if (!buyable.ok) {
-    // 503, not 400, when the plan is real but unconfigured: it is our
-    // fault, not the caller's, and a 400 hides it in the noise.
-    if (buyable.reason === 'not_configured') {
-      console.error('[billing] plan not purchasable:', buyable.detail)
-      return NextResponse.json({ error: 'That plan is temporarily unavailable. Please contact support.' }, { status: 503 })
-    }
-    return NextResponse.json({ error: 'Invalid plan', detail: buyable.detail }, { status: 400 })
-  }
-
   const service = await createServiceClient()
 
   const { data: userData } = await service
@@ -40,6 +29,20 @@ export async function POST(request: Request) {
   if (!['admin', 'superadmin'].includes(userData.role)) {
     return NextResponse.json({ error: 'Only an admin can change the plan.' }, { status: 403 })
   }
+
+  // After the role check, so a caller who may not change the plan learns
+  // nothing about which plans are configured.
+  const buyable = purchasable(newPlan)
+  if (!buyable.ok) {
+    // 503, not 400, when the plan is real but unconfigured: it is our
+    // fault, not the caller's, and a 400 hides it in the noise.
+    if (buyable.reason === 'not_configured') {
+      console.error('[billing] plan not purchasable:', buyable.detail)
+      return NextResponse.json({ error: 'That plan is temporarily unavailable. Please contact support.' }, { status: 503 })
+    }
+    return NextResponse.json({ error: 'Invalid plan', detail: buyable.detail }, { status: 400 })
+  }
+
 
   const { data: company } = await service
     .from('companies')

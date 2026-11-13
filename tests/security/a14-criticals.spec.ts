@@ -138,17 +138,26 @@ test("billing/upgrade: no plan before payment, and owners only", async ({ reques
   // Never run the admin call against a company with a live subscription: that
   // branch changes a real Stripe price.
   expect((before as any).stripe_subscription_id, "tenant A has a Stripe subscription; refusing to test billing").toBeNull()
+  const original = (before as any).plan
 
-  const foreman = await probe(TENANT_A.id, "foreman", "a14-billing-foreman")
-  const target = (before as any).plan === "payroll" ? "suite" : "payroll"
-  const f = await post(request, "/api/billing/upgrade", foreman, { newPlan: target })
-  expect(f.status(), await f.text()).toBe(403)
+  // Start from free and ask for suite, so "the plan did not change" means
+  // something. Restored whatever happens.
+  await s.from("companies").update({ plan: "free" }).eq("id", TENANT_A.id)
+  try {
+    const foreman = await probe(TENANT_A.id, "foreman", "a14-billing-foreman")
+    const f = await post(request, "/api/billing/upgrade", foreman, { newPlan: "suite" })
+    expect(f.status(), await f.text()).toBe(403)
 
-  const admin = await probe(TENANT_A.id, "admin", "a14-billing-admin")
-  const a = await post(request, "/api/billing/upgrade", admin, { newPlan: target })
-  expect([200, 503], await a.text()).toContain(a.status())
-  const { data: after } = await s.from("companies").select("plan").eq("id", TENANT_A.id).single()
-  expect((after as any).plan, "the plan changed before payment").toBe((before as any).plan)
+    const admin = await probe(TENANT_A.id, "admin", "a14-billing-admin")
+    const a = await post(request, "/api/billing/upgrade", admin, { newPlan: "suite" })
+    // 200 with a Checkout URL (unpaid, expires on its own), or 503 if suite is
+    // not configured in this environment. Either way, no plan yet.
+    expect([200, 503], await a.text()).toContain(a.status())
+    const { data: after } = await s.from("companies").select("plan").eq("id", TENANT_A.id).single()
+    expect((after as any).plan, "the plan changed before payment").toBe("free")
+  } finally {
+    await s.from("companies").update({ plan: original }).eq("id", TENANT_A.id)
+  }
 })
 
 test("join: no token for office accounts, no reactivation; new workers still join", async ({ request }) => {
